@@ -20,6 +20,8 @@
 
 #include "dart/dynamics/BodyNode.hpp"
 #include "dart/dynamics/MeshShape.hpp"
+#include "dart/math/MathTypes.hpp"
+#include "dart/proto/GUI.pb.h"
 #include "dart/server/WebsocketServer.hpp"
 
 namespace dart {
@@ -58,42 +60,66 @@ public:
       const std::shared_ptr<simulation::World>& world,
       const std::string& prefix = "world",
       bool renderForces = true,
-      bool renderForceMagnitudes = true);
+      bool renderForceMagnitudes = true,
+      const std::string& layer = "");
 
   /// This is a high-level command that creates a basis
   void renderBasis(
       s_t scale = 10.0,
       const std::string& prefix = "basis",
       const Eigen::Vector3s pos = Eigen::Vector3s::Zero(),
-      const Eigen::Vector3s euler = Eigen::Vector3s::Zero());
+      const Eigen::Vector3s euler = Eigen::Vector3s::Zero(),
+      const std::string& layer = "");
 
   /// This is a high-level command that creates/updates all the shapes in a
   /// world by calling the lower-level commands
   void renderSkeleton(
       const std::shared_ptr<dynamics::Skeleton>& skel,
       const std::string& prefix = "skel",
-      Eigen::Vector4s overrideColor = -1 * Eigen::Vector4s::Ones());
+      Eigen::Vector4s overrideColor = -1 * Eigen::Vector4s::Ones(),
+      const std::string& layer = "");
+
+  /// This is a high-level command that creates/updates all the shapes in a
+  /// world by calling the lower-level commands
+  void renderSkeletonInertiaCubes(
+      const std::shared_ptr<dynamics::Skeleton>& skel,
+      const std::string& prefix = "skel_inertia",
+      Eigen::Vector4s overrideColor = Eigen::Vector4s(0, 0, 1, 0.3),
+      const std::string& layer = "");
 
   /// This is a high-level command that renders a given trajectory as a
   /// bunch of lines in the world, one per body
   void renderTrajectoryLines(
       std::shared_ptr<simulation::World> world,
       Eigen::MatrixXs positions,
-      std::string prefix = "trajectory");
+      std::string prefix = "trajectory",
+      const std::string& layer = "");
+
+  /// This either creates or moves an arrow to have the new start and end points
+  void renderArrow(
+      Eigen::Vector3s start,
+      Eigen::Vector3s end,
+      s_t bodyRadius,
+      s_t tipRadius,
+      Eigen::Vector4s color = Eigen::Vector4s(1, 0, 0, 0.5),
+      const std::string& prefix = "arrow",
+      const std::string& layer = "");
 
   /// This is a high-level command that renders a wrench on a body node
   void renderBodyWrench(
       const dynamics::BodyNode* body,
       Eigen::Vector6s wrench,
       s_t scaleFactor = 0.1,
-      std::string prefix = "wrench");
+      std::string prefix = "wrench",
+      const std::string& layer = "");
 
   /// This renders little velocity lines starting at every vertex in the passed
   /// in body
   void renderMovingBodyNodeVertices(
       const dynamics::BodyNode* body,
       s_t scaleFactor = 0.1,
-      std::string prefix = "vert-vel");
+      std::string prefix = "vert-vel",
+      const std::string& layer = "");
 
   /// This is a high-level command that removes the lines rendering a wrench on
   /// a body node
@@ -104,6 +130,15 @@ public:
   /// and listeners
   virtual void clear();
 
+  /// Set frames per second
+  void setFramesPerSecond(int framesPerSecond);
+
+  /// This creates a layer in the web GUI
+  void createLayer(
+      std::string key,
+      const Eigen::Vector4s& color = Eigen::Vector4s(0.5, 0.5, 0.5, 1.0),
+      bool defaultShow = true);
+
   /// This creates a box in the web GUI under a specified key
   void createBox(
       std::string key,
@@ -111,6 +146,7 @@ public:
       const Eigen::Vector3s& pos,
       const Eigen::Vector3s& euler,
       const Eigen::Vector4s& color = Eigen::Vector4s(0.5, 0.5, 0.5, 1.0),
+      const std::string& layer = "",
       bool castShadows = false,
       bool receiveShadows = false);
 
@@ -120,6 +156,41 @@ public:
       s_t radius,
       const Eigen::Vector3s& pos,
       const Eigen::Vector4s& color = Eigen::Vector4s(0.5, 0.5, 0.5, 1.0),
+      const std::string& layer = "",
+      bool castShadows = false,
+      bool receiveShadows = false);
+
+  /// This creates a sphere in the web GUI under a specified key
+  void createSphere(
+      std::string key,
+      Eigen::Vector3s radii,
+      const Eigen::Vector3s& pos,
+      const Eigen::Vector4s& color = Eigen::Vector4s(0.5, 0.5, 0.5, 1.0),
+      const std::string& layer = "",
+      bool castShadows = false,
+      bool receiveShadows = false);
+
+  /// This creates a cone in the web GUI under a specified key
+  void createCone(
+      std::string key,
+      s_t radius,
+      s_t height,
+      const Eigen::Vector3s& pos,
+      const Eigen::Vector3s& euler,
+      const Eigen::Vector4s& color = Eigen::Vector4s(0.5, 0.5, 0.5, 1.0),
+      const std::string& layer = "",
+      bool castShadows = false,
+      bool receiveShadows = false);
+
+  /// This creates a cylinder in the web GUI under a specified key
+  void createCylinder(
+      std::string key,
+      s_t radius,
+      s_t height,
+      const Eigen::Vector3s& pos,
+      const Eigen::Vector3s& euler,
+      const Eigen::Vector4s& color = Eigen::Vector4s(0.5, 0.5, 0.5, 1.0),
+      const std::string& layer = "",
       bool castShadows = false,
       bool receiveShadows = false);
 
@@ -131,6 +202,7 @@ public:
       const Eigen::Vector3s& pos,
       const Eigen::Vector3s& euler,
       const Eigen::Vector4s& color = Eigen::Vector4s(0.5, 0.5, 0.5, 1.0),
+      const std::string& layer = "",
       bool castShadows = false,
       bool receiveShadows = false);
 
@@ -138,7 +210,9 @@ public:
   void createLine(
       std::string key,
       const std::vector<Eigen::Vector3s>& points,
-      const Eigen::Vector4s& color = Eigen::Vector4s(1.0, 0.5, 0.5, 1.0));
+      const Eigen::Vector4s& color = Eigen::Vector4s(1.0, 0.5, 0.5, 1.0),
+      const std::string& layer = "",
+      const std::vector<s_t>& width = std::vector<s_t>());
 
   /// This creates a mesh in the web GUI under a specified key, using raw shape
   /// data
@@ -154,6 +228,7 @@ public:
       const Eigen::Vector3s& euler,
       const Eigen::Vector3s& scale = Eigen::Vector3s::Ones(),
       const Eigen::Vector4s& color = Eigen::Vector4s(0.5, 0.5, 0.5, 1.0),
+      const std::string& layer = "",
       bool castShadows = false,
       bool receiveShadows = false);
 
@@ -167,6 +242,7 @@ public:
       const Eigen::Vector3s& euler,
       const Eigen::Vector3s& scale = Eigen::Vector3s::Ones(),
       const Eigen::Vector4s& color = Eigen::Vector4s(0.5, 0.5, 0.5, 1.0),
+      const std::string& layer = "",
       bool castShadows = false,
       bool receiveShadows = false);
 
@@ -179,6 +255,7 @@ public:
       const Eigen::Vector3s& euler,
       const Eigen::Vector3s& scale = Eigen::Vector3s::Ones(),
       const Eigen::Vector4s& color = Eigen::Vector4s(0.5, 0.5, 0.5, 1.0),
+      const std::string& layer = "",
       bool castShadows = false,
       bool receiveShadows = false);
 
@@ -222,8 +299,38 @@ public:
   /// lines.
   void setObjectScale(const std::string& key, const Eigen::Vector3s& scale);
 
-  /// This sets an object to allow mouse interaction on the GUI
-  void setObjectMouseInteractionEnabled(const std::string& key);
+  /// This sets a tooltip for the object at key.
+  void setObjectTooltip(const std::string& key, const std::string& tooltip);
+
+  /// This removes a tooltip for the object at key.
+  void deleteObjectTooltip(const std::string& key);
+
+  /// This sets a warning on a span of timesteps - only has an effect on the
+  /// replay viewer, not on a live view
+  void setSpanWarning(
+      int startTimestep,
+      int endTimestep,
+      const std::string& warningKey,
+      const std::string& warning,
+      const std::string& layer = "");
+
+  /// This sets a warning for the object at key.
+  void setObjectWarning(
+      const std::string& key,
+      const std::string& warningKey,
+      const std::string& warning,
+      const std::string& layer = "");
+
+  /// This deletes a warning for the object at key.
+  void deleteObjectWarning(
+      const std::string& key, const std::string& warningKey);
+
+  /// This sets an object to allow dragging around by the mouse on the GUI
+  void setObjectDragEnabled(const std::string& key);
+
+  /// This sets an object to allow editing the tooltip by double-clicking on the
+  /// object
+  void setObjectTooltipEditable(const std::string& key);
 
   /// This deletes an object by key
   void deleteObject(const std::string& key);
@@ -243,7 +350,8 @@ public:
       const std::string& key,
       const std::string& contents,
       const Eigen::Vector2i& fromTopLeft,
-      const Eigen::Vector2i& size);
+      const Eigen::Vector2i& size,
+      const std::string& layer = "");
 
   /// This changes the contents of text on the screen
   void setTextContents(const std::string& key, const std::string& newContents);
@@ -255,7 +363,8 @@ public:
       const std::string& label,
       const Eigen::Vector2i& fromTopLeft,
       const Eigen::Vector2i& size,
-      std::function<void()> onClick);
+      std::function<void()> onClick,
+      const std::string& layer = "");
 
   /// This changes the contents of text on the screen
   void setButtonLabel(const std::string& key, const std::string& newLabel);
@@ -270,7 +379,8 @@ public:
       s_t value,
       bool onlyInts,
       bool horizontal,
-      std::function<void(s_t)> onChange);
+      std::function<void(s_t)> onChange,
+      const std::string& layer = "");
 
   /// This changes the contents of text on the screen
   void setSliderValue(const std::string& key, s_t value);
@@ -292,7 +402,8 @@ public:
       const std::vector<s_t>& ys,
       s_t minY,
       s_t maxY,
-      const std::string& type);
+      const std::string& type,
+      const std::string& layer = "");
 
   /// This changes the contents of a plot, along with its display limits
   void setPlotData(
@@ -304,40 +415,6 @@ public:
       s_t minY,
       s_t maxY);
 
-  /*
-export type CreateRichPlotCommand = {
-  type: "create_rich_plot";
-  key: string;
-  from_top_left: number[];
-  size: number[];
-  min_x: number;
-  max_x: number;
-  min_y: number;
-  max_y: number;
-  title: string;
-  x_axis_label: string;
-  y_axis_label: string;
-};
-
-export type SetRichPlotData = {
-  type: "set_rich_plot_data";
-  key: string;
-  name: string;
-  color: string;
-  xs: number[];
-  ys: number[];
-  plot_type: "line" | "scatter";
-};
-
-export type SetRichPlotBounds = {
-  type: "set_rich_plot_bounds";
-  key: string;
-  min_x: number;
-  max_x: number;
-  min_y: number;
-  max_y: number;
-};
-  */
   /// This creates a rich plot with axis labels, a title, tickmarks, and
   /// multiple simultaneous lines
   void createRichPlot(
@@ -350,7 +427,8 @@ export type SetRichPlotBounds = {
       s_t maxY,
       const std::string& title,
       const std::string& xAxisLabel,
-      const std::string& yAxisLabel);
+      const std::string& yAxisLabel,
+      const std::string& layer = "");
 
   /// This sets a single data stream for a rich plot. `name` should be human
   /// readable and unique. You can overwrite data by using the same `name` with
@@ -377,19 +455,39 @@ export type SetRichPlotBounds = {
   /// This deletes a UI element by key
   void deleteUIElement(const std::string& key);
 
+  /// This gets an integer code for a string
+  int getStringCode(const std::string& key);
+
+  /// This gets a string code for an integer
+  std::string getCodeString(int code);
+
 protected:
   // protects the buffered JSON message (mJson) from getting
   // corrupted if we queue messages while trying to flush()
   std::recursive_mutex globalMutex;
-  std::recursive_mutex mJsonMutex;
+  std::recursive_mutex mProtoMutex;
   int mMessagesQueued;
-  std::stringstream mJson;
+  proto::CommandList mCommandList;
+  std::string mCommandListOutputBuffer;
   // This is a list of all the objects with mouse interaction enabled
-  std::unordered_set<std::string> mMouseInteractionEnabled;
+  std::unordered_set<std::string> mDragEnabled;
+  std::unordered_set<std::string> mTooltipEditable;
+
+  std::unordered_map<std::string, int> mStringCodes;
+  std::unordered_map<int, std::string> mCodeStrings;
+
+  struct Layer
+  {
+    std::string key;
+    Eigen::Vector4s color;
+    bool defaultShow;
+  };
+  std::unordered_map<std::string, Layer> mLayers;
 
   struct Box
   {
     std::string key;
+    std::string layer;
     Eigen::Vector3s size;
     Eigen::Vector3s pos;
     Eigen::Vector3s euler;
@@ -401,7 +499,8 @@ protected:
   struct Sphere
   {
     std::string key;
-    s_t radius;
+    std::string layer;
+    Eigen::Vector3s radii;
     Eigen::Vector3s pos;
     Eigen::Vector4s color;
     bool castShadows;
@@ -409,9 +508,38 @@ protected:
   };
   std::unordered_map<std::string, Sphere> mSpheres;
 
+  struct Cone
+  {
+    std::string key;
+    std::string layer;
+    s_t radius;
+    s_t height;
+    Eigen::Vector3s pos;
+    Eigen::Vector3s euler;
+    Eigen::Vector4s color;
+    bool castShadows;
+    bool receiveShadows;
+  };
+  std::unordered_map<std::string, Cone> mCones;
+
+  struct Cylinder
+  {
+    std::string key;
+    std::string layer;
+    s_t radius;
+    s_t height;
+    Eigen::Vector3s pos;
+    Eigen::Vector3s euler;
+    Eigen::Vector4s color;
+    bool castShadows;
+    bool receiveShadows;
+  };
+  std::unordered_map<std::string, Cylinder> mCylinders;
+
   struct Capsule
   {
     std::string key;
+    std::string layer;
     s_t radius;
     s_t height;
     Eigen::Vector3s pos;
@@ -424,14 +552,43 @@ protected:
   struct Line
   {
     std::string key;
+    std::string layer;
     std::vector<Eigen::Vector3s> points;
     Eigen::Vector4s color;
+    std::vector<s_t> width;
   };
   std::unordered_map<std::string, Line> mLines;
+
+  struct Tooltip
+  {
+    std::string key;
+    std::string tooltip;
+  };
+  std::unordered_map<std::string, Tooltip> mTooltips;
+
+  struct ObjectWarning
+  {
+    std::string key;
+    std::string warningKey;
+    std::string warning;
+    std::string layer;
+  };
+  std::unordered_map<std::string, ObjectWarning> mObjectWarnings;
+
+  struct SpanWarning
+  {
+    std::string warningKey;
+    std::string warning;
+    std::string layer;
+    int startTimestep;
+    int endTimestep;
+  };
+  std::unordered_map<std::string, SpanWarning> mSpanWarnings;
 
   struct Mesh
   {
     std::string key;
+    std::string layer;
     std::vector<Eigen::Vector3s> vertices;
     std::vector<Eigen::Vector3s> vertexNormals;
     std::vector<Eigen::Vector3i> faces;
@@ -457,6 +614,7 @@ protected:
   struct Text
   {
     std::string key;
+    std::string layer;
     std::string contents;
     Eigen::Vector2i fromTopLeft;
     Eigen::Vector2i size;
@@ -466,6 +624,7 @@ protected:
   struct Button
   {
     std::string key;
+    std::string layer;
     std::string label;
     Eigen::Vector2i fromTopLeft;
     Eigen::Vector2i size;
@@ -476,6 +635,7 @@ protected:
   struct Slider
   {
     std::string key;
+    std::string layer;
     Eigen::Vector2i fromTopLeft;
     Eigen::Vector2i size;
     s_t min;
@@ -490,6 +650,7 @@ protected:
   struct Plot
   {
     std::string key;
+    std::string layer;
     Eigen::Vector2i fromTopLeft;
     Eigen::Vector2i size;
     std::vector<s_t> xs;
@@ -513,6 +674,7 @@ protected:
   struct RichPlot
   {
     std::string key;
+    std::string layer;
     Eigen::Vector2i fromTopLeft;
     Eigen::Vector2i size;
     s_t minX;
@@ -526,23 +688,33 @@ protected:
   };
   std::unordered_map<std::string, RichPlot> mRichPlots;
 
-  void queueCommand(std::function<void(std::stringstream&)> writeCommand);
+  void queueCommand(std::function<void(proto::CommandList&)> writeCommand);
 
-  void encodeCreateBox(std::stringstream& json, Box& box);
-  void encodeCreateSphere(std::stringstream& json, Sphere& sphere);
-  void encodeCreateCapsule(std::stringstream& json, Capsule& capsule);
-  void encodeCreateLine(std::stringstream& json, Line& line);
-  void encodeCreateMesh(std::stringstream& json, Mesh& mesh);
-  void encodeCreateTexture(std::stringstream& json, Texture& texture);
-  void encodeEnableMouseInteraction(
-      std::stringstream& json, const std::string& key);
-  void encodeCreateText(std::stringstream& json, Text& text);
-  void encodeCreateButton(std::stringstream& json, Button& button);
-  void encodeCreateSlider(std::stringstream& json, Slider& slider);
-  void encodeCreatePlot(std::stringstream& json, Plot& plot);
-  void encodeCreateRichPlot(std::stringstream& json, RichPlot& plot);
+  void encodeSetFramesPerSecond(proto::CommandList& list, int framesPerSecond);
+  void encodeCreateLayer(proto::CommandList& list, Layer& layer);
+  void encodeCreateBox(proto::CommandList& list, Box& box);
+  void encodeCreateSphere(proto::CommandList& list, Sphere& sphere);
+  void encodeCreateCone(proto::CommandList& list, Cone& cone);
+  void encodeCreateCylinder(proto::CommandList& list, Cylinder& cylinder);
+  void encodeCreateCapsule(proto::CommandList& list, Capsule& capsule);
+  void encodeCreateLine(proto::CommandList& list, Line& line);
+  void encodeCreateMesh(proto::CommandList& list, Mesh& mesh);
+  void encodeSetTooltip(proto::CommandList& list, Tooltip& tooltip);
+  void encodeSetObjectWarning(proto::CommandList& list, ObjectWarning& tooltip);
+  void encodeSetSpanWarning(proto::CommandList& list, SpanWarning& tooltip);
+  void encodeCreateTexture(proto::CommandList& list, Texture& texture);
+  void encodeEnableDrag(proto::CommandList& list, const std::string& key);
+  void encodeEnableEditTooltip(
+      proto::CommandList& list, const std::string& key);
+  void encodeCreateText(proto::CommandList& list, Text& text);
+  void encodeCreateButton(proto::CommandList& list, Button& button);
+  void encodeCreateSlider(proto::CommandList& list, Slider& slider);
+  void encodeCreatePlot(proto::CommandList& list, Plot& plot);
+  void encodeCreateRichPlot(proto::CommandList& list, RichPlot& plot);
   void encodeSetRichPlotData(
-      std::stringstream& json, const std::string& plotKey, const RichPlotData& data);
+      proto::CommandList& list,
+      const std::string& plotKey,
+      const RichPlotData& data);
 };
 
 } // namespace server

@@ -63,10 +63,21 @@ namespace dynamics {
 typedef std::map<std::string, std::pair<dynamics::BodyNode*, Eigen::Vector3s>>
     MarkerMap;
 
+typedef std::map<std::string, std::pair<dynamics::BodyNode*, Eigen::Isometry3s>>
+    SensorMap;
+
 struct BodyScaleGroup
 {
   std::vector<dynamics::BodyNode*> nodes;
+  std::vector<Eigen::Vector3s> flipAxis;
   bool uniformScaling;
+};
+
+struct BodyScaleGroupAndIndex
+{
+  struct BodyScaleGroup& group;
+  int axis;
+  BodyScaleGroupAndIndex(BodyScaleGroup& group, int axis);
 };
 
 /// class Skeleton
@@ -212,6 +223,12 @@ public:
 
   /// Creates and returns a clone of this Skeleton.
   SkeletonPtr cloneSkeleton(const std::string& cloneName) const;
+
+  /// Creates and returns a clone of this Skeleton, where we merge the provided
+  /// bodies together and approximate the CustomJoints with simpler joint types.
+  SkeletonPtr simplifySkeleton(
+      const std::string& cloneName,
+      std::map<std::string, std::string> mergeBodiesInto) const;
 
   // Documentation inherited
   MetaSkeletonPtr cloneMetaSkeleton(
@@ -756,6 +773,10 @@ public:
   Eigen::VectorXs finiteDifferenceGradientOfHeightWrtBodyScales(
       Eigen::VectorXs pose, Eigen::Vector3s up = Eigen::Vector3s::UnitY());
 
+  /// This computes the gradient of the height
+  Eigen::VectorXs getGradientOfHeightWrtGroupScales(
+      Eigen::VectorXs pose, Eigen::Vector3s up = Eigen::Vector3s::UnitY());
+
   /// This returns a marker set with at least one marker in it, that each
   /// represents the lowest point on the body, measure by the `up` vector, in
   /// the specified position. If there are no ties, this will be of length 1. If
@@ -790,6 +811,9 @@ public:
 
   /// This gets a random pose that's valid within joint limits
   Eigen::VectorXs getRandomPose();
+
+  /// This gets a random velocity that's valid within joint limits
+  Eigen::VectorXs getRandomVelocity();
 
   /// This gets a random pose that's valid within joint limits, but only changes
   /// the specified joints. All unspecified joints are left as 0.
@@ -875,16 +899,19 @@ public:
   // section of this paper.
   Eigen::MatrixXs getLinkAkMatrixIndex(size_t index);
 
-  // This returns a jacobian matrix of velocity connect between world and joint coordinate
+  // This returns a jacobian matrix of velocity connect between world and joint
+  // coordinate
   Eigen::MatrixXs getLinkJvkMatrixIndex(size_t index);
 
-  // This returns a jacobian matrix of angular velocity connect between world and joint coordinate
+  // This returns a jacobian matrix of angular velocity connect between world
+  // and joint coordinate
   Eigen::MatrixXs getLinkJwkMatrixIndex(size_t index);
 
   // This returns a rotation matrix of body node wrt to world coordinate
   Eigen::Matrix3s getLinkRMatrixIndex(size_t index);
 
-  // This returns a jacobian matrix of angular velocity connect between world and joint coordiante
+  // This returns a jacobian matrix of angular velocity connect between world
+  // and joint coordiante
   Eigen::MatrixXs getLinkLocalJwkMatrixIndex(size_t index);
 
   // Sets the upper limits of all the joints from a single vector
@@ -917,14 +944,14 @@ public:
   // skeleton concatenated together
   void setLinkCOMs(Eigen::VectorXs coms);
 
-  // This set COM of a particular body node specified by index. 
+  // This set COM of a particular body node specified by index.
   void setLinkCOMIndex(Eigen::Vector3s com, size_t index);
 
   // This set all the diagonal term of moment of inertias.
   void setLinkDiagIs(Eigen::VectorXs mois);
 
-  // This set diagonal term of moment of inertia of a particular 
-  // body node specified by index 
+  // This set diagonal term of moment of inertia of a particular
+  // body node specified by index
   void setLinkDiagIIndex(Eigen::Vector3s com, size_t index);
 
   // This sets all the inertia moment-of-inertia paremeters for all the links in
@@ -950,6 +977,46 @@ public:
   // they're currently outside it.
   void clampPositionsToLimits();
 
+  /// There is an annoying tendency for custom joints to encode the linear
+  /// offset of the bone in their custom functions. We don't want that, so we
+  /// want to move any relative transform caused by custom functions into the
+  /// parent transform.
+  void zeroTranslationInCustomFunctions();
+
+  //----------------------------------------------------------------------------
+  // Utilities for featurizing diverse skeletons consistently
+  //----------------------------------------------------------------------------
+
+  /// This is a utility that will find a body with this mesh attached, if one
+  /// exists, and also the transform which relates the geometry frame to the
+  /// body frame.
+  ///
+  /// WARNING: Do not expose this to Python, because the pybind11 ownership
+  /// scheme can't handle mixed ownership, and it'll try to free the BodyNode
+  /// pointer when the pair goes out of use in Python, which is bad. Expose the
+  /// below methods instead.
+  std::pair<dynamics::BodyNode*, Eigen::Isometry3s>* getBodyAndTransformForMesh(
+      std::string meshFileName);
+
+  /// This is a utility that will find a body with this mesh attached, if one
+  /// exists.
+  dynamics::BodyNode* getBodyForMesh(std::string meshFileName);
+
+  /// This is a utility that will transform an isometry in the frame of a mesh
+  /// to a transform in the parent body's frame.
+  Eigen::Isometry3s getTransformFromMeshToParentBody(
+      std::string meshFileName, Eigen::Isometry3s relativeToGeometry);
+
+  /// This is a utility that will transform a translation in the frame of a mesh
+  /// to a translation in the parent body's frame.
+  Eigen::Vector3s getTranslationFromMeshToParentBody(
+      std::string meshFileName, Eigen::Vector3s relativeToGeometry);
+
+  /// This is a utility that will transform a rotation in the frame of a mesh
+  /// to a rotation in the parent body's frame.
+  Eigen::Matrix3s getRotationFromMeshToParentBody(
+      std::string meshFileName, Eigen::Matrix3s relativeToGeometry);
+
   //----------------------------------------------------------------------------
   // Constraining links to have the same scale
   //----------------------------------------------------------------------------
@@ -965,9 +1032,16 @@ public:
   /// This returns the index of the group that this body node corresponds to
   int getScaleGroupIndex(dynamics::BodyNode* bodyNode);
 
+  /// This returns the axis flips of this body in the scale group that this body
+  /// node corresponds to
+  Eigen::Vector3s getScaleGroupFlips(dynamics::BodyNode* bodyNode);
+
   /// This takes two scale groups and merges their contents into a single group.
   /// After this operation, there is one fewer scale group.
   void mergeScaleGroups(dynamics::BodyNode* a, dynamics::BodyNode* b);
+
+  /// The scale group axis flips
+  void autodetectScaleGroupAxisFlips(int symmetryAxis);
 
   /// This finds all the pairs of bodies that share the same prefix, and
   /// different suffixes (for example "a_body_l" and "a_body_r", sharing "_l"
@@ -975,9 +1049,17 @@ public:
   void autogroupSymmetricSuffixes(
       std::string leftSuffix = "_l", std::string rightSuffix = "_r");
 
+  /// This finds all the pairs of bodies that share the same suffix, and
+  /// different prefixes (for example "ulna_l" and "radius_l", sharing "_l")
+  void autogroupSymmetricPrefixes(
+      std::string firstPrefix = "ulna", std::string secondPrefix = "radius");
+
   /// This means that we'll scale a group along all three axis equally. This
   /// constrains scaling.
   void setScaleGroupUniformScaling(dynamics::BodyNode* a, bool uniform = true);
+
+  /// This returns the number of scale groups
+  int getNumScaleGroups();
 
   /// This returns the dimension of the scale group
   int getScaleGroupDim(int groupIndex);
@@ -994,6 +1076,36 @@ public:
 
   /// This returns the dimensions of the grouped scale vector.
   int getGroupScaleDim();
+
+  /// This precomputes the array of group scale indices that we need for
+  /// getGroupScaleIndexDetails()
+  void updateGroupScaleIndices();
+
+  /// This grabs the details for what a group scale index corresponds to
+  const BodyScaleGroupAndIndex& getGroupScaleIndexDetails(int index) const;
+
+  /// This produces a human-readable description of the group scale vector index
+  std::string debugGroupScaleIndex(int groupIdx);
+
+  /// This returns the vector relating changing a group scale parameter to the
+  /// location of the center of a body.
+  Eigen::Vector3s getGroupScaleMovementOnBodyInWorldSpace(
+      int groupIdx, int bodyIdx);
+
+  /// This returns the vector relating changing a group scale parameter to the
+  /// location of the center of a body.
+  Eigen::Vector3s finiteDifferenceGroupScaleMovementOnBodyInWorldSpace(
+      int groupIdx, int bodyIdx);
+
+  /// This returns the vector relating changing a group scale parameter to the
+  /// location of the center of a joint.
+  Eigen::Vector3s getGroupScaleMovementOnJointInWorldSpace(
+      int groupIdx, int bodyIdx);
+
+  /// This returns the vector relating changing a group scale parameter to the
+  /// location of the center of a joint.
+  Eigen::Vector3s finiteDifferenceGroupScaleMovementOnJointInWorldSpace(
+      int groupIdx, int bodyIdx);
 
   /// This sets the scales of all the body nodes according to their group
   /// membership. The `scale` vector is expected to be the same size as the
@@ -1015,6 +1127,134 @@ public:
   /// This returns the upper bound values for each index in the group scales
   /// vector
   Eigen::VectorXs getGroupScalesLowerBound();
+
+  /// This gets the masses of each scale group, concatenated
+  Eigen::VectorXs getGroupMasses();
+
+  /// This sets the masses of each scale group, concatenated
+  void setGroupMasses(Eigen::VectorXs masses);
+
+  /// This gets the upper bound for each group's mass, concatenated
+  Eigen::VectorXs getGroupMassesUpperBound();
+
+  /// This gets the lower bound for each group's mass, concatenated
+  Eigen::VectorXs getGroupMassesLowerBound();
+
+  /// This gets a vector of [(1/m), p_0, ..., p_n], where the first entry is the
+  /// inverse of the total mass of the skeleton, and all subsequent entries are
+  /// the percentages of the total for each link mass.
+  Eigen::VectorXs getLinearizedMasses();
+
+  /// This sets a vector of [(1/m), p_0, ..., p_n], where the first entry is the
+  /// inverse of the total mass of the skeleton, and all subsequent entries are
+  /// the percentages of the total for each link mass, and maps back into the
+  /// mass list.
+  void setLinearizedMasses(Eigen::VectorXs masses);
+
+  /// This gets the upper bound for the linearized mass, concatenated
+  Eigen::VectorXs getLinearizedMassesUpperBound();
+
+  /// This gets the lower bound for the linearized mass, concatenated
+  Eigen::VectorXs getLinearizedMassesLowerBound();
+
+  /// This maps a linearized masses vector to an "unnormalized COM." This means
+  /// that the percentages in the linearized mass vector need not add to 1.
+  /// Relaxing this constraint, and then applying it later in the optimizer, can
+  /// make certain dynamics problems into linear.
+  Eigen::Vector3s getUnnormalizedCOM(Eigen::VectorXs linearizedMasses);
+
+  /// This maps a linearized masses vector to an "unnormalized COM
+  /// acceleration." This means that the percentages in the linearized mass
+  /// vector need not add to 1. Relaxing this constraint, and then applying it
+  /// later in the optimizer, can make certain dynamics problems into linear.
+  Eigen::Vector3s getUnnormalizedCOMAcceleration(
+      Eigen::VectorXs linearizedMasses);
+
+  /// This maps a linearized masses vector to an "unnormalized COM
+  /// acceleration." This means that the percentages in the linearized mass
+  /// vector need not add to 1. Relaxing this constraint, and then applying it
+  /// later in the optimizer, can make certain dynamics problems into linear.
+  Eigen::Vector3s getUnnormalizedCOMFDAcceleration(
+      Eigen::VectorXs linearizedMasses);
+
+  /// This maps to the difference for unnormalized (analytical COM acc - fd COM
+  /// acc)
+  Eigen::Vector3s getUnnormalizedCOMAccelerationOffset(
+      Eigen::VectorXs linearizedMasses);
+
+  /// This gets the analytical jacobian relating the linearized masses to link
+  /// masses
+  Eigen::MatrixXs getGroupMassesJacobianWrtLinearizedMasses();
+
+  /// This gets the finite difference'd jacobian relating the linearized masses
+  /// to link masses
+  Eigen::MatrixXs finiteDifferenceGroupMassesJacobianWrtLinearizedMasses();
+
+  /// This gets the analytical jacobian relating changes in the linearized
+  /// masses to changes in the COM position, neglecting normalization to
+  /// guarantee that total percentages sum to 1.0
+  Eigen::MatrixXs getUnnormalizedCOMJacobianWrtLinearizedMasses();
+
+  /// This gets the analytical jacobian relating changes in the linearized
+  /// masses to changes in the COM position, neglecting normalization to
+  /// guarantee that total percentages sum to 1.0
+  Eigen::MatrixXs finiteDifferenceUnnormalizedCOMJacobianWrtLinearizedMasses();
+
+  /// This relates changes to the linearized masses to changes to the finite
+  /// difference'd formula for COM acceleration, (c[t-1] - 2*c[t] +
+  /// c[t+1])/(dt*dt)
+  Eigen::MatrixXs getUnnormalizedCOMFDAccJacobianWrtLinearizedMasses();
+
+  /// This relates changes to the linearized masses to changes to the finite
+  /// difference'd formula for COM acceleration, (c[t-1] - 2*c[t] +
+  /// c[t+1])/(dt*dt)
+  Eigen::MatrixXs
+  finiteDifferenceUnnormalizedCOMFDAccJacobianWrtLinearizedMasses();
+
+  /// This relates changes to the linearized masses to changes to the analytical
+  /// formula for COM acceleration
+  Eigen::MatrixXs getUnnormalizedCOMAnalyticalAccJacobianWrtLinearizedMasses();
+
+  /// This relates changes to the linearized masses to changes to the analytical
+  /// formula for COM acceleration
+  Eigen::MatrixXs
+  finiteDifferenceUnnormalizedCOMAnalyticalAccJacobianWrtLinearizedMasses();
+
+  /// This relates changes to the linearized masses to changes in the
+  /// unnormalized (analytical COM acc - fd COM acc) quantity.
+  Eigen::MatrixXs
+  getUnnormalizedCOMAccelerationOffsetJacobianWrtLinearizedMasses();
+
+  /// This relates changes to the linearized masses to changes in the
+  /// unnormalized (analytical COM acc - fd COM acc) quantity.
+  Eigen::MatrixXs
+  finiteDifferenceUnnormalizedCOMAccelerationOffsetJacobianWrtLinearizedMasses();
+
+  /// This gets the COMs of each scale group, concatenated
+  Eigen::VectorXs getGroupCOMs();
+
+  /// This gets the upper bound for each axis of each group's COM, concatenated
+  Eigen::VectorXs getGroupCOMUpperBound();
+
+  /// This gets the lower bound for each axis of each group's COM, concatenated
+  Eigen::VectorXs getGroupCOMLowerBound();
+
+  /// This sets the COMs of each scale group, concatenated
+  void setGroupCOMs(Eigen::VectorXs coms);
+
+  /// This gets the Inertias of each scale group (the 6 vector), concatenated
+  Eigen::VectorXs getGroupInertias();
+
+  /// This sets the Inertias of each scale group (the 6 vector), concatenated
+  void setGroupInertias(Eigen::VectorXs inertias);
+
+  /// This gets the upper bound for each axis of each group's inertias,
+  /// concatenated
+  Eigen::VectorXs getGroupInertiasUpperBound();
+
+  /// This gets the lower bound for each axis of each group's inertias,
+  /// concatenated
+  Eigen::VectorXs getGroupInertiasLowerBound();
 
   /// This is a general purpose utility to convert a Gradient wrt Body scales to
   /// one wrt Group scales
@@ -1124,6 +1364,13 @@ public:
   Eigen::VectorXs getJointWorldPositions(
       const std::vector<dynamics::Joint*>& joints) const;
 
+  /// This returns the world position of a joint
+  Eigen::Vector3s getJointWorldPosition(int idx) const;
+
+  /// This returns a map with the world positions of each joint, keyed by joint
+  /// name
+  std::map<std::string, Eigen::Vector3s> getJointWorldPositionsMap() const;
+
   /// This returns the concatenated 3-vectors for world angle of each joint's
   /// child space in 3D world space, for the registered joints.
   Eigen::VectorXs getJointWorldAngles(
@@ -1159,6 +1406,99 @@ public:
   /// to changes in source joint world positions.
   Eigen::MatrixXs finiteDifferenceJointWorldPositionsJacobianWrtBodyScales(
       const std::vector<dynamics::Joint*>& joints);
+
+  /// This returns a score for a force field, which runs a simple non-linear
+  /// function over the joint distance
+  s_t getJointForceFieldToOtherJoints(
+      const std::vector<dynamics::Joint*>& joints,
+      int jointIndex,
+      s_t barrierDistance,
+      s_t softness);
+
+  /// This returns a score for a force field, which runs a simple non-linear
+  /// function over the joint distance
+  Eigen::VectorXs getJointForceFieldToOtherJointsGradient(
+      const std::vector<dynamics::Joint*>& joints,
+      int jointIndex,
+      s_t barrierDistance,
+      s_t softness,
+      neural::WithRespectTo* wrt);
+
+  /// This returns a score for a force field, which runs a simple non-linear
+  /// function over the joint distance
+  Eigen::VectorXs finiteDifferenceJointForceFieldToOtherJointsGradient(
+      const std::vector<dynamics::Joint*>& joints,
+      int jointIndex,
+      s_t barrierDistance,
+      s_t softness,
+      neural::WithRespectTo* wrt);
+
+  /// This returns a score for a force field, which runs a simple non-linear
+  /// function over the joint distance with respect to body scales, which for
+  /// historical reasons is not supported in the neural::WithRespectTo API.
+  /// TODO: correct that
+  Eigen::VectorXs getJointForceFieldToOtherJointsGradientWrtBodyScales(
+      const std::vector<dynamics::Joint*>& joints,
+      int jointIndex,
+      s_t barrierDistance,
+      s_t softness);
+
+  /// This returns a score for a force field, which runs a simple non-linear
+  /// function over the joint distance with respect to body scales, which for
+  /// historical reasons is not supported in the neural::WithRespectTo API.
+  /// TODO: correct that
+  Eigen::VectorXs
+  finiteDifferenceJointForceFieldToOtherJointsGradientWrtBodyScales(
+      const std::vector<dynamics::Joint*>& joints,
+      int jointIndex,
+      s_t barrierDistance,
+      s_t softness);
+
+  /// This returns a vector of the distance to all joints after the joint
+  Eigen::VectorXs getJointDistanceToOtherJoints(
+      const std::vector<dynamics::Joint*>& joints, int jointIndex);
+
+  /// This gets the Jacobian relating changes in the joint world positions
+  /// (IMPORTANT: NOT JOINT ANGLE - physical position of joint centers in the
+  /// world) to the changes in the joint distance measurement vector for joint
+  /// `jointIndex`.
+  Eigen::MatrixXs getJointDistanceToOtherJointsJacobianWrtJointWorldPositions(
+      const std::vector<dynamics::Joint*>& joints, int jointIndex);
+
+  /// This gets the Jacobian relating changes in the joint world positions
+  /// (IMPORTANT: NOT JOINT ANGLE - physical position of joint centers in the
+  /// world) to the changes in the joint distance measurement vector for joint
+  /// `jointIndex`.
+  Eigen::MatrixXs
+  finiteDifferenceJointDistanceToOtherJointsJacobianWrtJointWorldPositions(
+      const std::vector<dynamics::Joint*>& joints, int jointIndex);
+
+  /// This returns a Jacobian of the distance to every joint in the body with
+  /// respect to WRT
+  Eigen::MatrixXs getJointDistanceToOtherJointsJacobianWrt(
+      const std::vector<dynamics::Joint*>& joints,
+      int jointIndex,
+      neural::WithRespectTo* wrt);
+
+  /// This returns a Jacobian of the distance to every joint in the body with
+  /// respect to WRT
+  Eigen::MatrixXs finiteDifferenceJointDistanceToOtherJointsJacobianWrt(
+      const std::vector<dynamics::Joint*>& joints,
+      int jointIndex,
+      neural::WithRespectTo* wrt);
+
+  /// This returns a Jacobian of the distance to every joint in the body with
+  /// respect to body scales, which for historical reasons is not supported in
+  /// the neural::WithRespectTo API. TODO: correct that
+  Eigen::MatrixXs getJointDistanceToOtherJointsJacobianWrtBodyScales(
+      const std::vector<dynamics::Joint*>& joints, int jointIndex);
+
+  /// This returns a Jacobian of the distance to every joint in the body with
+  /// respect to body scales, which for historical reasons is not supported in
+  /// the neural::WithRespectTo API. TODO: correct that
+  Eigen::MatrixXs
+  finiteDifferenceJointDistanceToOtherJointsJacobianWrtBodyScales(
+      const std::vector<dynamics::Joint*>& joints, int jointIndex);
 
   /// These are a set of bodies, and offsets in local body space where markers
   /// are mounted on the body
@@ -1275,6 +1615,22 @@ public:
       int axis,
       const Eigen::MatrixXs& markerWrtScaleJac);
 
+  Eigen::MatrixXs scratch(
+      const std::vector<std::pair<dynamics::BodyNode*, Eigen::Vector3s>>&
+          markers);
+
+  Eigen::MatrixXs scratchAnalytical(
+      const std::vector<std::pair<dynamics::BodyNode*, Eigen::Vector3s>>&
+          markers,
+      int index,
+      int axis);
+
+  Eigen::MatrixXs scratchFd(
+      const std::vector<std::pair<dynamics::BodyNode*, Eigen::Vector3s>>&
+          markers,
+      int index,
+      int axis);
+
   /// This gets the derivative of the Jacobian of the markers wrt joint
   /// positions, with respect to a single body scaling
   Eigen::MatrixXs
@@ -1352,6 +1708,103 @@ public:
       bool scaleBodies = false,
       math::IKConfig config = math::IKConfig());
 
+  /// These are a set of bodies, and offsets in local body space where gyros
+  /// are mounted on the body
+  std::map<std::string, Eigen::Vector3s> getGyroMapReadings(
+      const SensorMap& gyros);
+
+  /// These are a set of bodies, and offsets in local body space where
+  /// accelerometers are mounted on the body
+  std::map<std::string, Eigen::Vector3s> getAccMapReadings(
+      const SensorMap& accs);
+
+  /// This returns the world positions and orientations of the sensors
+  std::map<std::string, Eigen::Isometry3s> getSensorWorldPositions(
+      const SensorMap& sensors);
+
+  /// This converts markers from a source skeleton to the current, doing a
+  /// simple mapping based on body node names. Any markers that don't find a
+  /// body node in the current skeleton with the same name are dropped.
+  SensorMap convertSensorMap(
+      const SensorMap& sensorMap, bool warnOnDrop = true);
+
+  /// These are a set of bodies, and offsets in local body space where gyros
+  /// are mounted on the body
+  Eigen::VectorXs getGyroReadings(
+      const std::vector<std::pair<dynamics::BodyNode*, Eigen::Isometry3s>>&
+          gyros);
+
+  /// This returns the Jacobian relating changes in joint
+  /// positions to changes in gyro readings
+  Eigen::MatrixXs getGyroReadingsJacobianWrt(
+      const std::vector<std::pair<dynamics::BodyNode*, Eigen::Isometry3s>>&
+          gyros,
+      neural::WithRespectTo* wrt);
+
+  /// This returns the Jacobian relating changes in joint
+  /// positions to changes in gyro readings
+  Eigen::MatrixXs finiteDifferenceGyroReadingsJacobianWrt(
+      const std::vector<std::pair<dynamics::BodyNode*, Eigen::Isometry3s>>&
+          gyros,
+      neural::WithRespectTo* wrt);
+
+  /// These are a set of bodies, and offsets in local body space where accs
+  /// are mounted on the body
+  Eigen::VectorXs getAccelerometerReadings(
+      const std::vector<std::pair<dynamics::BodyNode*, Eigen::Isometry3s>>&
+          accs);
+
+  /// This returns the Jacobian relating changes in joint
+  /// positions to changes in acc readings
+  Eigen::MatrixXs getAccelerometerReadingsJacobianWrt(
+      const std::vector<std::pair<dynamics::BodyNode*, Eigen::Isometry3s>>&
+          accs,
+      neural::WithRespectTo* wrt);
+
+  /// This returns the Jacobian relating changes in joint
+  /// positions to changes in acc readings
+  Eigen::MatrixXs finiteDifferenceAccelerometerReadingsJacobianWrt(
+      const std::vector<std::pair<dynamics::BodyNode*, Eigen::Isometry3s>>&
+          accs,
+      neural::WithRespectTo* wrt);
+
+  /// These are a set of bodies, and offsets in local body space where
+  /// magnetometers are mounted on the body
+  Eigen::VectorXs getMagnetometerReadings(
+      const std::vector<std::pair<dynamics::BodyNode*, Eigen::Isometry3s>>&
+          mags,
+      Eigen::Vector3s magneticField);
+
+  /// This returns the Jacobian relating changes in joint
+  /// positions to changes in gyro readings
+  Eigen::MatrixXs getMagnetometerReadingsJacobianWrt(
+      const std::vector<std::pair<dynamics::BodyNode*, Eigen::Isometry3s>>&
+          mags,
+      Eigen::Vector3s magneticField,
+      neural::WithRespectTo* wrt);
+
+  /// This returns the Jacobian relating changes in joint
+  /// positions to changes in gyro readings
+  Eigen::MatrixXs finiteDifferenceMagnetometerReadingsJacobianWrt(
+      const std::vector<std::pair<dynamics::BodyNode*, Eigen::Isometry3s>>&
+          mags,
+      Eigen::Vector3s magneticField,
+      neural::WithRespectTo* wrt);
+
+  /// This returns the Jacobian relating changes in magnetic field to
+  /// changes in magnetometer readings
+  Eigen::MatrixXs getMagnetometerReadingsJacobianWrtMagneticField(
+      const std::vector<std::pair<dynamics::BodyNode*, Eigen::Isometry3s>>&
+          mags,
+      Eigen::Vector3s magneticField);
+
+  /// This returns the Jacobian relating changes in magnetic field to
+  /// changes in magnetometer readings
+  Eigen::MatrixXs finiteDifferenceMagnetometerReadingsJacobianWrtMagneticField(
+      const std::vector<std::pair<dynamics::BodyNode*, Eigen::Isometry3s>>&
+          mags,
+      Eigen::Vector3s magneticField);
+
   //----------------------------------------------------------------------------
   // Handling anthropometric measurements
   //----------------------------------------------------------------------------
@@ -1398,6 +1851,106 @@ public:
       Eigen::Vector3s axis);
 
   //----------------------------------------------------------------------------
+  // Handling translation of velocities and accelerations into body space
+  //----------------------------------------------------------------------------
+
+  /// This returns the spatial velocities (6 vecs) of the bodies each in local
+  /// body space, concatenated
+  Eigen::VectorXs getBodyLocalVelocities();
+
+  /// This returns the spatial accelerations (6 vecs) of the bodies in each in
+  /// local body space, concatenated
+  Eigen::VectorXs getBodyLocalAccelerations();
+
+  /// This returns the linear accelerations due to gravity (3 vecs) of the
+  /// bodies in each in local body space, concatenated
+  Eigen::VectorXs getBodyLocalGravityVectors();
+
+  /// This computes the jacobian of the local velocities for each body with
+  /// respect to `wrt`
+  Eigen::MatrixXs getBodyLocalVelocitiesJacobian(neural::WithRespectTo* wrt);
+
+  /// This brute forces our local velocities jacobian
+  Eigen::MatrixXs finiteDifferenceBodyLocalVelocitiesJacobian(
+      neural::WithRespectTo* wrt);
+
+  /// This computes the jacobian of the local accelerations for each body with
+  /// respect to `wrt`
+  Eigen::MatrixXs getBodyLocalAccelerationsJacobian(neural::WithRespectTo* wrt);
+
+  /// This brute forces our local accelerations jacobian
+  Eigen::MatrixXs finiteDifferenceBodyLocalAccelerationsJacobian(
+      neural::WithRespectTo* wrt);
+
+  /// This computes the jacobian of the local gravity vectors for each body with
+  /// respect to `wrt`
+  Eigen::MatrixXs getBodyLocalGravityVectorsJacobian(
+      neural::WithRespectTo* wrt);
+
+  /// This brute forces our local gravity vectors jacobian
+  Eigen::MatrixXs finiteDifferenceBodyLocalGravityVectorsJacobian(
+      neural::WithRespectTo* wrt);
+
+  /// This returns the spatial velocities (6 vecs) of the bodies in world space,
+  /// concatenated
+  Eigen::VectorXs getBodyWorldVelocities();
+
+  /// This returns the spatial accelerations (6 vecs) of the bodies in world
+  /// space, concatenated
+  Eigen::VectorXs getBodyWorldAccelerations();
+
+  /// This computes the jacobian of the world velocities for each body with
+  /// respect to `wrt`
+  Eigen::MatrixXs getBodyWorldVelocitiesJacobian(neural::WithRespectTo* wrt);
+
+  /// This brute forces our world velocities jacobian
+  Eigen::MatrixXs finiteDifferenceBodyWorldVelocitiesJacobian(
+      neural::WithRespectTo* wrt);
+
+  /// This computes the jacobian of the world accelerations for each body with
+  /// respect to `wrt`
+  Eigen::MatrixXs getBodyWorldAccelerationsJacobian(neural::WithRespectTo* wrt);
+
+  /// This brute forces our world accelerations jacobian
+  Eigen::MatrixXs finiteDifferenceBodyWorldAccelerationsJacobian(
+      neural::WithRespectTo* wrt);
+
+  /// This returns the spatial velocities (6 vecs) of the COMs of each body in
+  /// world space, concatenated
+  Eigen::VectorXs getCOMWorldVelocities();
+
+  /// This returns the spatial accelerations (6 vecs) of the COMs of each body
+  /// in world space, concatenated
+  Eigen::VectorXs getCOMWorldAccelerations();
+
+  /// This returns the linear accelerations (3 vecs) of the COMs of each body in
+  /// world space.
+  Eigen::VectorXs getCOMWorldLinearAccelerations();
+
+  /// This computes the jacobian of the world velocities for each body with
+  /// respect to `wrt`
+  Eigen::MatrixXs getCOMWorldVelocitiesJacobian(neural::WithRespectTo* wrt);
+
+  /// This brute forces our world velocities jacobian
+  Eigen::MatrixXs finiteDifferenceCOMWorldVelocitiesJacobian(
+      neural::WithRespectTo* wrt);
+
+  /// This computes the jacobian of the world accelerations for each body with
+  /// respect to `wrt`
+  Eigen::MatrixXs getCOMWorldAccelerationsJacobian(neural::WithRespectTo* wrt);
+
+  /// This brute forces our world accelerations jacobian
+  Eigen::MatrixXs finiteDifferenceCOMWorldAccelerationsJacobian(
+      neural::WithRespectTo* wrt);
+
+  Eigen::MatrixXs getCOMWorldLinearAccelerationsJacobian(
+      neural::WithRespectTo* wrt);
+
+  /// This brute forces our world linear accelerations jacobian
+  Eigen::MatrixXs finiteDifferenceCOMWorldLinearAccelerationsJacobian(
+      neural::WithRespectTo* wrt);
+
+  //----------------------------------------------------------------------------
   // Integration and finite difference
   //----------------------------------------------------------------------------
 
@@ -1434,6 +1987,16 @@ public:
   Eigen::VectorXs getVelocityDifferences(
       const Eigen::VectorXs& _dq2, const Eigen::VectorXs& _dq1) const;
 
+  /// For rotational joints (euler joints and ball joints), it is possible for
+  /// your position to suddenly jump by 360 degrees to an equivalent positions
+  /// at a different value for the joint angles. This wreaks havok with
+  /// smoothing and lowpass filtering, and so we would like sometimes to be able
+  /// to prevent the wrapping, and just pick the representation for our current
+  /// joint rotatinos that is as close as possible to our previous joint
+  /// positions, without large jumps.
+  Eigen::VectorXs unwrapPositionToNearest(
+      Eigen::VectorXs thisPos, Eigen::VectorXs lastPos) const;
+
   //----------------------------------------------------------------------------
   // Inverse Dynamics for Contacts
   //----------------------------------------------------------------------------
@@ -1448,14 +2011,22 @@ public:
     // These are the setup of the inverse dynamics problem
     Eigen::VectorXs pos;
     Eigen::VectorXs vel;
-    Eigen::VectorXs nextVel;
+    Eigen::VectorXs acc;
 
     /// This computes how much the actual dynamics we get when we apply this
     /// solution differ from the goal solution.
     s_t sumError();
   };
 
-  Eigen::VectorXs getInverseDynamics(const Eigen::VectorXs& nextVel);
+  Eigen::VectorXs getInverseDynamics(const Eigen::VectorXs& accelerations);
+
+  /// This computes the joint torques on the skeleton, given predicted wrenches
+  /// on each contact body, and optionally a predicted root residual.
+  Eigen::VectorXs getInverseDynamicsFromPredictions(
+      Eigen::VectorXs accelerations,
+      std::vector<dynamics::BodyNode*> contactBodies,
+      std::vector<Eigen::Vector6s> rootFrameNormalizedContactWrench,
+      Eigen::Vector6s rootResiduals = Eigen::Vector6s::Zero());
 
   /// This solves the inverse dynamics problem to figure out what forces we
   /// would need to apply (in our _current state_) in order to get the desired
@@ -1463,7 +2034,8 @@ public:
   /// `contactBody`, which can be post-processed down to individual contact
   /// results.
   ContactInverseDynamicsResult getContactInverseDynamics(
-      const Eigen::VectorXs& nextVel, const dynamics::BodyNode* contactBody);
+      const Eigen::VectorXs& accelerations,
+      const dynamics::BodyNode* contactBody);
 
   struct MultipleContactInverseDynamicsResult
   {
@@ -1476,7 +2048,7 @@ public:
     // These are the setup of the inverse dynamics problem
     Eigen::VectorXs pos;
     Eigen::VectorXs vel;
-    Eigen::VectorXs nextVel;
+    Eigen::VectorXs acc;
 
     /// This computes how much the actual dynamics we get when we apply this
     /// solution differ from the goal solution.
@@ -1498,9 +2070,58 @@ public:
   /// dynamics we use a heuristic: we find the inverse dynamics that minimizes
   /// the joint torques.
   MultipleContactInverseDynamicsResult getMultipleContactInverseDynamics(
-      const Eigen::VectorXs& nextVel,
+      const Eigen::VectorXs& accelerations,
       std::vector<const dynamics::BodyNode*> bodies,
       std::vector<Eigen::Vector6s> bodyWrenchGuesses);
+
+  struct MultipleContactCoPProblem
+  {
+    std::vector<const dynamics::BodyNode*> bodies;
+    Eigen::VectorXs massTorques;
+    Eigen::VectorXs coriolisAndGravity;
+    Eigen::MatrixXs jacs;
+    Eigen::MatrixXs jacBlock;
+    Eigen::FullPivLU<Eigen::MatrixXs> lu;
+    Eigen::MatrixXs J_null_space;
+    Eigen::Vector6s rootTorque;
+    std::vector<Eigen::Vector9s> copWrenchGuesses;
+    s_t groundHeight;
+    int verticalAxis;
+
+    s_t weightForceToMeters;
+
+    Eigen::VectorXs getInitialGuess();
+    s_t getLoss(const Eigen::VectorXs& x);
+    s_t getAvgCoPDistance(const Eigen::VectorXs& x);
+    Eigen::VectorXs getUnconstrainedGradient(const Eigen::VectorXs& x);
+    Eigen::VectorXs finiteDifferenceUnconstrainedGradient(
+        const Eigen::VectorXs& x);
+    Eigen::VectorXs projectToNullSpace(const Eigen::VectorXs& x);
+    Eigen::VectorXs clampToNearestLegalValues(const Eigen::VectorXs& x);
+    Eigen::Vector6s getConstraintErrors(const Eigen::VectorXs& x);
+  };
+
+  /// This is just broken out to make testing easier, this creates an
+  /// optimization problem object that can be used by
+  /// getMultipleContactInverseDynamicsNearCoP()
+  MultipleContactCoPProblem createMultipleContactInverseDynamicsNearCoPProblem(
+      const Eigen::VectorXs& accelerations,
+      std::vector<const dynamics::BodyNode*> bodies,
+      std::vector<Eigen::Vector9s> copWrenchGuesses,
+      s_t groundHeight,
+      int verticalAxis);
+
+  /// This performs a similar task to getMultipleContactInverseDynamics(), but
+  /// it resolves ambiguity by attempting to find contact forces that are as
+  /// closes as possible to the center-of-pressure (CoP) guesses.
+  MultipleContactInverseDynamicsResult getMultipleContactInverseDynamicsNearCoP(
+      const Eigen::VectorXs& accelerations,
+      std::vector<const dynamics::BodyNode*> bodies,
+      std::vector<Eigen::Vector6s> bodyWrenchGuesses,
+      s_t groundHeight,
+      int verticalAxis,
+      s_t weightForceToMeters = 0.001,
+      bool logOutput = false);
 
   struct MultipleContactInverseDynamicsOverTimeResult
   {
@@ -1516,7 +2137,7 @@ public:
     // One column per timestep
     Eigen::MatrixXs positions;
     Eigen::MatrixXs velocities;
-    Eigen::MatrixXs nextVelocities;
+    Eigen::MatrixXs accelerations;
 
     // Problem setup
     std::vector<Eigen::Vector6s> prevContactForces;
@@ -1560,6 +2181,73 @@ public:
       // This allows us to specify how we'd like to penalize magnitudes of
       // different contact forces frame-by-frame
       Eigen::MatrixXs magnitudeCosts = EMPTY);
+
+  //----------------------------------------------------------------------------
+  /// \{ \name Energy Accounting
+  //----------------------------------------------------------------------------
+
+  typedef struct JointEnergyTransmitter
+  {
+    std::string name;
+    Eigen::Vector3s worldCenter;
+    std::string parentBody;
+    Eigen::Vector3s parentCenter;
+    std::string childBody;
+    Eigen::Vector3s childCenter;
+
+    // Power flowing to parent. Positive numbers increase parent's energy,
+    // negative numbers decrease it.
+    s_t powerToParent;
+    // Power flowing to child. Positive numbers increase child's energy,
+    // negative numbers decrease it.
+    s_t powerToChild;
+  } JointEnergyTransmitter;
+
+  typedef struct ContactEnergyTransmitter
+  {
+    Eigen::Vector3s worldCenter;
+    Eigen::Vector3s worldForce;
+    Eigen::Vector3s worldMoment;
+    std::string contactBody;
+    Eigen::Vector3s contactBodyCenter;
+
+    // The rate of power being transmitted between the ground and the body
+    s_t powerToBody;
+  } ContactEnergyTransmitter;
+
+  typedef struct EnergyAccountingFrame
+  {
+    // The current amount of energy in each of the body segments, split across
+    // both categories.
+    Eigen::VectorXs bodyKineticEnergy;
+    Eigen::VectorXs bodyPotentialEnergy;
+    std::vector<Eigen::Vector3s> bodyCenters;
+
+    // The rates of power flowing into / out of each body
+    Eigen::VectorXs bodyKineticEnergyDeriv;
+    Eigen::VectorXs bodyPotentialEnergyDeriv;
+
+    Eigen::VectorXs bodyGravityPower;
+    Eigen::VectorXs bodyExternalForcePower;
+    Eigen::VectorXs bodyParentJointPower;
+    Eigen::VectorXs bodyChildJointPowerSum;
+    std::vector<std::vector<s_t>> bodyChildJointPowers;
+
+    // Each joint energy transfer
+    std::vector<JointEnergyTransmitter> joints;
+    // Each contact energy transfer
+    std::vector<ContactEnergyTransmitter> contacts;
+  } EnergyAccountingFrame;
+
+  /// This will create an "accounting frame" of data at the current moment
+  EnergyAccountingFrame getEnergyAccounting(
+      s_t heightZeroPoint = 0.0,
+      Eigen::Vector3s referenceFrameVelocity = Eigen::Vector3s::Zero(),
+      std::vector<dynamics::BodyNode*> contactBodies
+      = std::vector<dynamics::BodyNode*>(),
+      std::vector<Eigen::Vector3s> cops = std::vector<Eigen::Vector3s>(),
+      std::vector<Eigen::Vector3s> forces = std::vector<Eigen::Vector3s>(),
+      std::vector<Eigen::Vector3s> moments = std::vector<Eigen::Vector3s>());
 
   //----------------------------------------------------------------------------
   /// \{ \name Support Polygon
@@ -1738,16 +2426,16 @@ public:
       const JacobianNode* _node,
       const Eigen::Vector3s& _localOffset,
       const Frame* _inCoordinatesOf) const override;
-  
+
   // Documentation inherited
   math::Jacobian getWorldPositionJacobian(const JacobianNode* _node) const;
 
-  math::Jacobian getWorldPositionJacobian(const JacobianNode* _node,
-                                          const Eigen::Vector3s& _localOffset) const;
+  math::Jacobian getWorldPositionJacobian(
+      const JacobianNode* _node, const Eigen::Vector3s& _localOffset) const;
 
   // Documentation inherited
   math::Jacobian finiteDifferenceWorldPositionJacobian(
-      const JacobianNode* _node, 
+      const JacobianNode* _node,
       const Eigen::Vector3s& _localOffset,
       bool useRidders = true);
 
@@ -1893,27 +2581,27 @@ public:
 
   // Documentation inherited
   const Eigen::VectorXs& getExternalForces() const override;
-  
+
   // Get damping coefficients
   Eigen::VectorXs getDampingCoeffVector();
 
   // Set Damping Coeff Vector
   void setDampingCoeffVector(Eigen::VectorXs damp_coeffs);
-  
+
   // Get damping force of the skeleton.
   Eigen::VectorXs getDampingForce();
 
-  //Get spring coefficients
+  // Get spring coefficients
   Eigen::VectorXs getSpringStiffVector();
 
-  //set spring coefficinets
+  // set spring coefficinets
   void setSpringStiffVector(Eigen::VectorXs spring_stiffs);
 
-  //Get rest positions
+  // Get rest positions
   Eigen::VectorXs getRestPositions();
 
-  //Get Spring Forces
-  Eigen::VectorXs getSpringForce(); 
+  // Get Spring Forces
+  Eigen::VectorXs getSpringForce();
 
   /// Get constraint force vector for a tree
   const Eigen::VectorXs& getConstraintForces(std::size_t _treeIdx) const;
@@ -2224,6 +2912,14 @@ protected:
 
   /// The groups that constrain the scales of body nodes to be equal
   std::vector<BodyScaleGroup> mBodyScaleGroups;
+
+  /// This is a cache for the data around our group scales
+  std::vector<BodyScaleGroupAndIndex> mGroupScaleIndices;
+
+  /// This is a cache for looking up meshes attached to bodies
+  std::map<std::string, std::pair<dynamics::BodyNode*, Eigen::Isometry3s>>
+      mMeshBodyCache;
+  std::map<std::string, bool> mMeshExistsCache;
 
   struct DirtyFlags
   {

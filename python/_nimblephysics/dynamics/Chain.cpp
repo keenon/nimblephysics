@@ -45,6 +45,42 @@ namespace python {
 
 void Chain(py::module& m)
 {
+  ::py::class_<dart::dynamics::Chain::Criteria>(m, "ChainCriteria")
+      .def(
+          ::py::init<dart::dynamics::BodyNode*, dart::dynamics::BodyNode*>(),
+          ::py::arg("start"),
+          ::py::arg("target"))
+      .def(
+          ::py::init<
+              dart::dynamics::BodyNode*,
+              dart::dynamics::BodyNode*,
+              bool>(),
+          ::py::arg("start"),
+          ::py::arg("target"),
+          ::py::arg("includeBoth"))
+      .def(
+          "satisfy",
+          +[](const dart::dynamics::Chain::Criteria* self)
+              -> std::vector<dart::dynamics::BodyNode*> {
+            return self->satisfy();
+          })
+      .def(
+          "convert",
+          +[](const dart::dynamics::Chain::Criteria* self)
+              -> dart::dynamics::Linkage::Criteria { return self->convert(); })
+      .def_static(
+          "static_convert",
+          +[](const dart::dynamics::Linkage::Criteria& criteria)
+              -> dart::dynamics::Chain::Criteria {
+            return dart::dynamics::Chain::Criteria::convert(criteria);
+          },
+          ::py::arg("criteria"))
+      .def_readwrite("mStart", &dart::dynamics::Chain::Criteria::mStart)
+      .def_readwrite("mTarget", &dart::dynamics::Chain::Criteria::mTarget)
+      .def_readwrite(
+          "mIncludeUpstreamParentJoint",
+          &dart::dynamics::Chain::Criteria::mIncludeUpstreamParentJoint);
+
   ::py::class_<
       dart::dynamics::Chain,
       dart::dynamics::Linkage,
@@ -141,42 +177,6 @@ void Chain(py::module& m)
           "isStillChain", +[](const dart::dynamics::Chain* self) -> bool {
             return self->isStillChain();
           });
-
-  ::py::class_<dart::dynamics::Chain::Criteria>(m, "ChainCriteria")
-      .def(
-          ::py::init<dart::dynamics::BodyNode*, dart::dynamics::BodyNode*>(),
-          ::py::arg("start"),
-          ::py::arg("target"))
-      .def(
-          ::py::init<
-              dart::dynamics::BodyNode*,
-              dart::dynamics::BodyNode*,
-              bool>(),
-          ::py::arg("start"),
-          ::py::arg("target"),
-          ::py::arg("includeBoth"))
-      .def(
-          "satisfy",
-          +[](const dart::dynamics::Chain::Criteria* self)
-              -> std::vector<dart::dynamics::BodyNode*> {
-            return self->satisfy();
-          })
-      .def(
-          "convert",
-          +[](const dart::dynamics::Chain::Criteria* self)
-              -> dart::dynamics::Linkage::Criteria { return self->convert(); })
-      .def_static(
-          "static_convert",
-          +[](const dart::dynamics::Linkage::Criteria& criteria)
-              -> dart::dynamics::Chain::Criteria {
-            return dart::dynamics::Chain::Criteria::convert(criteria);
-          },
-          ::py::arg("criteria"))
-      .def_readwrite("mStart", &dart::dynamics::Chain::Criteria::mStart)
-      .def_readwrite("mTarget", &dart::dynamics::Chain::Criteria::mTarget)
-      .def_readwrite(
-          "mIncludeUpstreamParentJoint",
-          &dart::dynamics::Chain::Criteria::mIncludeUpstreamParentJoint);
 }
 
 } // namespace python

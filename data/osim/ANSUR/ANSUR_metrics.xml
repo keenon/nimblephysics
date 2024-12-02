@@ -1,0 +1,226 @@
+<Metrics>
+  <!-- (75) STATURE -->
+  <Metric>
+    <Name>stature</Name>
+    <MarkerA>
+      <MeshNode>hat_skull</MeshNode>
+      <Offset>0.0 0.65 0</Offset>
+    </MarkerA>
+    <MarkerB>
+      <MeshNode>r_foot</MeshNode>
+      <Offset>0.0 0 0</Offset>
+    </MarkerB>
+    <MeasureAlongAxis>0 1 0</MeasureAlongAxis>
+    <BodyPose>0 0 0 0 0.94 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0</BodyPose>
+  </Metric>
+  <!-- (52) ILIOCRISTALE HEIGHT -->
+  <Metric>
+    <Name>iliocristaleheight</Name>
+    <MarkerA>
+      <MeshNode>r_pelvis</MeshNode>
+      <Offset>-0.08 0.06 0.08</Offset>
+    </MarkerA>
+    <MarkerB>
+      <MeshNode>r_foot</MeshNode>
+      <Offset>0 0.0 0</Offset>
+    </MarkerB>
+    <MeasureAlongAxis>0 1 0</MeasureAlongAxis>
+    <BodyPose>0 0 0 0 0.94 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0</BodyPose>
+  </Metric>
+    <!-- (27) CROTCH HEIGHT -->
+  <Metric>
+    <Name>crotchheight</Name>
+    <MarkerA>
+      <MeshNode>r_pelvis</MeshNode>
+      <Offset>0 -0.15 0.0</Offset>
+    </MarkerA>
+    <MarkerB>
+      <MeshNode>r_foot</MeshNode>
+      <Offset>0 0.0 0</Offset>
+    </MarkerB>
+    <MeasureAlongAxis>0 1 0</MeasureAlongAxis>
+    <BodyPose>0 0 0 0 0.94 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0</BodyPose>
+  </Metric>
+  <!-- (83) TROCHANTERION HEIGHT -->
+  <Metric>
+    <Name>trochanterionheight</Name>
+    <MarkerA>
+      <MeshNode>r_femur</MeshNode>
+      <Offset>-0.02 0.0 0.05</Offset>
+    </MarkerA>
+    <MarkerB>
+      <MeshNode>r_foot</MeshNode>
+      <Offset>0 0.0 0</Offset>
+    </MarkerB>
+    <MeasureAlongAxis>0 1 0</MeasureAlongAxis>
+    <BodyPose>0 0 0 0 0.94 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0</BodyPose>
+  </Metric>
+    <!-- (10) BICRISTAL BREADTH -->
+  <Metric>
+    <Name>bicristalbreadth</Name>
+    <MarkerA>
+      <MeshNode>r_pelvis</MeshNode>
+      <Offset>0.0 0.0 -0.12</Offset>
+    </MarkerA>
+    <MarkerB>
+      <MeshNode>l_pelvis</MeshNode>
+      <Offset>0.0 0.0 0.12</Offset>
+    </MarkerB>
+    <MeasureAlongAxis>0 0 0</MeasureAlongAxis>
+    <BodyPose>0 0 0 0 0.94 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0</BodyPose>
+  </Metric>
+  <!-- (88) WAIST DEPTH -->
+  <Metric>
+    <Name>waistdepth</Name>
+    <MarkerA>
+      <MeshNode>r_pelvis</MeshNode>
+      <Offset>0.09 0.08 0</Offset>
+    </MarkerA>
+    <MarkerB>
+      <MeshNode>r_pelvis</MeshNode>
+      <Offset>-0.11 0.08 0.0</Offset>
+    </MarkerB>
+    <MeasureAlongAxis>0 0 0</MeasureAlongAxis>
+    <BodyPose>0 0 0 0 0.94 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0</BodyPose>
+  </Metric>
+  <!-- (25) CHEST DEPTH* -->
+  <Metric>
+    <Name>chestdepth</Name>
+    <MarkerA>
+      <MeshNode>hat_spine</MeshNode>
+      <Offset>0.12 0.3 0</Offset>
+    </MarkerA>
+    <MarkerB>
+      <MeshNode>hat_spine</MeshNode>
+      <Offset>-0.12 0.3 0.0</Offset>
+    </MarkerB>
+    <MeasureAlongAxis>0 0 0</MeasureAlongAxis>
+    <BodyPose>0 0 0 0 0.94 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0</BodyPose>
+  </Metric>
+  <!-- (25) CHEST DEPTH* - CompleteHumanModel version -->
+  <Metric>
+    <Name>chestdepth</Name>
+    <MarkerA>
+      <MeshNode>thorax</MeshNode>
+      <Offset>0.1 -0.13 0</Offset>
+    </MarkerA>
+    <MarkerB>
+      <MeshNode>thorax</MeshNode>
+      <Offset>-0.14 -0.13 0.0</Offset>
+    </MarkerB>
+    <MeasureAlongAxis>1 0 0</MeasureAlongAxis>
+    <BodyPose>0 0 0 0 0.94 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0</BodyPose>
+  </Metric>
+    <!-- (8) BIACROMIAL BREADTH -->
+  <Metric>
+    <Name>biacromialbreadth</Name>
+    <MarkerA>
+      <MeshNode>hat_spine</MeshNode>
+      <Offset>0.0 0.4 0.18</Offset>
+    </MarkerA>
+    <MarkerB>
+      <MeshNode>hat_spine</MeshNode>
+      <Offset>0.0 0.4 -0.18</Offset>
+    </MarkerB>
+    <MeasureAlongAxis>0 0 0</MeasureAlongAxis>
+    <BodyPose>0 0 0 0 0.94 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0</BodyPose>
+  </Metric>
+  <!-- (8) BIACROMIAL BREADTH - CompleteHumanModel version -->
+  <Metric>
+    <Name>biacromialbreadth</Name>
+    <MarkerA>
+      <MeshNode>thorax</MeshNode>
+      <Offset>0.0 -0.13 0.16</Offset>
+    </MarkerA>
+    <MarkerB>
+      <MeshNode>thorax</MeshNode>
+      <Offset>0.0 -0.13 -0.16</Offset>
+    </MarkerB>
+    <MeasureAlongAxis>0 0 1</MeasureAlongAxis>
+    <BodyPose>0 0 0 0 0.94 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0</BodyPose>
+  </Metric>
+    <!-- (45) HEAD BREADTH -->
+  <Metric>
+    <Name>headbreadth</Name>
+    <MarkerA>
+      <MeshNode>hat_skull</MeshNode>
+      <Offset>0 0.6 -0.07</Offset>
+    </MarkerA>
+    <MarkerB>
+      <MeshNode>hat_skull</MeshNode>
+      <Offset>0 0.6 0.07</Offset>
+    </MarkerB>
+    <MeasureAlongAxis>0 0 0</MeasureAlongAxis>
+    <BodyPose>0 0 0 0 0.94 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0</BodyPose>
+  </Metric>
+    <!-- (47) HEAD LENGTH -->
+  <Metric>
+    <Name>headlength</Name>
+    <MarkerA>
+      <MeshNode>hat_skull</MeshNode>
+      <Offset>0.08 0.6 0</Offset>
+    </MarkerA>
+    <MarkerB>
+      <MeshNode>hat_skull</MeshNode>
+      <Offset>-0.07 0.6 0</Offset>
+    </MarkerB>
+    <MeasureAlongAxis>1 0 0</MeasureAlongAxis>
+    <BodyPose>0 0 0 0 0.94 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0</BodyPose>
+  </Metric>
+  <!-- (2) ACROMIAL HEIGHT  -->
+  <Metric>
+    <Name>acromialheight</Name>
+    <MarkerA>
+      <MeshNode>thorax</MeshNode>
+      <Offset>0 0 0</Offset>
+    </MarkerA>
+    <MarkerB>
+      <MeshNode>r_foot</MeshNode>
+      <Offset>0 0.0 0</Offset>
+    </MarkerB>
+    <MeasureAlongAxis>0 1 0</MeasureAlongAxis>
+    <BodyPose>0 0 0 0 0.94 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0</BodyPose>
+  </Metric>
+  <!-- (2) ACROMION-RADIALE LENGTH -->
+  <Metric>
+    <Name>acromionradialelength</Name>
+    <MarkerA>
+      <MeshNode>humerus_lv</MeshNode>
+      <Offset>0 0.04 0</Offset>
+    </MarkerA>
+    <MarkerB>
+      <MeshNode>humerus_lv</MeshNode>
+      <Offset>0 -0.28 0</Offset>
+    </MarkerB>
+    <MeasureAlongAxis>0 0 0</MeasureAlongAxis>
+    <BodyPose>0 0 0 0 0.94 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0</BodyPose>
+  </Metric>
+  <!-- (37) FOREARM-CENTER OF GRIP LENGTH -->
+  <Metric>
+    <Name>forearmcenterofgriplength</Name>
+    <MarkerA>
+      <MeshNode>radius_lv</MeshNode>
+      <Offset>0 0.04 0</Offset>
+    </MarkerA>
+    <MarkerB>
+      <MeshNode>radius_lv</MeshNode>
+      <Offset>0 -0.28 0</Offset>
+    </MarkerB>
+    <MeasureAlongAxis>0 0 0</MeasureAlongAxis>
+    <BodyPose>0 0 0 0 0.94 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0</BodyPose>
+  </Metric>
+  <!-- (56) KNEE HEIGHT, MIDPATELLA  -->
+  <Metric>
+    <Name>kneeheightmidpatella</Name>
+    <MarkerA>
+      <MeshNode>r_tibia</MeshNode>
+      <Offset>0 0 0</Offset>
+    </MarkerA>
+    <MarkerB>
+      <MeshNode>r_foot</MeshNode>
+      <Offset>0 0.0 0</Offset>
+    </MarkerB>
+    <MeasureAlongAxis>0 1 0</MeasureAlongAxis>
+    <BodyPose>0 0 0 0 0.94 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0</BodyPose>
+  </Metric>
+</Metrics>

@@ -1,0 +1,232 @@
+syntax = "proto3";
+
+package dart.proto;
+
+enum MissingGRFReason { notMissingGRF = 0;
+                        measuredGrfZeroWhenAccelerationNonZero = 1;
+                        unmeasuredExternalForceDetected = 2;
+                        torqueDiscrepancy = 3;
+                        forceDiscrepancy = 4;
+                        notOverForcePlate = 5;
+                        missingImpact = 6;
+                        missingBlip = 7;
+                        shiftGRF = 8;
+                        interpolatedClippedGRF = 9;
+                        manualReview = 10;
+                        footContactDetectedButNoForce = 11;
+                        tooHighMarkerRMS = 12;
+                        hasInputOutliers = 13;
+                        hasNoForcePlateData = 14;
+                        velocitiesStillTooHighAfterFiltering = 15;
+                        copOutsideConvexFootError = 16;
+                        zeroForceFrame = 17;
+                        extendedToNearestPeakForce = 18;
+                      };
+
+enum ProcessingPassType {
+  kinematics = 0;
+  dynamics = 1;
+  lowPassFilter = 2;
+  accMinimizingFilter = 3;
+};
+
+enum BasicTrialType {
+  treadmill = 0;
+  overground = 1;
+  staticTrial = 2;
+  other = 3;
+};
+
+enum DetectedTrialFeature {
+  walking = 0;
+  running = 1;
+  unevenTerrain = 2;
+  flatTerrain = 3;
+}
+
+enum DataQuality {
+  pilotData = 0;
+  experimentalData = 1;
+  internetData = 2;
+}
+
+// Many of the ML tasks we want to support from SubjectOnDisk data include 
+// effectively predicting the results of a downstream processing task from 
+// an upstream processing task. Trivially, that's predicting physics from
+// raw motion. Hopefully soon, that may also include things like predicting
+// IMU joint accelerations from raw kinematics.
+message SubjectOnDiskTrialProcessingPassHeader {
+  // This is the type of the processing pass that generated this data
+  ProcessingPassType type = 1;
+  // If we're projecting a lower-body-only dataset onto a full-body model, then
+  // there will be DOFs that we don't get to observe. Downstream applications
+  // will want to ignore these DOFs.
+  repeated bool dof_positions_observed = 2;
+  // If we didn't use gyros to measure rotational velocity directly, then the
+  // velocity on this joint is likely to be noisy. If that's true, downstream
+  // applications won't want to try to predict the velocity on these DOFs
+  // directly.
+  repeated bool dof_velocities_finite_differenced = 3;
+  // If we didn't use accelerometers to measure acceleration directly, then the
+  // acceleration on this joint is likely to be noisy. If that's true,
+  // downstream applications won't want to try to predict the acceleration on
+  // these DOFs directly.
+  repeated bool dof_acceleration_finite_differenced = 4;
+  // This records the marker error for each frame in this trial.
+  repeated float marker_rms = 5;
+  repeated float marker_max = 6;
+  // This records the residual of the inverse dynamics solution for each frame in this trial.
+  repeated float linear_residual = 7;
+  // This records the residual of the inverse dynamics solution for each frame in this trial.
+  repeated float angular_residual = 8;
+  // This is for allowing the user to pre-filter out data where joint velocities are above a certain "unreasonable limit", like 50 rad/s or so
+  repeated float joints_max_velocity = 9;
+  // If we're doing a lowpass filter on this pass, then what was the cutoff frequency of that filter?
+  float lowpass_cutoff_frequency = 10;
+  // If we're doing a lowpass filter on this pass, then what was the order of that (Butterworth) filter?
+  int32 lowpass_filter_order = 11;
+  // If we clipped background noise on the force plates this pass, then this is the cutoff we used for each plate
+  repeated float force_plate_cutoff = 12;
+  // If we ran an acceleration minimizing smoother on this pass, then this is the regularization weight we used to track the original positions
+  float acc_minimizing_regularization_weight = 13;
+  // If we ran an acceleration minimizing smoother on this pass, then this is the regularization weight we used to track the original forces
+  float acc_minimizing_force_regularization_weight = 14;
+}
+
+message SubjectOnDiskTrialHeader {
+  string name = 1;
+  // This is the only array that has the potential to be somewhat large in
+  // memory, but we really want to know this information when randomly picking
+  // frames from the subject to sample.
+  repeated MissingGRFReason missing_GRF_reason = 2;
+  repeated bool has_manual_GRF_annotation = 16;
+  // This is how many frames are in this trial
+  int32 trial_length = 3;
+  // This is the timestep used in this trial (assumed constant throughout the trial)
+  double trial_timestep = 4;
+  // These are the processing passes that were applied to this trial
+  repeated SubjectOnDiskTrialProcessingPassHeader processing_pass_header = 5;
+  // This records the tags this trial was assigned with on the AddBiomechanics platform
+  repeated string trial_tag = 6;
+  // This is the number of force plates present on this trial
+  int32 num_force_plates = 7;
+  // If there are force plates, we can optionally include each force plate's corners here, concatenated as 4 3-vectors per plate
+  repeated double force_plate_corners = 8;
+  // This is true if we guessed the marker names without any ground truth from the user.
+  bool marker_names_guessed = 9;
+  // This is the original name of the source trial, before we (probably) split it into pieces during processing
+  string original_name = 10;
+  // This is the split index within the original trial -- 0 if we didn't split or if we're the first split
+  int32 split_index = 11;
+  // This is the shorthand for values from the original trial
+  int32 original_trial_start_frame = 12;
+  int32 original_trial_end_frame = 13;
+  float original_trial_start_time = 14;
+  float original_trial_end_time = 15;
+  // This is the type of trial we're dealing with
+  BasicTrialType trial_type = 17;
+  // This is the detected features of this trial
+  repeated DetectedTrialFeature detected_trial_feature = 18;
+}
+
+message SubjectOnDiskPass {
+  ProcessingPassType pass_type = 1;
+  string model_osim_text = 2;
+}
+
+message SubjectOnDiskHeader {
+  int32 num_dofs = 1;
+  int32 num_joints = 24;
+  int32 num_trials = 2;
+  // This is the size of each frame in bytes. This should be constant across all frames in the file, to allow easy seeking.
+  int32 raw_sensor_frame_size = 3;
+  int32 processing_pass_frame_size = 4;
+  // This has all the global information about each pass
+  repeated SubjectOnDiskPass passes = 5;
+  // This is the global configuration of the skeleton
+  repeated string ground_contact_body = 6;
+  repeated string custom_value_name = 7;
+  repeated int32 custom_value_length = 8;
+  repeated SubjectOnDiskTrialHeader trial_header = 9;
+  // The version number for this file format
+  int32 version = 10;
+  // An optional link to the web where this subject came from
+  string href = 11;
+  // Any text-based notes on the subject data, like citations etc
+  string notes = 12;
+  // Subject details
+  string biological_sex = 13;
+  double height_m = 14;
+  double mass_kg = 15;
+  int32 age_years = 16;
+  // Details about the marker data as it will appear on each frame
+  repeated string marker_name = 17;
+  // Details about the imu data as it will appear on each frame
+  repeated string acc_name = 18;
+  repeated string gyro_name = 19;
+  // Details about the EMG data as it will appear on each frame
+  repeated string emg_name = 20;
+  // This is how many samples of each EMG we get per timestep (the multiple of the mocap sampling frequency for our EMG data, usually ~10)
+  int32 emg_dim = 21;
+  // Details about the exo DOF data as it will appear on each frame
+  repeated int32 exo_dof_index = 22;
+  // Details about the subject tags provided on the AddBiomechanics platform
+  repeated string subject_tag = 23;
+  // This is what the user has tagged this subject as, in terms of data quality
+  DataQuality data_quality = 25;
+}
+
+message SubjectOnDiskProcessingPassFrame {
+  // The values for all the DOFs
+  repeated double pos = 1;
+  repeated double vel = 2;
+  repeated double acc = 3;
+  repeated double tau = 4;
+  // This is an array of 6-vectors, one per ground contact body
+  repeated double ground_contact_wrench = 5;
+  // These are the original force-plate data in world space, one per ground contact body
+  repeated double ground_contact_center_of_pressure = 6;
+  repeated double ground_contact_torque = 7;
+  repeated double ground_contact_force = 8;
+  // These are the center of mass kinematics
+  repeated double com_pos = 9;
+  repeated double com_vel = 10;
+  repeated double com_acc = 11;
+  repeated double root_frame_com_acc = 17;
+  // Relevant physical data transformed into the root (probably pelvis) frame
+  repeated double root_frame_residual = 12;
+  // These are 6-vec's per contact body, so each length N*6
+  repeated double root_frame_ground_contact_wrench = 14;
+  // These are 3-vec's per contact body, so each length N*3
+  repeated double root_frame_ground_contact_center_of_pressure = 18;
+  repeated double root_frame_ground_contact_torques = 19;
+  repeated double root_frame_ground_contact_force = 20;
+  // One 3-vec per joint
+  repeated double root_frame_joint_centers = 15;
+  // One 3-vec per joint
+  repeated double world_frame_joint_centers = 16;
+  // The recent history of root transformations, expressed in the current root frame
+  repeated double root_frame_spatial_velocity = 21;
+  repeated double root_frame_spatial_acceleration = 22;
+  repeated double root_frame_root_pos_history = 23;
+  repeated double root_frame_root_euler_history = 24;
+}
+
+message SubjectOnDiskSensorFrame {
+  // We include this to allow the binary format to store/load a bunch of new
+  // types of values while remaining backwards compatible.
+  repeated double custom_values = 1;
+  // These are marker observations on this frame, with all NaNs indicating that that marker was not observed on this frame
+  repeated double marker_obs = 2;
+  // These are IMU observations on this frame, with all NaNs indicating that that imu was not observed on this frame
+  repeated double acc_obs = 3;
+  repeated double gyro_obs = 4;
+  // These are the EMG observations on this frame
+  repeated double emg_obs = 5;
+  // These are the exo observations on this frame
+  repeated double exo_obs = 6;
+  // These are the raw force plate readings, per force plate, without any assignment to feet or any post-processing
+  repeated double raw_force_plate_cop = 7;
+  repeated double raw_force_plate_torque = 8;
+  repeated double raw_force_plate_force = 9;
+}

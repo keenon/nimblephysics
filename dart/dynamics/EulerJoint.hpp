@@ -94,6 +94,9 @@ public:
   /// Return the axis order
   AxisOrder getAxisOrder() const;
 
+  /// Returns the axis of rotation for DOF `index`, depending on the AxisOrder
+  Eigen::Vector3s getAxis(int index) const;
+
   /// This takes a vector of 1's and -1's to indicate which entries to flip, if
   /// any
   void setFlipAxisMap(Eigen::Vector3s map);
@@ -158,6 +161,11 @@ public:
 
   Eigen::Matrix3s convertToRotation(const Eigen::Vector3s& _positions) const;
 
+  /// Returns the value for q that produces the nearest rotation to
+  /// `relativeRotation` passed in.
+  Eigen::VectorXs getNearestPositionToDesiredRotation(
+      const Eigen::Matrix3s& relativeRotation) override;
+
   /// This is a truly static method to compute the relative Jacobian, which gets
   /// reused in CustomJoint
   static Eigen::Matrix<s_t, 6, 3> computeRelativeJacobianStatic(
@@ -202,7 +210,8 @@ public:
       const Eigen::Vector3s& flipAxisMap,
       const Eigen::Isometry3s& childBodyToJoint);
 
-  math::Jacobian getRelativeJacobianDeriv(std::size_t index) const override;
+  Eigen::Matrix<s_t, 6, 3> getRelativeJacobianDerivWrtPositionStatic(
+      std::size_t index) const override;
 
   static math::Jacobian computeRelativeJacobianTimeDerivDerivWrtPos(
       std::size_t index,
@@ -243,13 +252,13 @@ public:
   math::Jacobian getRelativeJacobianTimeDerivDerivWrtVelocity(
       std::size_t index) const override;
 
+  /// Constructor called by Skeleton class
+  EulerJoint(const Properties& properties);
+
 protected:
   /// This contains 1's and -1's to indicate whether we should flip a given
   /// input axis.
   Eigen::Vector3s mFlipAxisMap;
-
-  /// Constructor called by Skeleton class
-  EulerJoint(const Properties& properties);
 
   // Documentation inherited
   Joint* clone() const override;

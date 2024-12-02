@@ -95,6 +95,10 @@ public:
 
   /// Returns a DegreeOfFreedom vector containing the dofs that form a Chain
   /// leading up to this JacobianNode from the root of the Skeleton.
+  virtual const std::vector<DegreeOfFreedom*> getChainDofs() = 0;
+
+  /// Returns a DegreeOfFreedom vector containing the dofs that form a Chain
+  /// leading up to this JacobianNode from the root of the Skeleton.
   virtual const std::vector<const DegreeOfFreedom*> getChainDofs() const = 0;
 
   /// \}

@@ -33,6 +33,7 @@
 #ifndef DART_DYNAMICS_REVOLUTEJOINT_HPP_
 #define DART_DYNAMICS_REVOLUTEJOINT_HPP_
 
+#include "dart/dynamics/CustomJoint.hpp"
 #include "dart/dynamics/detail/RevoluteJointAspect.hpp"
 
 namespace dart {
@@ -43,6 +44,7 @@ class RevoluteJoint : public detail::RevoluteJointBase
 {
 public:
   friend class Skeleton;
+  friend class CustomJoint<1>;
   using UniqueProperties = detail::RevoluteJointUniqueProperties;
   using Properties = detail::RevoluteJointProperties;
   using Base = detail::RevoluteJointBase;
@@ -93,6 +95,11 @@ public:
   // Documentation inherited
   GenericJoint<math::R1Space>::JacobianMatrix getRelativeJacobianStatic(
       const GenericJoint<math::R1Space>::Vector& positions) const override;
+
+  /// Returns the value for q that produces the nearest rotation to
+  /// `relativeRotation` passed in.
+  Eigen::VectorXs getNearestPositionToDesiredRotation(
+      const Eigen::Matrix3s& relativeRotation) override;
 
 protected:
   /// Constructor called by Skeleton class

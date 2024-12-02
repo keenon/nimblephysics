@@ -1,0 +1,42 @@
+[2022-04-27 13:05:46.942] [info] Preparing to run ScaleTool.
+[2022-04-27 13:05:46.942] [info] Processing subject TODO-subject-name...
+[2022-04-27 13:05:46.942] [info] Step 1: Loading generic model
+[2022-04-27 13:05:46.960] [info] Loaded model Rajagopal2015_passiveCal_hipAbdMoved from file /Users/keenonwerling/Desktop/dev/nimblephysics/data/osim/Rajagopal2015_v3_scaled/Rajagopal2015_passiveCal_hipAbdMoved.osim
+[2022-04-27 13:05:47.032] [info] Step 2: Scaling generic model
+[2022-04-27 13:05:47.189] [info] Wrote model file 'rescaled.osim' from model.
+[2022-04-27 13:05:47.189] [error] Marker placement parameters disabled (apply is false) or not set. No markers have been moved.
+[2022-04-27 13:09:48.491] [info] Preparing to run ScaleTool.
+[2022-04-27 13:09:48.491] [info] Processing subject TODO-subject-name...
+[2022-04-27 13:09:48.491] [info] Step 1: Loading generic model
+[2022-04-27 13:09:48.509] [info] Loaded model Rajagopal2015_passiveCal_hipAbdMoved from file /Users/keenonwerling/Desktop/dev/nimblephysics/data/osim/Rajagopal2015_v3_scaled/Rajagopal2015_passiveCal_hipAbdMoved.osim
+[2022-04-27 13:09:48.578] [info] Step 2: Scaling generic model
+[2022-04-27 13:09:48.733] [info] Wrote model file 'rescaled.osim' from model.
+[2022-04-27 13:09:48.733] [error] Marker placement parameters disabled (apply is false) or not set. No markers have been moved.
+[2022-04-27 13:11:26.730] [info] Preparing to run ScaleTool.
+[2022-04-27 13:11:26.731] [info] Processing subject TODO-subject-name...
+[2022-04-27 13:11:26.731] [info] Step 1: Loading generic model
+[2022-04-27 13:11:26.749] [info] Loaded model Rajagopal2015_passiveCal_hipAbdMoved from file /Users/keenonwerling/Desktop/dev/nimblephysics/data/osim/Rajagopal2015_v3_scaled/Rajagopal2015_passiveCal_hipAbdMoved.osim
+[2022-04-27 13:11:26.820] [info] Step 2: Scaling generic model
+[2022-04-27 13:11:26.979] [info] Wrote model file 'rescaled.osim' from model.
+[2022-04-27 13:11:26.979] [error] Marker placement parameters disabled (apply is false) or not set. No markers have been moved.
+[2022-04-27 13:20:48.598] [info] Preparing to run ScaleTool.
+[2022-04-27 13:20:48.599] [info] Processing subject TODO-subject-name...
+[2022-04-27 13:20:48.599] [info] Step 1: Loading generic model
+[2022-04-27 13:20:48.618] [info] Loaded model Rajagopal2015_passiveCal_hipAbdMoved from file /Users/keenonwerling/Desktop/dev/nimblephysics/data/osim/Rajagopal2015_v3_scaled/Rajagopal2015_passiveCal_hipAbdMoved.osim
+[2022-04-27 13:20:48.687] [info] Step 2: Scaling generic model
+[2022-04-27 13:20:48.838] [info] Wrote model file 'rescaled.osim' from model.
+[2022-04-27 13:20:48.838] [error] Marker placement parameters disabled (apply is false) or not set. No markers have been moved.
+[2022-04-27 13:35:27.102] [info] Preparing to run ScaleTool.
+[2022-04-27 13:35:27.102] [info] Processing subject TODO-subject-name...
+[2022-04-27 13:35:27.102] [info] Step 1: Loading generic model
+[2022-04-27 13:35:27.121] [info] Loaded model Rajagopal2015_passiveCal_hipAbdMoved from file /Users/keenonwerling/Desktop/dev/nimblephysics/data/osim/Rajagopal2015_v3_scaled/Rajagopal2015_passiveCal_hipAbdMoved.osim
+[2022-04-27 13:35:27.191] [info] Step 2: Scaling generic model
+[2022-04-27 13:35:27.341] [info] Wrote model file 'rescaled.osim' from model.
+[2022-04-27 13:35:27.341] [error] Marker placement parameters disabled (apply is false) or not set. No markers have been moved.
+[2022-04-27 13:39:07.876] [info] Preparing to run ScaleTool.
+[2022-04-27 13:39:07.877] [info] Processing subject TODO-subject-name...
+[2022-04-27 13:39:07.877] [info] Step 1: Loading generic model
+[2022-04-27 13:39:07.895] [info] Loaded model Rajagopal2015_passiveCal_hipAbdMoved from file /Users/keenonwerling/Desktop/dev/nimblephysics/data/osim/Rajagopal2015_v3_scaled/Rajagopal2015_passiveCal_hipAbdMoved.osim
+[2022-04-27 13:39:07.964] [info] Step 2: Scaling generic model
+[2022-04-27 13:39:08.120] [info] Wrote model file 'rescaled.osim' from model.
+[2022-04-27 13:39:08.120] [error] Marker placement parameters disabled (apply is false) or not set. No markers have been moved.

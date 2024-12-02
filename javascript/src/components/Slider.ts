@@ -1,6 +1,6 @@
 class Slider {
   type: "slider";
-  key: string;
+  key: number;
   container: HTMLElement;
   from_top_left: number[];
   size: number[];
@@ -16,7 +16,7 @@ class Slider {
 
   constructor(
     container: HTMLElement,
-    key: string,
+    key: number,
     from_top_left: number[],
     size: number[],
     min: number,

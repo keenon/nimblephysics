@@ -1627,7 +1627,26 @@ GenericJoint<ConfigSpaceT>::getRelativeJacobianStatic() const
     this->mIsRelativeJacobianDirty = false;
   }
 
+  assert(mJacobian.norm() != 0.0);
+
   return mJacobian;
+}
+
+//==============================================================================
+template <class ConfigSpaceT>
+math::Jacobian GenericJoint<ConfigSpaceT>::getRelativeJacobianDerivWrtPosition(
+    std::size_t index) const
+{
+  return getRelativeJacobianDerivWrtPositionStatic(index);
+}
+
+//==============================================================================
+template <class ConfigSpaceT>
+typename GenericJoint<ConfigSpaceT>::JacobianMatrix
+GenericJoint<ConfigSpaceT>::getRelativeJacobianDerivWrtPositionStatic(
+    std::size_t /*index*/) const
+{
+  return GenericJoint<ConfigSpaceT>::JacobianMatrix::Zero();
 }
 
 //==============================================================================
@@ -1834,6 +1853,7 @@ GenericJoint<ConfigSpaceT>::getInvProjArtInertia() const
 {
   Joint::updateArticulatedInertia();
 
+  assert(!math::isInf(mInvProjArtInertia));
   return mInvProjArtInertia;
 }
 
@@ -1963,7 +1983,7 @@ void GenericJoint<ConfigSpaceT>::computeJacobianOfMinvX_A(
     if (hasDof(dof))
     {
       const Jacobian DS_Dq
-          = this->getRelativeJacobianDeriv(dof->getIndexInJoint());
+          = this->getRelativeJacobianDerivWrtPosition(dof->getIndexInJoint());
       const Jacobian DdS_Dq
           = this->getRelativeJacobianTimeDerivDerivWrtPosition(
               dof->getIndexInJoint());
@@ -2072,7 +2092,7 @@ Eigen::MatrixXs GenericJoint<ConfigSpaceT>::computeJacobianOfMinvX_B(
       const Eigen::Vector6s Scol = S.col(dofIndexInJoint);
 
       const Jacobian DS_Dq
-          = this->getRelativeJacobianDeriv(dof->getIndexInJoint());
+          = this->getRelativeJacobianDerivWrtPosition(dof->getIndexInJoint());
       const Jacobian DdS_Dq
           = this->getRelativeJacobianTimeDerivDerivWrtPosition(
               dof->getIndexInJoint());
@@ -2148,9 +2168,13 @@ template <class ConfigSpaceT>
 void GenericJoint<ConfigSpaceT>::addChildArtInertiaToDynamic(
     Eigen::Matrix6s& parentArtInertia, const Eigen::Matrix6s& childArtInertia)
 {
+  assert(!math::isNan(getRelativeJacobianStatic()));
   // Child body's articulated inertia
   JacobianMatrix AIS = childArtInertia * getRelativeJacobianStatic();
+  assert(!math::isNan(AIS));
   Eigen::Matrix6s PI = childArtInertia;
+  assert(!math::isNan(PI));
+  assert(!math::isInf(mInvProjArtInertia));
   PI.noalias() -= AIS * mInvProjArtInertia * AIS.transpose();
   assert(!math::isNan(PI));
 
@@ -2254,13 +2278,26 @@ void GenericJoint<ConfigSpaceT>::updateInvProjArtInertiaDynamic(
 {
   // Projected articulated inertia
   const JacobianMatrix& Jacobian = getRelativeJacobianStatic();
-  const Matrix projAI = Jacobian.transpose() * artInertia * Jacobian;
+  const Matrix projAI = Jacobian.transpose().eval() * artInertia * Jacobian;
 
   // Inversion of projected articulated inertia
   mInvProjArtInertia = math::inverse<ConfigSpaceT>(projAI);
 
   // Verification
   assert(!math::isNan(mInvProjArtInertia));
+#ifndef NDEBUG
+  if (math::isInf(mInvProjArtInertia))
+  {
+    for (int i = 0; i < getNumDofs(); i++)
+    {
+      std::cout << "Dof[" << i << "]: " << getDof(i)->getName() << std::endl;
+    }
+    std::cout << "Pos: " << std::endl << getPositions() << std::endl;
+    std::cout << "Jac: " << std::endl << Jacobian << std::endl;
+    std::cout << "Proj AI: " << std::endl << projAI << std::endl;
+  }
+#endif
+  assert(!math::isInf(mInvProjArtInertia));
 }
 
 //==============================================================================
@@ -2632,9 +2669,9 @@ void GenericJoint<ConfigSpaceT>::updateAccelerationDynamic(
       * (mTotalForce
          - getRelativeJacobianStatic().transpose() * artInertia
                * math::AdInvT(this->getRelativeTransform(), spatialAcc)));
-  //std::cout<<"Projection Factor: \n"<<getInvProjArtInertia()<<std::endl;
-  //std::cout<<"TotalForce: \n"<<mTotalForce<<std::endl;
-  // Verification
+  // std::cout<<"Projection Factor: \n"<<getInvProjArtInertia()<<std::endl;
+  // std::cout<<"TotalForce: \n"<<mTotalForce<<std::endl;
+  //  Verification
   assert(!math::isNan(getAccelerationsStatic()));
 }
 

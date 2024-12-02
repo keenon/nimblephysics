@@ -31,20 +31,22 @@
  */
 
 #include <iostream>
+
 #include <gtest/gtest.h>
-#include "TestHelpers.hpp"
 
 #include "dart/dart.hpp"
+
+#include "TestHelpers.hpp"
 
 using namespace dart;
 using namespace dynamics;
 
-//class ZeroDofJointTest : public GenericJoint<NullSpace>
+// class ZeroDofJointTest : public GenericJoint<NullSpace>
 //{
-//public:
-//  /// Constructor called by Skeleton class
-//  ZeroDofJointTest(const Properties& properties = Properties())
-//    : GenericJoint<NullSpace>(properties) {}
+// public:
+//   /// Constructor called by Skeleton class
+//   ZeroDofJointTest(const Properties& properties = Properties())
+//     : GenericJoint<NullSpace>(properties) {}
 
 //  virtual ~ZeroDofJointTest() {}
 
@@ -64,9 +66,9 @@ using namespace dynamics;
 //      const Vector& positions) const override
 //  { return JacobianMatrix(); }
 
-//protected:
-//  // Documentation inherited
-//  Joint* clone() const override { return nullptr; }
+// protected:
+//   // Documentation inherited
+//   Joint* clone() const override { return nullptr; }
 
 //  // Documentation inherited
 //  void updateDegreeOfFreedomNames() override {}
@@ -86,12 +88,19 @@ class SingleDofJointTest : public GenericJoint<R1Space>
 public:
   /// Constructor called by Skeleton class
   SingleDofJointTest(const Properties& properties = Properties())
-    : GenericJoint<R1Space>(properties) {}
+    : GenericJoint<R1Space>(properties)
+  {
+  }
 
-  virtual ~SingleDofJointTest() {}
+  virtual ~SingleDofJointTest()
+  {
+  }
 
   /// Gets a string representing the joint type
-  const std::string& getType() const override { return getStaticType(); }
+  const std::string& getType() const override
+  {
+    return getStaticType();
+  }
 
   const std::string& getStaticType() const
   {
@@ -100,27 +109,53 @@ public:
   }
 
   // Documentation inherited
-  bool isCyclic(size_t /*index*/) const override { return false; }
+  bool isCyclic(size_t /*index*/) const override
+  {
+    return false;
+  }
 
   JacobianMatrix getRelativeJacobianStatic(
       const Vector& /*positions*/) const override
-  { return JacobianMatrix(); }
+  {
+    return JacobianMatrix();
+  }
+
+  /// Returns the value for q that produces the nearest rotation to
+  /// `relativeRotation` passed in.
+  Eigen::VectorXs getNearestPositionToDesiredRotation(
+      const Eigen::Matrix3s& relativeRotation) override
+  {
+    (void)relativeRotation;
+    // This is ignored in these tests
+    return getPositions();
+  }
 
 protected:
   // Documentation inherited
-  Joint* clone() const override { return nullptr; }
+  Joint* clone() const override
+  {
+    return nullptr;
+  }
 
   // Documentation inherited
-  void updateDegreeOfFreedomNames() override {}
+  void updateDegreeOfFreedomNames() override
+  {
+  }
 
   // Documentation inherited
-  void updateRelativeTransform() const override {}
+  void updateRelativeTransform() const override
+  {
+  }
 
   // Documentation inherited
-  void updateRelativeJacobian(bool /*mandatory = true*/) const override {}
+  void updateRelativeJacobian(bool /*mandatory = true*/) const override
+  {
+  }
 
   // Documentation inherited
-  void updateRelativeJacobianTimeDeriv() const override {}
+  void updateRelativeJacobianTimeDeriv() const override
+  {
+  }
 };
 
 class MultiDofJointTest : public GenericJoint<RealVectorSpace<6>>
@@ -128,12 +163,19 @@ class MultiDofJointTest : public GenericJoint<RealVectorSpace<6>>
 public:
   /// Constructor called by Skeleton class
   MultiDofJointTest(const Properties& properties = Properties())
-    : GenericJoint<RealVectorSpace<6>>(properties) {}
+    : GenericJoint<RealVectorSpace<6>>(properties)
+  {
+  }
 
-  virtual ~MultiDofJointTest() {}
+  virtual ~MultiDofJointTest()
+  {
+  }
 
   /// Gets a string representing the joint type
-  const std::string& getType() const override { return getStaticType(); }
+  const std::string& getType() const override
+  {
+    return getStaticType();
+  }
 
   const std::string& getStaticType() const
   {
@@ -142,27 +184,53 @@ public:
   }
 
   // Documentation inherited
-  bool isCyclic(size_t /*index*/) const override { return false; }
+  bool isCyclic(size_t /*index*/) const override
+  {
+    return false;
+  }
 
   JacobianMatrix getRelativeJacobianStatic(
       const Vector& /*positions*/) const override
-  { return JacobianMatrix(); }
+  {
+    return JacobianMatrix();
+  }
+
+  /// Returns the value for q that produces the nearest rotation to
+  /// `relativeRotation` passed in.
+  Eigen::VectorXs getNearestPositionToDesiredRotation(
+      const Eigen::Matrix3s& relativeRotation) override
+  {
+    (void)relativeRotation;
+    // This is ignored in these tests
+    return getPositions();
+  }
 
 protected:
   // Documentation inherited
-  Joint* clone() const override { return nullptr; }
+  Joint* clone() const override
+  {
+    return nullptr;
+  }
 
   // Documentation inherited
-  void updateDegreeOfFreedomNames() override {}
+  void updateDegreeOfFreedomNames() override
+  {
+  }
 
   // Documentation inherited
-  void updateRelativeTransform() const override {}
+  void updateRelativeTransform() const override
+  {
+  }
 
   // Documentation inherited
-  void updateRelativeJacobian(bool /*mandatory = true*/) const override {}
+  void updateRelativeJacobian(bool /*mandatory = true*/) const override
+  {
+  }
 
   // Documentation inherited
-  void updateRelativeJacobianTimeDeriv() const override {}
+  void updateRelativeJacobianTimeDeriv() const override
+  {
+  }
 };
 
 class SO3JointTest : public GenericJoint<SO3Space>
@@ -170,12 +238,19 @@ class SO3JointTest : public GenericJoint<SO3Space>
 public:
   /// Constructor called by Skeleton class
   SO3JointTest(const Properties& properties = Properties())
-    : GenericJoint<SO3Space>(properties) {}
+    : GenericJoint<SO3Space>(properties)
+  {
+  }
 
-  virtual ~SO3JointTest() {}
+  virtual ~SO3JointTest()
+  {
+  }
 
   /// Gets a string representing the joint type
-  const std::string& getType() const override { return getStaticType(); }
+  const std::string& getType() const override
+  {
+    return getStaticType();
+  }
 
   const std::string& getStaticType() const
   {
@@ -184,33 +259,59 @@ public:
   }
 
   // Documentation inherited
-  bool isCyclic(size_t /*index*/) const override { return false; }
+  bool isCyclic(size_t /*index*/) const override
+  {
+    return false;
+  }
 
   JacobianMatrix getRelativeJacobianStatic(
       const Vector& /*positions*/) const override
-  { return JacobianMatrix(); }
+  {
+    return JacobianMatrix();
+  }
+
+  /// Returns the value for q that produces the nearest rotation to
+  /// `relativeRotation` passed in.
+  Eigen::VectorXs getNearestPositionToDesiredRotation(
+      const Eigen::Matrix3s& relativeRotation) override
+  {
+    (void)relativeRotation;
+    // This is ignored in these tests
+    return getPositions();
+  }
 
 protected:
   // Documentation inherited
-  Joint* clone() const override { return nullptr; }
+  Joint* clone() const override
+  {
+    return nullptr;
+  }
 
   // Documentation inherited
-  void updateDegreeOfFreedomNames() override {}
+  void updateDegreeOfFreedomNames() override
+  {
+  }
 
   // Documentation inherited
-  void updateRelativeTransform() const override {}
+  void updateRelativeTransform() const override
+  {
+  }
 
   // Documentation inherited
-  void updateRelativeJacobian(bool /*mandatory = true*/) const override {}
+  void updateRelativeJacobian(bool /*mandatory = true*/) const override
+  {
+  }
 
   // Documentation inherited
-  void updateRelativeJacobianTimeDeriv() const override {}
+  void updateRelativeJacobianTimeDeriv() const override
+  {
+  }
 };
 
 //==============================================================================
 TEST(GenericJoint, Basic)
 {
-//  ZeroDofJointTest zeroDofJoint;
+  //  ZeroDofJointTest zeroDofJoint;
   SingleDofJointTest singleDofJoint;
   MultiDofJointTest genericJoint;
   SO3JointTest so3Joint;

@@ -539,6 +539,7 @@ void ConstrainedGroupGradientMatrices::constructMatrices(
   int numUpperBound = 0;
   int numBouncing = 0;
   int numIllegal = 0;
+  (void)numIllegal;
   // Fill in mappings[] with the correct values, overwriting previous data
   for (std::size_t j = 0; j < mNumConstraintDim; j++)
   {

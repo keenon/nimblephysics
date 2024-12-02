@@ -7,6 +7,7 @@ dart_add_test("unit" test_CustomJoint)
 dart_add_test("unit" test_Factory)
 dart_add_test("unit" test_GenericJoints)
 dart_add_test("unit" test_Geometry)
+dart_add_test("unit" test_ExpMapNestedGradient)
 dart_add_test("unit" test_Inertia)
 dart_add_test("unit" test_Lemke)
 dart_add_test("unit" test_LocalResourceRetriever)
@@ -23,18 +24,37 @@ dart_add_test("unit" test_ScrewGeometry)
 dart_add_test("unit" test_JointJacobians)
 dart_add_test("unit" test_SimmSpline)
 dart_add_test("unit" test_PolynomialFunction)
+dart_add_test("unit" test_PolynomialFitter)
 dart_add_test("unit" test_EulerFreeJoint)
 dart_add_test("unit" test_EulerJoint)
 dart_add_test("unit" test_UniversalJoint)
 dart_add_test("unit" test_MarkerFitterAxisDetection)
+dart_add_test("unit" test_AssignmentMatcher)
+dart_add_test("unit" test_MarkerTrace)
+dart_add_test("unit" test_NearestPositionToDesiredRotation)
+dart_add_test("unit" test_EnergyAccounting)
+dart_add_test("unit" test_GraphFlowDiscretizer)
+dart_add_test("unit" test_CortexStreaming)
+dart_add_test("unit" test_StreamingMarkerTraces)
+dart_add_test("unit" test_LinkBeamSearch)
+dart_add_test("unit" test_RelativeFilter)
+
 if(DART_USE_ARBITRARY_PRECISION)
-dart_add_test("unit" test_MPFR)
+  dart_add_test("unit" test_MPFR)
 endif()
 
 if(TARGET dart-utils)
-
   dart_add_test("unit" test_AccelerationSmoother)
   target_link_libraries(test_AccelerationSmoother dart-utils)
+
+  dart_add_test("unit" test_AccelerationMinimizer)
+  target_link_libraries(test_AccelerationMinimizer dart-utils)
+
+  dart_add_test("unit" test_AccelerationTrackAndMinimize)
+  target_link_libraries(test_AccelerationTrackAndMinimize dart-utils)
+
+  dart_add_test("unit" test_IKInitializer)
+  target_link_libraries(test_IKInitializer dart-utils)
 
   dart_add_test("unit" test_CompositeResourceRetriever)
   target_link_libraries(test_CompositeResourceRetriever dart-utils)
@@ -54,23 +74,32 @@ if(TARGET dart-utils)
   dart_add_test("unit" test_SkelParser)
   target_link_libraries(test_SkelParser dart-utils)
 
-  dart_add_test("unit" test_OpenSimParser)
-  target_link_libraries(test_OpenSimParser dart-utils)
-
   dart_add_test("unit" test_SkeletonConverter)
   target_link_libraries(test_SkeletonConverter dart-utils)
 
   dart_add_test("unit" test_SkeletonToBallJoints)
   target_link_libraries(test_SkeletonToBallJoints dart-utils)
 
+  dart_add_test("unit" test_Convex2DDistanceMeasurement)
+  target_link_libraries(test_Convex2DDistanceMeasurement dart-utils)
+
+  dart_add_test("unit" test_SkeletonSimplification)
+  target_link_libraries(test_SkeletonSimplification dart-utils)
+
   dart_add_test("unit" test_SkeletonMarkers)
   target_link_libraries(test_SkeletonMarkers dart-utils)
 
-  dart_add_test("unit" test_MarkerFitterKinematics)
-  target_link_libraries(test_MarkerFitterKinematics dart-utils)
+  dart_add_test("unit" test_MarkerFitter)
+  target_link_libraries(test_MarkerFitter dart-utils)
 
-  dart_add_test("unit" test_MarkerFitterDynamics)
-  target_link_libraries(test_MarkerFitterDynamics dart-utils)
+  dart_add_test("unit" test_MarkerFixer)
+  target_link_libraries(test_MarkerFixer dart-utils)
+
+  dart_add_test("unit" test_MarkerOffsetPrior)
+  target_link_libraries(test_MarkerOffsetPrior dart-utils)
+
+  dart_add_test("unit" test_MarkerLabeller)
+  target_link_libraries(test_MarkerLabeller dart-utils)
 
   dart_add_test("unit" test_Scaling)
   target_link_libraries(test_Scaling dart-utils)
@@ -84,6 +113,12 @@ if(TARGET dart-utils)
   dart_add_test("unit" test_C3D)
   target_link_libraries(test_C3D dart-utils)
 
+  dart_add_test("unit" test_MarkerBeamSearch)
+  target_link_libraries(test_MarkerBeamSearch dart-utils)
+
+  dart_add_test("unit" test_MarkerMultiBeamSearch)
+  target_link_libraries(test_MarkerMultiBeamSearch dart-utils)
+
   dart_add_test("unit" test_CSVParser)
   target_link_libraries(test_CSVParser dart-utils)
 
@@ -95,6 +130,22 @@ if(TARGET dart-utils)
 endif()
 
 if(TARGET dart-utils-urdf)
+  dart_add_test("unit" test_OpenSimParser)
+  target_link_libraries(test_OpenSimParser dart-utils)
+  target_link_libraries(test_OpenSimParser dart-utils-urdf)
+
+  dart_add_test("unit" test_IKLimits)
+  target_link_libraries(test_IKLimits dart-utils)
+  target_link_libraries(test_IKLimits dart-utils-urdf)
+
+  dart_add_test("unit" test_StreamingIK)
+  target_link_libraries(test_StreamingIK dart-utils)
+  target_link_libraries(test_StreamingIK dart-utils-urdf)
+
+  dart_add_test("unit" test_StreamingMocapLab)
+  target_link_libraries(test_StreamingMocapLab dart-utils)
+  target_link_libraries(test_StreamingMocapLab dart-utils-urdf)
+
   dart_add_test("unit" test_ConstraintSolver)
   target_link_libraries(test_ConstraintSolver dart-utils)
   target_link_libraries(test_ConstraintSolver dart-utils-urdf)
@@ -133,6 +184,70 @@ if(TARGET dart-utils-urdf)
   dart_add_test("unit" test_Sensors)
   target_link_libraries(test_Sensors dart-utils)
   target_link_libraries(test_Sensors dart-utils-urdf)
+
+  dart_add_test("unit" test_DynamicsFitter)
+  target_link_libraries(test_DynamicsFitter dart-utils)
+  target_link_libraries(test_DynamicsFitter dart-utils-urdf)
+
+  dart_add_test("unit" test_ForcePlate)
+  target_link_libraries(test_ForcePlate dart-utils)
+  target_link_libraries(test_ForcePlate dart-utils-urdf)
+
+  dart_add_test("unit" test_InverseDynamics)
+  target_link_libraries(test_InverseDynamics dart-utils)
+  target_link_libraries(test_InverseDynamics dart-utils-urdf)
+
+  dart_add_test("unit" test_SubjectOnDisk)
+  target_link_libraries(test_SubjectOnDisk dart-utils)
+  target_link_libraries(test_SubjectOnDisk dart-utils-urdf)
+
+  dart_add_test("unit" test_LinearizedMassMapping)
+  target_link_libraries(test_LinearizedMassMapping dart-utils)
+  target_link_libraries(test_LinearizedMassMapping dart-utils-urdf)
+
+  dart_add_test("unit" test_ScapulathoracicJoint)
+  target_link_libraries(test_ScapulathoracicJoint dart-utils)
+  target_link_libraries(test_ScapulathoracicJoint dart-utils-urdf)
+
+  dart_add_test("unit" test_EllipsoidJoint)
+  target_link_libraries(test_EllipsoidJoint dart-utils)
+  target_link_libraries(test_EllipsoidJoint dart-utils-urdf)
+
+  dart_add_test("unit" test_ConstantCurveJoint)
+  target_link_libraries(test_ConstantCurveJoint dart-utils)
+  target_link_libraries(test_ConstantCurveJoint dart-utils-urdf)
+
+  dart_add_test("unit" test_ConstantCurveIncompressibleJoint)
+  target_link_libraries(test_ConstantCurveIncompressibleJoint dart-utils)
+  target_link_libraries(test_ConstantCurveIncompressibleJoint dart-utils-urdf)
+
+  dart_add_test("unit" test_BodySpatialTranslation)
+  target_link_libraries(test_BodySpatialTranslation dart-utils)
+  target_link_libraries(test_BodySpatialTranslation dart-utils-urdf)
+
+  dart_add_test("unit" test_DifferentiableIMUs)
+  target_link_libraries(test_DifferentiableIMUs dart-utils)
+  target_link_libraries(test_DifferentiableIMUs dart-utils-urdf)
+
+  dart_add_test("unit" test_DifferentiableExternalForce)
+  target_link_libraries(test_DifferentiableExternalForce dart-utils)
+  target_link_libraries(test_DifferentiableExternalForce dart-utils-urdf)
+
+  dart_add_test("unit" test_RotationalGradients)
+  target_link_libraries(test_RotationalGradients dart-utils)
+  target_link_libraries(test_RotationalGradients dart-utils-urdf)
+
+  dart_add_test("unit" test_CompleteHumanModel)
+  target_link_libraries(test_CompleteHumanModel dart-utils)
+  target_link_libraries(test_CompleteHumanModel dart-utils-urdf)
+
+  dart_add_test("unit" test_JointForceField)
+  target_link_libraries(test_JointForceField dart-utils)
+  target_link_libraries(test_JointForceField dart-utils-urdf)
+
+  dart_add_test("unit" test_ExoSolverPinnedContact)
+  target_link_libraries(test_ExoSolverPinnedContact dart-utils)
+  target_link_libraries(test_ExoSolverPinnedContact dart-utils-urdf)
 endif()
 
 if(TARGET dart-planning)
@@ -141,13 +256,11 @@ if(TARGET dart-planning)
 endif()
 
 foreach(collision_engine
-    dart-collision-bullet
-    dart-collision-ode)
-
+  dart-collision-bullet
+  dart-collision-ode)
   if(TARGET ${collision_engine})
     target_link_libraries(test_CollisionGroups ${collision_engine})
   endif()
-
 endforeach()
 
 dart_format_add(test_Inertia.cpp)

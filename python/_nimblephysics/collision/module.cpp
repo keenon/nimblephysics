@@ -42,27 +42,30 @@ void Contact(py::module& sm);
 
 void CollisionOption(py::module& sm);
 void CollisionResult(py::module& sm);
-
-void CollisionDetector(py::module& sm);
-void DARTCollisionDetector(py::module& sm);
+void CollisionObject(py::module& sm);
 
 void CollisionGroup(py::module& sm);
 void DARTCollisionGroup(py::module& sm);
 
+void CollisionDetector(py::module& sm);
+void DARTCollisionDetector(py::module& sm);
+
 void dart_collision(py::module& m)
 {
   auto sm = m.def_submodule("collision");
+
+  CollisionObject(sm);
 
   Contact(sm);
 
   CollisionOption(sm);
   CollisionResult(sm);
 
-  CollisionDetector(sm);
-  DARTCollisionDetector(sm);
-
   CollisionGroup(sm);
+  CollisionDetector(sm);
+
   DARTCollisionGroup(sm);
+  DARTCollisionDetector(sm);
 }
 
 } // namespace python

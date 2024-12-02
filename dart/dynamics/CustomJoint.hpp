@@ -39,7 +39,9 @@
 
 #include "dart/dynamics/EulerJoint.hpp"
 #include "dart/dynamics/GenericJoint.hpp"
+#include "dart/math/ConfigurationSpace.hpp"
 #include "dart/math/CustomFunction.hpp"
+#include "dart/math/MathTypes.hpp"
 #include "dart/math/SimmSpline.hpp"
 
 namespace dart {
@@ -50,82 +52,157 @@ namespace dynamics {
  * behavior in Nimble to load the Rajagopal model, without sacrificing
  * performance or differentiability.
  */
-class CustomJoint : public GenericJoint<math::R1Space>
+template <std::size_t Dimension>
+class CustomJoint : public GenericJoint<math::RealVectorSpace<Dimension>>
 {
+  static constexpr std::size_t NumDofs = Dimension;
+  static constexpr int NumDofsEigen = static_cast<int>(Dimension);
+
+  using TangentSpace = typename math::RealVectorSpace<Dimension>::TangentSpace;
+
+  using Point = typename math::RealVectorSpace<Dimension>::Point;
+  using EuclideanPoint =
+      typename math::RealVectorSpace<Dimension>::EuclideanPoint;
+  using Vector = typename math::RealVectorSpace<Dimension>::Vector;
+  using Matrix = typename math::RealVectorSpace<Dimension>::Matrix;
+  using JacobianMatrix =
+      typename math::RealVectorSpace<Dimension>::JacobianMatrix;
+
 public:
   friend class Skeleton;
 
-  CustomJoint(const Properties& props);
+  CustomJoint<Dimension>(
+      const detail::GenericJointProperties<math::RealVectorSpace<Dimension>>&
+          props);
 
   /// This sets a custom function to map our single input degree of freedom to
   /// the wrapped Euler joint's degree of freedom and index i
   void setCustomFunction(
-      std::size_t i, std::shared_ptr<math::CustomFunction> fn);
+      std::size_t i, std::shared_ptr<math::CustomFunction> fn, int drivenByDof);
 
   std::shared_ptr<math::CustomFunction> getCustomFunction(std::size_t i);
 
-  /// This gets the Jacobian of the mapping functions. That is, for every
-  /// epsilon change in x, how does each custom function change?
-  Eigen::Vector6s getCustomFunctionGradientAt(s_t x) const;
+  /// There is an annoying tendency for custom joints to encode the linear
+  /// offset of the bone in their custom functions. We don't want that, so we
+  /// want to move any relative transform caused by custom functions into the
+  /// parent transform.
+  void zeroTranslationInCustomFunctions();
 
-  Eigen::Vector6s finiteDifferenceCustomFunctionGradientAt(
-      s_t x, bool useRidders = true) const;
+  int getCustomFunctionDrivenByDof(std::size_t i);
+
+  /// This gets the Jacobian of the mapping functions. That is, for every
+  /// epsilon change in dof=x, how does each custom function change?
+  math::Jacobian getCustomFunctionGradientAt(const Eigen::VectorXs& x) const;
+
+  /// This gets the time derivative of the Jacobian of the mapping functions.
+  math::Jacobian getCustomFunctionGradientAtTimeDeriv(
+      const Eigen::VectorXs& x, const Eigen::VectorXs& dx) const;
+
+  math::Jacobian finiteDifferenceCustomFunctionGradientAtTimeDeriv(
+      const Eigen::VectorXs& x, const Eigen::VectorXs& dx) const;
+
+  math::Jacobian finiteDifferenceCustomFunctionGradientAt(
+      const Eigen::VectorXs& x, bool useRidders = true) const;
+
+  math::Jacobian getCustomFunctionGradientAtTimeDerivPosDeriv(
+      const Eigen::VectorXs& x,
+      const Eigen::VectorXs& dx,
+      const Eigen::VectorXs& ddx,
+      int index) const;
+
+  math::Jacobian finiteDifferenceCustomFunctionGradientAtTimeDerivPosDeriv(
+      const Eigen::VectorXs& x,
+      const Eigen::VectorXs& dx,
+      const Eigen::VectorXs& ddx,
+      int index) const;
+
+  math::Jacobian getCustomFunctionGradientAtTimeDerivVelDeriv(
+      const Eigen::VectorXs& x,
+      const Eigen::VectorXs& dx,
+      const Eigen::VectorXs& ddx,
+      int index) const;
+
+  math::Jacobian finiteDifferenceCustomFunctionGradientAtTimeDerivVelDeriv(
+      const Eigen::VectorXs& x,
+      const Eigen::VectorXs& dx,
+      const Eigen::VectorXs& ddx,
+      int index) const;
 
   /// This gets the array of 2nd order derivatives at x
-  Eigen::Vector6s getCustomFunctionSecondGradientAt(s_t x) const;
+  math::Jacobian getCustomFunctionSecondGradientAt(
+      const Eigen::VectorXs& x) const;
 
   /// This produces the positions of each of the mapping functions, at a given
   /// point of input.
-  Eigen::Vector6s getCustomFunctionPositions(s_t x) const;
+  Eigen::Vector6s getCustomFunctionPositions(const Eigen::VectorXs& x) const;
 
   /// This produces the velocities of each of the mapping functions, at a given
   /// point with a specific velocity.
-  Eigen::Vector6s getCustomFunctionVelocities(s_t x, s_t dx) const;
+  Eigen::Vector6s getCustomFunctionVelocities(
+      const Eigen::VectorXs& x, const Eigen::VectorXs& dx) const;
 
   /// This produces the accelerations of each of the mapping functions, at a
   /// given point with a specific acceleration.
-  Eigen::Vector6s getCustomFunctionAccelerations(s_t x, s_t dx, s_t ddx) const;
+  Eigen::Vector6s getCustomFunctionAccelerations(
+      const Eigen::VectorXs& x,
+      const Eigen::VectorXs& dx,
+      const Eigen::VectorXs& ddx) const;
 
   /// This produces the derivative of the accelerations with respect to changes
   /// in position x
-  Eigen::Vector6s getCustomFunctionVelocitiesDerivativeWrtPos(
-      s_t x, s_t dx) const;
+  math::Jacobian getCustomFunctionVelocitiesDerivativeWrtPos(
+      const Eigen::VectorXs& x, const Eigen::VectorXs& dx) const;
 
-  Eigen::Vector6s finiteDifferenceCustomFunctionVelocitiesDerivativeWrtPos(
-      s_t x, s_t dx) const;
+  math::Jacobian finiteDifferenceCustomFunctionVelocitiesDerivativeWrtPos(
+      const Eigen::VectorXs& x, const Eigen::VectorXs& dx) const;
 
   /// This produces the derivative of the accelerations with respect to changes
   /// in position x
-  Eigen::Vector6s getCustomFunctionAccelerationsDerivativeWrtPos(
-      s_t x, s_t dx, s_t ddx) const;
+  math::Jacobian getCustomFunctionAccelerationsDerivativeWrtPos(
+      const Eigen::VectorXs& x,
+      const Eigen::VectorXs& dx,
+      const Eigen::VectorXs& ddx) const;
 
-  Eigen::Vector6s finiteDifferenceCustomFunctionAccelerationsDerivativeWrtPos(
-      s_t x, s_t dx, s_t ddx) const;
+  math::Jacobian finiteDifferenceCustomFunctionAccelerationsDerivativeWrtPos(
+      const Eigen::VectorXs& x,
+      const Eigen::VectorXs& dx,
+      const Eigen::VectorXs& ddx) const;
 
   /// This produces the derivative of the accelerations with respect to changes
   /// in velocity dx
-  Eigen::Vector6s getCustomFunctionAccelerationsDerivativeWrtVel(s_t x) const;
+  math::Jacobian getCustomFunctionAccelerationsDerivativeWrtVel(
+      const Eigen::VectorXs& x) const;
 
-  Eigen::Vector6s finiteDifferenceCustomFunctionAccelerationsDerivativeWrtVel(
-      s_t x, s_t dx, s_t ddx) const;
+  math::Jacobian finiteDifferenceCustomFunctionAccelerationsDerivativeWrtVel(
+      const Eigen::VectorXs& x,
+      const Eigen::VectorXs& dx,
+      const Eigen::VectorXs& ddx) const;
 
   /// This returns the first 3 custom function outputs
-  Eigen::Vector3s getEulerPositions(s_t x) const;
+  Eigen::Vector3s getEulerPositions(const Eigen::VectorXs& x) const;
 
   /// This returns the first 3 custom function outputs's derivatives
-  Eigen::Vector3s getEulerVelocities(s_t x, s_t dx) const;
+  Eigen::Vector3s getEulerVelocities(
+      const Eigen::VectorXs& x, const Eigen::VectorXs& dx) const;
 
   /// This returns the first 3 custom function outputs's second derivatives
-  Eigen::Vector3s getEulerAccelerations(s_t x, s_t dx, s_t ddx) const;
+  Eigen::Vector3s getEulerAccelerations(
+      const Eigen::VectorXs& x,
+      const Eigen::VectorXs& dx,
+      const Eigen::VectorXs& ddx) const;
 
   /// This returns the last 3 custom function outputs
-  Eigen::Vector3s getTranslationPositions(s_t x) const;
+  Eigen::Vector3s getTranslationPositions(const Eigen::VectorXs& x) const;
 
   /// This returns the last 3 custom function outputs's derivatives
-  Eigen::Vector3s getTranslationVelocities(s_t x, s_t dx) const;
+  Eigen::Vector3s getTranslationVelocities(
+      const Eigen::VectorXs& x, const Eigen::VectorXs& dx) const;
 
   /// This returns the last 3 custom function outputs's second derivatives
-  Eigen::Vector3s getTranslationAccelerations(s_t x, s_t dx, s_t ddx) const;
+  Eigen::Vector3s getTranslationAccelerations(
+      const Eigen::VectorXs& x,
+      const Eigen::VectorXs& dx,
+      const Eigen::VectorXs& ddx) const;
 
   const std::string& getType() const override;
 
@@ -151,20 +228,26 @@ public:
 
   dart::dynamics::Joint* clone() const override;
 
+  dart::dynamics::Joint* simplifiedClone() const override;
+
   void updateDegreeOfFreedomNames() override;
 
   void updateRelativeTransform() const override;
 
   /// Fixed-size version of getRelativeJacobian(positions)
   JacobianMatrix getRelativeJacobianStatic(
-      const Eigen::Vector1s& position) const override;
+      const Vector& position) const override;
 
-  Eigen::Matrix6s getSpatialJacobianStaticDerivWrtInput(s_t pos) const;
+  Eigen::Matrix6s getSpatialJacobianStaticDerivWrtInput(
+      const Eigen::VectorXs& pos, std::size_t index) const;
 
   Eigen::Matrix6s finiteDifferenceSpatialJacobianStaticDerivWrtInput(
-      s_t pos, bool useRidders = true) const;
+      const Eigen::VectorXs& pos,
+      std::size_t index,
+      bool useRidders = true) const;
 
-  math::Jacobian getRelativeJacobianDeriv(std::size_t index) const override;
+  JacobianMatrix getRelativeJacobianDerivWrtPositionStatic(
+      std::size_t index) const override;
 
   math::Jacobian finiteDifferenceRelativeJacobianDeriv(
       std::size_t index, bool useRidders = true);
@@ -174,15 +257,24 @@ public:
   void updateRelativeJacobianTimeDeriv() const override;
 
   Eigen::Matrix6s getSpatialJacobianTimeDerivDerivWrtInputPos(
-      s_t pos, s_t vel) const;
+      const Eigen::VectorXs& pos,
+      const Eigen::VectorXs& vel,
+      std::size_t index) const;
 
   Eigen::Matrix6s finiteDifferenceSpatialJacobianTimeDerivDerivWrtInputPos(
-      s_t pos, s_t vel, bool useRidders = true) const;
+      const Eigen::VectorXs& pos,
+      const Eigen::VectorXs& vel,
+      std::size_t index,
+      bool useRidders = true) const;
 
-  Eigen::Matrix6s getSpatialJacobianTimeDerivDerivWrtInputVel(s_t pos) const;
+  Eigen::Matrix6s getSpatialJacobianTimeDerivDerivWrtInputVel(
+      const Eigen::VectorXs& pos, std::size_t index) const;
 
   Eigen::Matrix6s finiteDifferenceSpatialJacobianTimeDerivDerivWrtInputVel(
-      s_t pos, s_t vel, bool useRidders = true) const;
+      const Eigen::VectorXs& pos,
+      const Eigen::VectorXs& vel,
+      std::size_t index,
+      bool useRidders = true) const;
 
   /// Computes derivative of time derivative of Jacobian w.r.t. position.
   math::Jacobian getRelativeJacobianTimeDerivDerivWrtPosition(
@@ -197,6 +289,19 @@ public:
 
   math::Jacobian finiteDifferenceRelativeJacobianTimeDerivDerivWrtVelocity(
       std::size_t index, bool useRidders = true);
+
+  // Returns the gradient of the screw axis with respect to the rotate dof
+  Eigen::Vector6s getScrewAxisGradientForPosition(
+      int axisDof, int rotateDof) override;
+
+  // Returns the gradient of the screw axis with respect to the rotate dof
+  Eigen::Vector6s getScrewAxisGradientForForce(
+      int axisDof, int rotateDof) override;
+
+  /// Returns the value for q that produces the nearest rotation to
+  /// `relativeRotation` passed in.
+  Eigen::VectorXs getNearestPositionToDesiredRotation(
+      const Eigen::Matrix3s& relativeRotation) override;
 
   ///////////////////////////////////////////////////////////////////////////
   // Only for use during development and testing of Jacobians.
@@ -216,6 +321,9 @@ protected:
 
   // There should be 6 of these, one for each axis of the wrapped Euler joint
   std::vector<std::shared_ptr<math::CustomFunction>> mFunctions;
+
+  // Each function is driven by a single degree of freedom
+  std::vector<int> mFunctionDrivenByDof;
 };
 
 }; // namespace dynamics

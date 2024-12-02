@@ -41,6 +41,9 @@
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
 
+#include "dart/biomechanics/C3DLoader.hpp"
+#include "dart/math/MathTypes.hpp"
+
 namespace py = pybind11;
 
 namespace dart {
@@ -59,17 +62,49 @@ void OpenSimParser(py::module& m)
           ::py::arg("markers"))
       .def_readwrite("skeleton", &dart::biomechanics::OpenSimFile::skeleton)
       .def_readwrite(
-          "markersMap", &dart::biomechanics::OpenSimFile::markersMap);
+          "trackingMarkers", &dart::biomechanics::OpenSimFile::trackingMarkers)
+      .def_readwrite(
+          "anatomicalMarkers",
+          &dart::biomechanics::OpenSimFile::anatomicalMarkers)
+      .def_readwrite("bodyScales", &dart::biomechanics::OpenSimFile::bodyScales)
+      .def_readwrite("warnings", &dart::biomechanics::OpenSimFile::warnings)
+      .def_readwrite(
+          "ignoredBodies", &dart::biomechanics::OpenSimFile::ignoredBodies)
+      .def_readwrite(
+          "jointsDrivenBy", &dart::biomechanics::OpenSimFile::jointsDrivenBy)
+      .def_readwrite("markersMap", &dart::biomechanics::OpenSimFile::markersMap)
+      .def_readwrite("meshMap", &dart::biomechanics::OpenSimFile::meshMap)
+      .def_readwrite(
+          "meshScaleMap", &dart::biomechanics::OpenSimFile::meshScaleMap);
 
   ::py::class_<dart::biomechanics::OpenSimMot>(m, "OpenSimMot")
       .def_readwrite("poses", &dart::biomechanics::OpenSimMot::poses)
       .def_readwrite("timestamps", &dart::biomechanics::OpenSimMot::timestamps);
+
+  ::py::class_<dart::biomechanics::OpenSimMocoTrajectory>(
+      m, "OpenSimMocoTrajectory")
+      .def_readwrite(
+          "timestamps", &dart::biomechanics::OpenSimMocoTrajectory::timestamps)
+      .def_readwrite(
+          "excitations",
+          &dart::biomechanics::OpenSimMocoTrajectory::excitations)
+      .def_readwrite(
+          "activations",
+          &dart::biomechanics::OpenSimMocoTrajectory::activations)
+      .def_readwrite(
+          "excitationNames",
+          &dart::biomechanics::OpenSimMocoTrajectory::excitationNames)
+      .def_readwrite(
+          "activationNames",
+          &dart::biomechanics::OpenSimMocoTrajectory::activationNames);
 
   ::py::class_<dart::biomechanics::OpenSimTRC>(m, "OpenSimTRC")
       .def_readwrite(
           "markerTimesteps", &dart::biomechanics::OpenSimTRC::markerTimesteps)
       .def_readwrite(
           "markerLines", &dart::biomechanics::OpenSimTRC::markerLines)
+      .def_readwrite(
+          "framesPerSecond", &dart::biomechanics::OpenSimTRC::framesPerSecond)
       .def_readwrite("timestamps", &dart::biomechanics::OpenSimTRC::timestamps);
 
   ::py::class_<dart::biomechanics::OpenSimScaleAndMarkerOffsets>(
@@ -89,33 +124,149 @@ void OpenSimParser(py::module& m)
   auto sm = m.def_submodule("OpenSimParser");
   sm.def(
       "parseOsim",
-      +[](const std::string& path) {
-        return dart::biomechanics::OpenSimParser::parseOsim(path);
+      +[](const std::string& path,
+          const std::string geometryFolder,
+          bool ignoreGeometry) {
+        return dart::biomechanics::OpenSimParser::parseOsim(
+            path, geometryFolder, ignoreGeometry);
       },
-      ::py::arg("path"));
+      ::py::arg("path"),
+      ::py::arg("geometryFolder") = "",
+      ::py::arg("ignoreGeometry") = false);
 
   sm.def(
       "saveOsimScalingXMLFile",
-      +[](std::shared_ptr<dynamics::Skeleton> skel,
+      +[](const std::string& subjectName,
+          std::shared_ptr<dynamics::Skeleton> skel,
           double massKg,
           double heightM,
           const std::string& osimInputPath,
+          const std::string& osimInputMarkersPath,
           const std::string& osimOutputPath,
           const std::string& scalingInstructionsOutputPath) {
         return dart::biomechanics::OpenSimParser::saveOsimScalingXMLFile(
+            subjectName,
             skel,
             massKg,
             heightM,
             osimInputPath,
+            osimInputMarkersPath,
             osimOutputPath,
             scalingInstructionsOutputPath);
       },
+      ::py::arg("subjectName"),
       ::py::arg("skel"),
       ::py::arg("massKg"),
       ::py::arg("heightM"),
       ::py::arg("osimInputPath"),
+      ::py::arg("osimInputMarkersPath"),
       ::py::arg("osimOutputPath"),
       ::py::arg("scalingInstructionsOutputPath"));
+
+  sm.def(
+      "saveOsimInverseKinematicsXMLFile",
+      +[](const std::string& subjectName,
+          std::vector<std::string> markerNames,
+          const std::string& osimInputModelPath,
+          const std::string& osimInputTrcPath,
+          const std::string& osimOutputMotPath,
+          const std::string& ikInstructionsOutputPath) {
+        return dart::biomechanics::OpenSimParser::
+            saveOsimInverseKinematicsXMLFile(
+                subjectName,
+                markerNames,
+                osimInputModelPath,
+                osimInputTrcPath,
+                osimOutputMotPath,
+                ikInstructionsOutputPath);
+      },
+      ::py::arg("subjectName"),
+      ::py::arg("markerNames"),
+      ::py::arg("osimInputModelPath"),
+      ::py::arg("osimInputTrcPath"),
+      ::py::arg("osimOutputMotPath"),
+      ::py::arg("ikInstructionsOutputPath"));
+
+  sm.def(
+      "saveOsimInverseDynamicsRawForcesXMLFile",
+      +[](const std::string& subjectName,
+          std::shared_ptr<dynamics::Skeleton> skel,
+          const Eigen::MatrixXs& poses,
+          const std::vector<biomechanics::ForcePlate> forcePlates,
+          const std::string& grfForcesPath,
+          const std::string& forcesOutputPath) {
+        return dart::biomechanics::OpenSimParser::
+            saveOsimInverseDynamicsRawForcesXMLFile(
+                subjectName,
+                skel,
+                poses,
+                forcePlates,
+                grfForcesPath,
+                forcesOutputPath);
+      },
+      ::py::arg("subjectName"),
+      ::py::arg("skel"),
+      ::py::arg("poses"),
+      ::py::arg("forcePlates"),
+      ::py::arg("grfForcePath"),
+      ::py::arg("forcesOutputPath"));
+
+  sm.def(
+      "saveOsimInverseDynamicsProcessedForcesXMLFile",
+      +[](const std::string& subjectName,
+          const std::vector<dynamics::BodyNode*> contactBodies,
+          const std::string& grfForcesPath,
+          const std::string& forcesOutputPath) {
+        return dart::biomechanics::OpenSimParser::
+            saveOsimInverseDynamicsProcessedForcesXMLFile(
+                subjectName, contactBodies, grfForcesPath, forcesOutputPath);
+      },
+      ::py::arg("subjectName"),
+      ::py::arg("contactBodies"),
+      ::py::arg("grfForcePath"),
+      ::py::arg("forcesOutputPath"));
+
+  sm.def(
+      "saveOsimInverseDynamicsXMLFile",
+      +[](const std::string& subjectName,
+          const std::string& osimInputModelPath,
+          const std::string& osimInputMotPath,
+          const std::string& osimForcesXmlPath,
+          const std::string& osimOutputStoPath,
+          const std::string& osimOutputBodyForcesStoPath,
+          const std::string& idInstructionsOutputPath,
+          const s_t startTime,
+          const s_t endTime) {
+        return dart::biomechanics::OpenSimParser::
+            saveOsimInverseDynamicsXMLFile(
+                subjectName,
+                osimInputModelPath,
+                osimInputMotPath,
+                osimForcesXmlPath,
+                osimOutputStoPath,
+                osimOutputBodyForcesStoPath,
+                idInstructionsOutputPath,
+                startTime,
+                endTime);
+      },
+      ::py::arg("subjectName"),
+      ::py::arg("osimInputModelPath"),
+      ::py::arg("osimInputMotPath"),
+      ::py::arg("osimForcesXmlPath"),
+      ::py::arg("osimOutputStoPath"),
+      ::py::arg("osimOutputBodyForcesStoPath"),
+      ::py::arg("idInstructionsOutputPath"),
+      ::py::arg("startTime"),
+      ::py::arg("endTime"));
+
+  sm.def(
+      "rationalizeJoints",
+      +[](const common::Uri& uri, const std::string& outputPath) {
+        return dart::biomechanics::OpenSimParser::rationalizeJoints(
+            uri, outputPath);
+      },
+      ::py::arg("inputPath"),
+      ::py::arg("outputPath"));
 
   sm.def(
       "moveOsimMarkers",
@@ -133,11 +284,116 @@ void OpenSimParser(py::module& m)
       ::py::arg("outputPath"));
 
   sm.def(
+      "translateOsimMarkers",
+      +[](const common::Uri& originalModelPath,
+          const common::Uri& targetModelPath,
+          const std::string& outputPath,
+          bool verbose) {
+        return dart::biomechanics::OpenSimParser::translateOsimMarkers(
+            originalModelPath, targetModelPath, outputPath, verbose);
+      },
+      ::py::arg("originalModelPath"),
+      ::py::arg("targetModelPath"),
+      ::py::arg("outputPath"),
+      ::py::arg("verbose") = false);
+
+  sm.def(
+      "isArmBodyHeuristic",
+      +[](std::shared_ptr<dynamics::Skeleton> skel, std::string bodyName) {
+        return dart::biomechanics::OpenSimParser::isArmBodyHeuristic(
+            skel, bodyName);
+      },
+      ::py::arg("skel"),
+      ::py::arg("bodyName"));
+
+  sm.def(
+      "isTorsoBodyHeuristic",
+      +[](std::shared_ptr<dynamics::Skeleton> skel, std::string bodyName) {
+        return dart::biomechanics::OpenSimParser::isTorsoBodyHeuristic(
+            skel, bodyName);
+      },
+      ::py::arg("skel"),
+      ::py::arg("bodyName"));
+
+  sm.def(
+      "hasArms",
+      +[](std::shared_ptr<dynamics::Skeleton> skel) {
+        return dart::biomechanics::OpenSimParser::hasArms(skel);
+      },
+      ::py::arg("skel"));
+
+  sm.def(
+      "hasTorso",
+      +[](std::shared_ptr<dynamics::Skeleton> skel) {
+        return dart::biomechanics::OpenSimParser::hasTorso(skel);
+      },
+      ::py::arg("skel"));
+
+  sm.def(
+      "replaceOsimMarkers",
+      +[](const common::Uri& uri,
+          const std::map<std::string, std::pair<std::string, Eigen::Vector3s>>&
+              markerOffsets,
+          const std::map<std::string, bool>& isAnatomical,
+          const std::string& outputPath) {
+        return dart::biomechanics::OpenSimParser::replaceOsimMarkers(
+            uri, markerOffsets, isAnatomical, outputPath);
+      },
+      ::py::arg("inputPath"),
+      ::py::arg("markers"),
+      ::py::arg("isAnatomical"),
+      ::py::arg("outputPath"));
+
+  sm.def(
+      "replaceOsimInertia",
+      +[](const common::Uri& uri,
+          const std::shared_ptr<dynamics::Skeleton> skel,
+          const std::string& outputPath) {
+        return dart::biomechanics::OpenSimParser::replaceOsimInertia(
+            uri, skel, outputPath);
+      },
+      ::py::arg("inputPath"),
+      ::py::arg("skel"),
+      ::py::arg("outputPath"));
+
+  sm.def(
+      "filterJustMarkers",
+      +[](const common::Uri& uri, const std::string& outputPath) {
+        return dart::biomechanics::OpenSimParser::filterJustMarkers(
+            uri, outputPath);
+      },
+      ::py::arg("inputPath"),
+      ::py::arg("outputPath"));
+
+  sm.def(
       "loadTRC",
       +[](const std::string& path) {
         return dart::biomechanics::OpenSimParser::loadTRC(path);
       },
       ::py::arg("path"));
+
+  sm.def(
+      "loadGRF",
+      +[](const std::string& path,
+          const std::vector<double>& targetTimestamps) {
+        return dart::biomechanics::OpenSimParser::loadGRF(
+            path, targetTimestamps);
+      },
+      ::py::arg("path"),
+      ::py::arg("targetTimestamps") = ::py::list());
+
+  sm.def(
+      "saveTRC",
+      +[](const std::string& outputPath,
+          const std::vector<double>& timestamps,
+          const std::vector<std::map<std::string, Eigen::Vector3s>>&
+              markerTimesteps) {
+        return dart::biomechanics::OpenSimParser::saveTRC(
+            outputPath, timestamps, markerTimesteps);
+      },
+      ::py::arg("path"),
+      ::py::arg("timestamps"),
+      ::py::arg("markerTimestamps"));
 
   sm.def(
       "loadMot",
@@ -146,6 +402,37 @@ void OpenSimParser(py::module& m)
       },
       ::py::arg("skel"),
       ::py::arg("path"));
+
+  sm.def(
+      "loadMocoTrajectory",
+      +[](const std::string& path) {
+        return dart::biomechanics::OpenSimParser::loadMocoTrajectory(path);
+      },
+      ::py::arg("path"));
+
+  sm.def(
+      "appendMocoTrajectoryAndSaveCSV",
+      +[](const std::string& inputPath,
+          const dart::biomechanics::OpenSimMocoTrajectory& mocoTraj,
+          std::string outputPath) {
+        return dart::biomechanics::OpenSimParser::
+            appendMocoTrajectoryAndSaveCSV(inputPath, mocoTraj, outputPath);
+      },
+      ::py::arg("inputPath"),
+      ::py::arg("mocoTraj"),
+      ::py::arg("outputPath"));
+
+  sm.def(
+      "loadMotAtLowestMarkerRMSERotation",
+      +[](biomechanics::OpenSimFile osim,
+          const std::string& path,
+          biomechanics::C3D c3d) {
+        return dart::biomechanics::OpenSimParser::
+            loadMotAtLowestMarkerRMSERotation(osim, path, c3d);
+      },
+      ::py::arg("osim"),
+      ::py::arg("path"),
+      ::py::arg("c3d"));
 
   sm.def(
       "saveMot",
@@ -162,10 +449,75 @@ void OpenSimParser(py::module& m)
       ::py::arg("poses"));
 
   sm.def(
+      "saveRawGRFMot",
+      +[](const std::string& outputPath,
+          const std::vector<double>& timestamps,
+          const std::vector<biomechanics::ForcePlate> forcePlates) {
+        return dart::biomechanics::OpenSimParser::saveRawGRFMot(
+            outputPath, timestamps, forcePlates);
+      },
+      ::py::arg("outputPath"),
+      ::py::arg("timestamps"),
+      ::py::arg("forcePlates"));
+  sm.def(
+      "saveProcessedGRFMot",
+      +[](const std::string& outputPath,
+          const std::vector<double>& timestamps,
+          const std::vector<dynamics::BodyNode*> bodyNodes,
+          std::shared_ptr<dynamics::Skeleton> skel,
+          const Eigen::MatrixXs& poses,
+          const std::vector<biomechanics::ForcePlate>& forcePlates,
+          const Eigen::MatrixXs wrenches) {
+        return dart::biomechanics::OpenSimParser::saveProcessedGRFMot(
+            outputPath,
+            timestamps,
+            bodyNodes,
+            skel,
+            poses,
+            forcePlates,
+            wrenches);
+      },
+      ::py::arg("outputPath"),
+      ::py::arg("timestamps"),
+      ::py::arg("bodyNodes"),
+      ::py::arg("skel"),
+      ::py::arg("poses"),
+      ::py::arg("forcePlates"),
+      ::py::arg("wrenches"));
+
+  sm.def(
+      "saveIDMot",
+      +[](std::shared_ptr<dynamics::Skeleton> skel,
+          const std::string& outputPath,
+          const std::vector<double>& timestamps,
+          const Eigen::MatrixXs torques) {
+        return dart::biomechanics::OpenSimParser::saveIDMot(
+            skel, outputPath, timestamps, torques);
+      },
+      ::py::arg("skel"),
+      ::py::arg("outputPath"),
+      ::py::arg("timestamps"),
+      ::py::arg("forcePlates"));
+
+  sm.def(
       "getScaleAndMarkerOffsets",
       &dart::biomechanics::OpenSimParser::getScaleAndMarkerOffsets,
       ::py::arg("standardSkeleton"),
       ::py::arg("scaledSkeleton"));
+
+  sm.def(
+      "convertOsimToSDF",
+      &dart::biomechanics::OpenSimParser::convertOsimToSDF,
+      ::py::arg("uri"),
+      ::py::arg("outputPath"),
+      ::py::arg("mergeBodiesInto"));
+
+  sm.def(
+      "convertOsimToMJCF",
+      &dart::biomechanics::OpenSimParser::convertOsimToMJCF,
+      ::py::arg("uri"),
+      ::py::arg("outputPath"),
+      ::py::arg("mergeBodiesInto"));
 }
 
 } // namespace python

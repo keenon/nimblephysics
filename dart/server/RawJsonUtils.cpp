@@ -14,7 +14,7 @@ std::string numberToJson(s_t number)
 {
   if (isfinite(number))
   {
-    return std::to_string(number);
+    return std::to_string((double)number);
   }
   else
   {

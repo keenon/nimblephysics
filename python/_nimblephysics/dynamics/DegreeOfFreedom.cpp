@@ -30,6 +30,8 @@
  *   POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <string>
+
 #include <dart/dynamics/DegreeOfFreedom.hpp>
 #include <dart/dynamics/Skeleton.hpp>
 #include <pybind11/pybind11.h>
@@ -44,10 +46,7 @@ namespace python {
 
 void DegreeOfFreedom(py::module& m)
 {
-  ::py::class_<
-      dart::dynamics::DegreeOfFreedom,
-      dart::common::Subject,
-      std::shared_ptr<dart::dynamics::DegreeOfFreedom>>(m, "DegreeOfFreedom")
+  ::py::class_<dart::dynamics::DegreeOfFreedom>(m, "DegreeOfFreedom")
       .def(
           "setName",
           +[](dart::dynamics::DegreeOfFreedom* self, const std::string& _name)
@@ -144,9 +143,7 @@ void DegreeOfFreedom(py::module& m)
       .def(
           "getPositionLimits",
           +[](const dart::dynamics::DegreeOfFreedom* self)
-              -> std::pair<s_t, s_t> {
-            return self->getPositionLimits();
-          })
+              -> std::pair<s_t, s_t> { return self->getPositionLimits(); })
       .def(
           "setPositionLowerLimit",
           +[](dart::dynamics::DegreeOfFreedom* self, s_t _limit) {
@@ -223,9 +220,7 @@ void DegreeOfFreedom(py::module& m)
       .def(
           "getVelocityLimits",
           +[](const dart::dynamics::DegreeOfFreedom* self)
-              -> std::pair<s_t, s_t> {
-            return self->getVelocityLimits();
-          })
+              -> std::pair<s_t, s_t> { return self->getVelocityLimits(); })
       .def(
           "setVelocityLowerLimit",
           +[](dart::dynamics::DegreeOfFreedom* self, s_t _limit) {
@@ -319,9 +314,7 @@ void DegreeOfFreedom(py::module& m)
       .def(
           "getAccelerationLimits",
           +[](const dart::dynamics::DegreeOfFreedom* self)
-              -> std::pair<s_t, s_t> {
-            return self->getAccelerationLimits();
-          })
+              -> std::pair<s_t, s_t> { return self->getAccelerationLimits(); })
       .def(
           "setAccelerationLowerLimit",
           +[](dart::dynamics::DegreeOfFreedom* self, s_t _limit) {
@@ -357,7 +350,9 @@ void DegreeOfFreedom(py::module& m)
           })
       .def(
           "resetControlForce",
-          +[](dart::dynamics::DegreeOfFreedom* self) { self->resetControlForce(); })
+          +[](dart::dynamics::DegreeOfFreedom* self) {
+            self->resetControlForce();
+          })
       .def(
           "setControlForceLimits",
           +[](dart::dynamics::DegreeOfFreedom* self,
@@ -480,6 +475,11 @@ void DegreeOfFreedom(py::module& m)
           "getSkeleton",
           +[](dart::dynamics::DegreeOfFreedom* self)
               -> dart::dynamics::SkeletonPtr { return self->getSkeleton(); })
+      .def(
+          "getJointName",
+          +[](dart::dynamics::DegreeOfFreedom* self) -> std::string {
+            return self->getJoint()->getName();
+          })
       .def(
           "getSkeleton",
           +[](const dart::dynamics::DegreeOfFreedom* self)

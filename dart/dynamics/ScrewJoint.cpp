@@ -32,6 +32,7 @@
 
 #include "dart/dynamics/ScrewJoint.hpp"
 
+#include <exception>
 #include <string>
 
 #include "dart/dynamics/BodyNode.hpp"
@@ -175,6 +176,16 @@ ScrewJoint::getRelativeJacobianStatic(
   assert(!math::isNan(jacobian));
 
   return jacobian;
+}
+
+//==============================================================================
+/// Returns the value for q that produces the nearest rotation to
+/// `relativeRotation` passed in.
+Eigen::VectorXs ScrewJoint::getNearestPositionToDesiredRotation(
+    const Eigen::Matrix3s& relativeRotation)
+{
+  (void)relativeRotation;
+  throw std::exception();
 }
 
 //==============================================================================

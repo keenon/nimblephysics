@@ -34,6 +34,7 @@
 #include <eigen_geometry_pybind.h>
 #include <pybind11/eigen.h>
 #include <pybind11/pybind11.h>
+#include <pybind11/stl.h>
 
 namespace py = pybind11;
 
@@ -472,12 +473,7 @@ namespace py = pybind11;
               dart::dynamics::GenericJoint<space>,                             \
               dart::dynamics::detail::GenericJointState<space>,                \
               dart::dynamics::detail::GenericJointUniqueProperties<space>>>,   \
-      dart::common::Composite,                                                 \
-      std::shared_ptr<dart::common::SpecializedForAspect<                      \
-          dart::common::EmbeddedStateAndPropertiesAspect<                      \
-              dart::dynamics::GenericJoint<space>,                             \
-              dart::dynamics::detail::GenericJointState<space>,                \
-              dart::dynamics::detail::GenericJointUniqueProperties<space>>>>>( \
+      dart::common::Composite>( \
       m,                                                                       \
       "SpecializedForAspect_EmbeddedStateAndPropertiesAspect_"                 \
       "GenericJoint_" #name "_GenericJointState_GenericJointUniqueProperties") \
@@ -493,12 +489,7 @@ namespace py = pybind11;
           dart::common::EmbeddedStateAndPropertiesAspect<                      \
               dart::dynamics::GenericJoint<space>,                             \
               dart::dynamics::detail::GenericJointState<space>,                \
-              dart::dynamics::detail::GenericJointUniqueProperties<space>>>,   \
-      std::shared_ptr<dart::common::RequiresAspect<                            \
-          dart::common::EmbeddedStateAndPropertiesAspect<                      \
-              dart::dynamics::GenericJoint<space>,                             \
-              dart::dynamics::detail::GenericJointState<space>,                \
-              dart::dynamics::detail::GenericJointUniqueProperties<space>>>>>( \
+              dart::dynamics::detail::GenericJointUniqueProperties<space>>>>( \
       m,                                                                       \
       "RequiresAspect_EmbeddedStateAndPropertiesAspect_GenericJoint_" #name    \
       "_GenericJointState_GenericJointUniqueProperties")                       \
@@ -513,11 +504,7 @@ namespace py = pybind11;
           dart::common::EmbeddedStateAndPropertiesAspect<                      \
               dart::dynamics::GenericJoint<space>,                             \
               dart::dynamics::detail::GenericJointState<space>,                \
-              dart::dynamics::detail::GenericJointUniqueProperties<space>>>,   \
-      std::shared_ptr<dart::common::EmbedStateAndProperties<                   \
-          dart::dynamics::GenericJoint<space>,                                 \
-          dart::dynamics::detail::GenericJointState<space>,                    \
-          dart::dynamics::detail::GenericJointUniqueProperties<space>>>>(      \
+              dart::dynamics::detail::GenericJointUniqueProperties<space>>>>(      \
       m,                                                                       \
       "EmbedStateAndProperties_GenericJoint_" #name                            \
       "GenericJointState_GenericJointUniqueProperties");                       \
@@ -533,13 +520,7 @@ namespace py = pybind11;
           dart::dynamics::GenericJoint<space>,                                 \
           dart::dynamics::detail::GenericJointState<space>,                    \
           dart::dynamics::detail::GenericJointUniqueProperties<space>>,        \
-      dart::dynamics::Joint,                                                   \
-      std::shared_ptr<dart::common::CompositeJoiner<                           \
-          dart::common::EmbedStateAndProperties<                               \
-              dart::dynamics::GenericJoint<space>,                             \
-              dart::dynamics::detail::GenericJointState<space>,                \
-              dart::dynamics::detail::GenericJointUniqueProperties<space>>,    \
-          dart::dynamics::Joint>>>(                                            \
+      dart::dynamics::Joint>(                                            \
       m,                                                                       \
       "CompositeJoiner_EmbedStateAndProperties_GenericJoint_" #name            \
       "GenericJointStateGenericJointUniqueProperties_Joint");                  \
@@ -555,12 +536,7 @@ namespace py = pybind11;
               dart::dynamics::GenericJoint<space>,                             \
               dart::dynamics::detail::GenericJointState<space>,                \
               dart::dynamics::detail::GenericJointUniqueProperties<space>>,    \
-          dart::dynamics::Joint>,                                              \
-      std::shared_ptr<dart::common::EmbedStateAndPropertiesOnTopOf<            \
-          dart::dynamics::GenericJoint<space>,                                 \
-          dart::dynamics::detail::GenericJointState<space>,                    \
-          dart::dynamics::detail::GenericJointUniqueProperties<space>,         \
-          dart::dynamics::Joint>>>(                                            \
+          dart::dynamics::Joint>>(                                            \
       m,                                                                       \
       "EmbedStateAndPropertiesOnTopOf_GenericJoint_" #name                     \
       "_GenericJointState_GenericJointUniqueProperties_Joint");                \
@@ -571,33 +547,8 @@ namespace py = pybind11;
           dart::dynamics::GenericJoint<space>,                                 \
           dart::dynamics::detail::GenericJointState<space>,                    \
           dart::dynamics::detail::GenericJointUniqueProperties<space>,         \
-          dart::dynamics::Joint>,                                              \
-      std::shared_ptr<dart::dynamics::GenericJoint<space>>>(                   \
+          dart::dynamics::Joint>>(                   \
       m, "GenericJoint_" #name)                                                \
-      .def(                                                                    \
-          "hasGenericJointAspect",                                             \
-          +[](const dart::dynamics::GenericJoint<space>* self) -> bool {       \
-            return self->hasGenericJointAspect();                              \
-          })                                                                   \
-      .def(                                                                    \
-          "setGenericJointAspect",                                             \
-          +[](dart::dynamics::GenericJoint<space>* self,                       \
-              const dart::dynamics::GenericJoint<space>::Aspect* aspect) {     \
-            self->setGenericJointAspect(aspect);                               \
-          },                                                                   \
-          ::py::arg("aspect"))                                                 \
-      .def(                                                                    \
-          "removeGenericJointAspect",                                          \
-          +[](dart::dynamics::GenericJoint<space>* self) {                     \
-            self->removeGenericJointAspect();                                  \
-          })                                                                   \
-      .def(                                                                    \
-          "releaseGenericJointAspect",                                         \
-          +[](dart::dynamics::GenericJoint<space>* self)                       \
-              -> std::unique_ptr<                                              \
-                  dart::dynamics::GenericJoint<space>::Aspect> {               \
-            return self->releaseGenericJointAspect();                          \
-          })                                                                   \
       .def(                                                                    \
           "setProperties",                                                     \
           +[](dart::dynamics::GenericJoint<space>* self,                       \
@@ -609,19 +560,6 @@ namespace py = pybind11;
           +[](dart::dynamics::GenericJoint<space>* self,                       \
               const dart::dynamics::GenericJoint<space>::UniqueProperties&     \
                   properties) { self->setProperties(properties); },            \
-          ::py::arg("properties"))                                             \
-      .def(                                                                    \
-          "setAspectState",                                                    \
-          +[](dart::dynamics::GenericJoint<space>* self,                       \
-              const dart::dynamics::GenericJoint<space>::AspectState& state) { \
-            self->setAspectState(state);                                       \
-          },                                                                   \
-          ::py::arg("state"))                                                  \
-      .def(                                                                    \
-          "setAspectProperties",                                               \
-          +[](dart::dynamics::GenericJoint<space>* self,                       \
-              const dart::dynamics::GenericJoint<space>::AspectProperties&     \
-                  properties) { self->setAspectProperties(properties); },      \
           ::py::arg("properties"))                                             \
       .def(                                                                    \
           "getGenericJointProperties",                                         \
@@ -1314,6 +1252,7 @@ void GenericJoint(py::module& m)
   DARTPY_DEFINE_GENERICJOINT(R1, ::dart::math::RealVectorSpace<1>);
   DARTPY_DEFINE_GENERICJOINT(R2, ::dart::math::RealVectorSpace<2>);
   DARTPY_DEFINE_GENERICJOINT(R3, ::dart::math::RealVectorSpace<3>);
+  DARTPY_DEFINE_GENERICJOINT(R4, ::dart::math::RealVectorSpace<4>);
   DARTPY_DEFINE_GENERICJOINT(R6, ::dart::math::RealVectorSpace<6>);
   DARTPY_DEFINE_GENERICJOINT(SO3, ::dart::math::SO3Space);
   DARTPY_DEFINE_GENERICJOINT(SE3, ::dart::math::SE3Space);

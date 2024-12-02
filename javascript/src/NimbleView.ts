@@ -6,17 +6,20 @@ import View from "./components/View";
 import Slider from "./components/Slider";
 import SimplePlot from "./components/SimplePlot";
 import RichPlot from "./components/RichPlot";
+import { dart } from './proto/GUI';
+import { MeshLine, MeshLineMaterial } from './THREE.MeshLine';
 import VERSION_NUM from "../../VERSION.txt";
 import logoSvg from "!!raw-loader!./nimblelogo.svg";
 import leftMouseSvg from "!!raw-loader!./leftMouse.svg";
 import rightMouseSvg from "!!raw-loader!./rightMouse.svg";
+import scrollMouseSvg from "!!raw-loader!./scrollMouse.svg";
 
 const SCALE_FACTOR = 100;
 
 type Text = {
   type: "text";
   container: HTMLElement;
-  key: string;
+  key: number;
   from_top_left: number[];
   size: number[];
   contents: string;
@@ -26,11 +29,150 @@ type Button = {
   type: "button";
   container: HTMLElement;
   buttonElem: HTMLButtonElement;
-  key: string;
+  key: number;
   from_top_left: number[];
   size: number[];
   label: string;
 };
+
+class Layer {
+  view: DARTView;
+  shown: boolean;
+  key: number;
+  name: string;
+  color: number[];
+  objects: Set<number>;
+  uiElements: Set<number>;
+
+  constructor(key: number, name: string, color: number[], shown: boolean, view: DARTView) {
+    this.key = key;
+    this.name = name;
+    this.color = color;
+    this.view = view;
+    this.objects = new Set();
+    this.uiElements = new Set();
+    this.shown = shown;
+
+    const row = document.createElement("tr");
+
+    const checkCell = document.createElement("td");
+    row.appendChild(checkCell);
+    const checkbox = document.createElement("input");
+    checkbox.type = "checkbox";
+    checkbox.checked = shown;
+    checkCell.appendChild(checkbox);
+
+    const nameCell = document.createElement("td");
+    row.appendChild(nameCell);
+    const nameColor = document.createElement('div');
+    nameColor.style.width = '20px';
+    nameColor.style.height = '20px';
+    nameColor.style.marginRight = '7px';
+    nameColor.style.display = 'inline-block';
+    nameColor.style.verticalAlign = 'middle';
+    nameColor.style.backgroundColor = 'rgba('+(color[0]*255)+','+(color[1]*255)+','+(color[2]*255)+','+color[3]+')';
+    nameCell.appendChild(nameColor);
+    const nameSpan = document.createElement("span");
+    nameSpan.innerHTML = this.name === '' ? 'Default' : this.name;
+    nameCell.appendChild(nameSpan);
+
+    this.view.layersTable.appendChild(row);
+
+    checkbox.onclick = () => {
+      if (!checkbox.checked) {
+        this.hide();
+      }
+      else {
+        this.show();
+      }
+    };
+  }
+
+  addObject = (key: number) => {
+    this.objects.add(key);
+    if (this.shown) {
+      this.view.showObject(key);
+    }
+    else {
+      this.view.hideObject(key);
+    }
+  };
+
+  addUIElement = (key: number) => {
+    this.uiElements.add(key);
+  };
+
+  show = () => {
+    console.log("Show: "+this.name);
+    this.shown = true;
+    this.objects.forEach((key) => {
+      this.view.showObject(key);
+    });
+    this.view.render();
+  };
+
+  hide = () => {
+    this.shown = false;
+    this.objects.forEach((key) => {
+      this.view.hideObject(key);
+    });
+    this.view.render();
+  };
+}
+
+class ObjectWarning {
+  view: DARTView;
+  objectKey: number;
+  warningKey: number;
+  warning: string;
+  shown: boolean;
+  div: HTMLElement;
+  button: HTMLButtonElement;
+
+  constructor(view: DARTView, key: number, warningKey: number, warning: string) {
+    this.objectKey = key;
+    this.warningKey = warningKey;
+    this.warning = warning;
+    this.shown = true;
+    this.view = view;
+    this.div = document.createElement("div");
+    this.div.addEventListener("mouseover", () => {
+      this.view.onMouseoverWarning(this.warningKey);
+    });
+    this.div.addEventListener("mouseout", () => {
+      this.view.onMouseoutWarning(this.warningKey);
+    });
+    this.div.className = "ObjectWarning";
+    this.div.style.position = "absolute";
+    this.div.innerHTML = this.warning;
+    this.button = document.createElement("button");
+    this.button.innerHTML = "Dismiss";
+    this.button.onclick = () => {
+      this.view.dismissWarning(this.warningKey);
+      this.remove();
+    };
+    this.div.appendChild(this.button);
+    this.view.uiContainer.appendChild(this.div);
+  }
+
+  update = () => {
+    const pos = this.view.view.getObjectScreenPosition(this.objectKey);
+    if (pos != null) {
+      // The magic offsets are so that the CSS arrow points to the object
+      this.div.style.top = (pos[1] + 15) + "px";
+      this.div.style.left = (pos[0] - 20) + "px";
+      this.div.style.display = "block";
+    }
+  }
+
+  remove = () => {
+    this.div.remove();
+  }
+
+  focus = () => {
+    const pos = this.view.view.centerObject(this.objectKey);
+  }
+}
 
 class DARTView {
   scene: THREE.Scene;
@@ -40,20 +182,40 @@ class DARTView {
   view: View;
   running: boolean;
 
-  objects: Map<string, THREE.Group | THREE.Mesh | THREE.Line>;
-  keys: Map<THREE.Object3D, string>;
-  textures: Map<string, THREE.Texture>;
-  disposeHandlers: Map<string, () => void>;
-  objectType: Map<string, string>;
+  objects: Map<number, THREE.Group | THREE.Mesh | THREE.Line>;
+  meshLines: Map<number, MeshLine>;
+  meshLineGeometry: Map<number, THREE.Geometry>;
+  objectColors: Map<number, number[]>;
+  keys: Map<THREE.Object3D, number>;
+  textures: Map<number, THREE.Texture>;
+  disposeHandlers: Map<number, () => void>;
+  objectType: Map<number, string>;
+  objectWarnings: Map<number, ObjectWarning>;
+  mouseoverWarning: number;
+  mouseoverWarningListeners: Map<number, (over: boolean) => void>;
+  dismissedWarnings: Set<number>;
 
-  uiElements: Map<string, Text | Button | Slider | SimplePlot | RichPlot>;
+  uiElements: Map<number, Text | Button | Slider | SimplePlot | RichPlot>;
 
-  dragListeners: ((key: string, pos: number[]) => void)[];
+  dragListeners: ((key: number, pos: number[]) => void)[];
+  dragEndListeners: ((key: number) => void)[];
+  tooltipEditListeners: ((key: number, tooltip: string) => void)[];
 
   sphereGeometry: THREE.SphereBufferGeometry;
+  coneGeometry: THREE.ConeBufferGeometry;
+  cylinderGeometry: THREE.CylinderBufferGeometry;
+
+  layers: Map<number, Layer>;
 
   connected: boolean;
   notConnectedWarning: HTMLElement;
+  layersTable: HTMLElement;
+
+  tooltip: HTMLElement;
+  hovering: number[];
+  editingTooltip: boolean = false;
+
+  backgroundColor: string = '#ffffff';
 
   constructor(container: HTMLElement, startConnected: boolean = false) {
     container.className += " DARTWindow";
@@ -65,17 +227,32 @@ class DARTView {
     this.container.appendChild(this.glContainer);
     this.container.appendChild(this.uiContainer);
 
+    this.tooltip = document.createElement("div");
+    this.tooltip.className = 'Tooltip';
+    this.uiContainer.appendChild(this.tooltip);
+    this.hovering = []
+
     this.objects = new Map();
+    this.meshLines = new Map();
+    this.meshLineGeometry = new Map();
+    this.objectColors = new Map();
     this.keys = new Map();
     this.disposeHandlers = new Map();
     this.textures = new Map();
     this.uiElements = new Map();
     this.objectType = new Map();
+    this.objectWarnings = new Map();
+    this.mouseoverWarning = -1;
+    this.mouseoverWarningListeners = new Map();
+    this.dismissedWarnings = new Set();
     this.dragListeners = [];
+    this.dragEndListeners = [];
+    this.tooltipEditListeners = [];
+    this.layers = new Map();
 
     this.scene = new THREE.Scene();
     // this.scene.background = new THREE.Color(0xf8f8f8);
-    this.scene.background = new THREE.Color(0xffffff);
+    this.scene.background = new THREE.Color(this.backgroundColor);
 
     const light = new THREE.DirectionalLight();
     light.castShadow = true;
@@ -114,11 +291,12 @@ class DARTView {
     updateCamera();
     */
 
-    this.view = new View(this.scene, this.glContainer);
+    this.view = new View(this.scene, this.glContainer, this.onTooltipHoveron, this.onTooltipHoveroff, this.onEditTooltip, this.onRerender);
     this.running = false;
 
     this.glContainer.addEventListener("keydown", this.glContainerKeyboardEventListener);
 
+    window.addEventListener('mousemove', this.tooltipMousemoveListener);
     /// Get ready to deal with object dragging
 
     this.view.setDragHandler((obj: THREE.Object3D, posVec: THREE.Vector3) => {
@@ -131,6 +309,9 @@ class DARTView {
       if (key != null) {
         this.dragListeners.forEach((listener) => listener(key, pos));
       }
+    }, (obj: THREE.Object3D) => {
+      let key = this.keys.get(obj);
+      this.dragEndListeners.forEach(l => l(key));
     });
 
     /// Random GUI stuff
@@ -142,6 +323,7 @@ class DARTView {
 
     const logo = document.createElement("svg");
     logo.innerHTML = logoSvg;
+    logo.style.width = "30px";
     title.appendChild(logo);
 
     const titleText = document.createElement("span");
@@ -156,9 +338,6 @@ class DARTView {
 
     const instructionsRow1 = document.createElement("tr");
     instructions.appendChild(instructionsRow1);
-    const instructionsRow2 = document.createElement("tr");
-    instructions.appendChild(instructionsRow2);
-
     const leftMouseCell = document.createElement("td");
     instructionsRow1.appendChild(leftMouseCell);
     const leftMouseImg = document.createElement("svg");
@@ -168,6 +347,8 @@ class DARTView {
     instructionsRow1.appendChild(leftMouseInstructionsCell);
     leftMouseInstructionsCell.innerHTML = "Rotate view";
 
+    const instructionsRow2 = document.createElement("tr");
+    instructions.appendChild(instructionsRow2);
     const rightMouseCell = document.createElement("td");
     instructionsRow2.appendChild(rightMouseCell);
     const rightMouseImg = document.createElement("svg");
@@ -177,7 +358,55 @@ class DARTView {
     instructionsRow2.appendChild(rightMouseInstructionsCell);
     rightMouseInstructionsCell.innerHTML = "Translate view";
 
+    const instructionsRow3 = document.createElement("tr");
+    instructions.appendChild(instructionsRow3);
+    const scrollMouseCell = document.createElement("td");
+    instructionsRow3.appendChild(scrollMouseCell);
+    const scrollMouseImg = document.createElement("svg");
+    scrollMouseImg.innerHTML = scrollMouseSvg;
+    scrollMouseCell.appendChild(scrollMouseImg);
+    const scrollMouseInstructionsCell = document.createElement("td");
+    instructionsRow3.appendChild(scrollMouseInstructionsCell);
+    scrollMouseInstructionsCell.innerHTML = "Zoom view";
+
+    const instructionsRow4 = document.createElement("tr");
+    instructions.appendChild(instructionsRow4);
+    const cKeyCell = document.createElement("td");
+    instructionsRow4.appendChild(cKeyCell);
+    cKeyCell.className = 'GUI_instruction_center';
+    const cKey = document.createElement("td");
+    cKeyCell.appendChild(cKey);
+    cKey.className = 'GUI_instruction_key';
+    cKey.innerHTML = "c";
+    const centerInstructionsCell = document.createElement("td");
+    instructionsRow4.appendChild(centerInstructionsCell);
+    centerInstructionsCell.innerHTML = "Center view";
+
     this.uiContainer.appendChild(instructions);
+
+    const layersTableOuter = document.createElement("table");
+    layersTableOuter.className = "GUI_layers";
+
+    const layersTableHead = document.createElement("thead");
+
+    const layersTableHeadRow = document.createElement("tr");
+    const layersTableHeadElem = document.createElement("td");
+    layersTableHeadElem.colSpan = 2;
+    layersTableHeadElem.innerHTML = "LAYERS";
+    layersTableHeadRow.appendChild(layersTableHeadElem);
+    layersTableHead.appendChild(layersTableHeadRow);
+    layersTableOuter.appendChild(layersTableHead);
+
+    const layersTableBody = document.createElement("tbody");
+    layersTableOuter.appendChild(layersTableBody);
+    this.layersTable = layersTableBody;
+
+
+    const layersTableHolder = document.createElement("div");
+    layersTableHolder.className = "GUI_layers_container";
+    layersTableHolder.appendChild(layersTableOuter);
+
+    this.uiContainer.appendChild(layersTableHolder);
 
     // Set up the reusable sphere geometry
 
@@ -187,12 +416,151 @@ class DARTView {
       NUM_SPHERE_SEGMENTS,
       NUM_SPHERE_SEGMENTS
     );
+    this.coneGeometry = new THREE.ConeBufferGeometry(SCALE_FACTOR, SCALE_FACTOR, NUM_SPHERE_SEGMENTS, 1, false);
+    this.cylinderGeometry = new THREE.CylinderBufferGeometry(SCALE_FACTOR, SCALE_FACTOR, SCALE_FACTOR, NUM_SPHERE_SEGMENTS, 1, false);
   }
+
+  setBackgroundColor = (color: string) => {
+    this.backgroundColor = color;
+    this.scene.background = new THREE.Color(color);
+    this.render();
+  };
+
+  getBackgroundColor = () => {
+    return this.backgroundColor;
+  };
 
   glContainerKeyboardEventListener = (e: KeyboardEvent) => {
     if (e.key === " ") {
       e.preventDefault();
     }
+  };
+
+  onTooltipHoveron = (keys: number[], tooltip: string, top_x: number, top_y: number) => {
+    if (this.editingTooltip) {
+      return;
+    }
+
+    this.tooltip.innerHTML = tooltip;
+    this.tooltip.style.top = top_y+'px';
+    this.tooltip.style.left = top_x+'px';
+    this.tooltip.style.opacity = '1.0';
+    if (JSON.stringify(keys) !== JSON.stringify(this.hovering)) {
+      if (this.hovering.length > 0) {
+        this.hovering.forEach(k => {
+          this.resetObjectColor(k);
+        });
+      }
+
+      keys.forEach((key) => {
+        const currentColor = this.objectColors.get(key);
+        let hoverColor = [currentColor[0]*0.7, currentColor[1]*0.7, currentColor[2]*0.7, 1];
+        this.setObjectColor(key, hoverColor, false);
+      })
+
+      this.hovering = keys;
+      this.render();
+    }
+  };
+
+  onEditTooltip = (key: number) => {
+    this.editingTooltip = true;
+    this.tooltip.style.opacity = '1.0';
+    const textField = document.createElement('input');
+    textField.type = 'text';
+    textField.value = this.tooltip.innerHTML;
+    this.tooltip.innerHTML = '';
+    this.tooltip.className += ' Tooltip-edit';
+    this.tooltip.appendChild(textField);
+    const lostFocus = () => {
+      const finalValue = textField.value;
+      this.tooltip.removeChild(textField);
+      this.tooltip.innerHTML = finalValue;
+      this.tooltip.className = 'Tooltip';
+
+      this.tooltipEditListeners.forEach(l => l(key, finalValue));
+
+      this.editingTooltip = false;
+    };
+    const onBlur = () => {
+      lostFocus();
+      this.onTooltipHoveroff();
+    };
+    textField.addEventListener('blur', onBlur);
+    textField.addEventListener('keydown', (e: KeyboardEvent) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        e.stopPropagation();
+        // Prevent a race condition with the blur handler that is difficult to reason about
+        textField.removeEventListener('blur', onBlur);
+        lostFocus();
+      }
+    });
+    textField.focus();
+  };
+
+  onRerender = () => {
+    // Update the warning elements, if we have any
+    this.objectWarnings.forEach((v, k) => v.update());
+  };
+
+  focusOnWarning = (warningKey: number) => {
+    const warningObject = this.objectWarnings.get(warningKey);
+    if (warningObject != null) {
+      warningObject.focus();
+    }
+  }
+
+  onMouseoverWarning = (key: number) => {
+    this.mouseoverWarning = key;
+  }
+
+  onMouseoutWarning = (key: number) => {
+    if (this.mouseoverWarning === key) {
+      this.mouseoverWarning = -1;
+    }
+  }
+
+  isWarningMouseover = (key: number) => {
+    return this.mouseoverWarning === key;
+  }
+
+  dismissWarning = (key: number) => {
+    this.dismissedWarnings.add(key);
+  }
+
+  isWarningDismissed = (key: number) => {
+    if (this.dismissedWarnings.has(key)) {
+      return true;
+    }
+    return false;
+  }
+
+  tooltipMousemoveListener = (e: MouseEvent) => {
+    if (this.editingTooltip) {
+      return;
+    }
+
+    const rect = this.container.getBoundingClientRect();
+    const mouseX = e.clientX - rect.left;
+    const mouseY = e.clientY - rect.top;
+    this.tooltip.style.top = mouseY+'px';
+    this.tooltip.style.left = mouseX+'px';
+  }
+
+  onTooltipHoveroff = () => {
+    if (this.editingTooltip) {
+      return;
+    }
+
+    if (this.hovering.length > 0) {
+      this.hovering.forEach(k => {
+        this.resetObjectColor(k);
+      });
+      this.hovering = [];
+      this.render();
+    }
+    this.tooltip.style.opacity = '0.0';
   };
 
   /**
@@ -203,7 +571,7 @@ class DARTView {
 
     // Clean up leftover callbacks that could cause a leak
     this.disposeHandlers.clear();
-    this.view.setDragHandler(null);
+    this.view.setDragHandler(null, null);
     this.glContainer.removeEventListener("keydown", this.glContainerKeyboardEventListener);
 
     this.scene = null;
@@ -216,145 +584,342 @@ class DARTView {
   /**
    * This reads and handles a command sent from the backend
    */
-  handleCommand = (command: Command) => {
-    if (command.type === "create_box") {
+  handleCommand = (command: dart.proto.Command) => {
+    if (command.layer != null) {
+      const key = command.layer.key;
+      const name = command.layer.name;
+      const color = command.layer.color;
+      const show = command.layer.default_show === true;
+      this.createLayer(key, name, color, show);
+    }
+    else if (command.box != null) {
+      const data = command.box.data;
+      const size: number[] = [data[0], data[1], data[2]];
+      const pos: number[] = [data[3], data[4], data[5]];
+      const euler: number[] = [data[6], data[7], data[8]];
+      const color: number[] = [data[9], data[10], data[11], data[12]];
       this.createBox(
-        command.key,
-        command.size,
-        command.pos,
-        command.euler,
-        command.color,
-        command.cast_shadows,
-        command.receive_shadows
+        command.box.key,
+        size,
+        pos,
+        euler,
+        color,
+        command.box.layer,
+        command.box.cast_shadows === true,
+        command.box.receive_shadows === true
       );
-    } else if (command.type === "create_sphere") {
-      this.createSphere(
-        command.key,
-        command.radius,
-        command.pos,
-        command.color,
-        command.cast_shadows,
-        command.receive_shadows
+    }
+    else if (command.sphere != null) {
+      const data = command.sphere.data;
+      // For backwards compatibility
+      if (data.length == 8) {
+        const radii: number[] = [data[0], data[0], data[0]];
+        const pos: number[] = [data[1], data[2], data[3]];
+        const color: number[] = [data[4], data[5], data[6], data[7]];
+        this.createSphere(
+          command.sphere.key,
+          radii,
+          pos,
+          color,
+          command.sphere.layer,
+          command.sphere.cast_shadows === true,
+          command.sphere.receive_shadows === true
+        );
+      }
+      else {
+        const radii: number[] = [data[0], data[1], data[2]];
+        const pos: number[] = [data[3], data[4], data[5]];
+        const color: number[] = [data[6], data[7], data[8], data[9]];
+        this.createSphere(
+          command.sphere.key,
+          radii,
+          pos,
+          color,
+          command.sphere.layer,
+          command.sphere.cast_shadows === true,
+          command.sphere.receive_shadows === true
+        );
+      }
+    }
+    else if (command.cone != null) {
+      const data = command.cone.data;
+      const radius: number = data[0];
+      const height: number = data[1];
+      const pos: number[] = [data[2], data[3], data[4]];
+      const euler: number[] = [data[5], data[6], data[7]];
+      const color: number[] = [data[8], data[9], data[10], data[11]];
+      this.createCone(
+        command.cone.key,
+        radius,
+        height,
+        pos,
+        euler,
+        color,
+        command.cone.layer,
+        command.cone.cast_shadows === true,
+        command.cone.receive_shadows === true
       );
-    } else if (command.type === "create_capsule") {
+    }
+    else if (command.cylinder != null) {
+      const data = command.cylinder.data;
+      const radius: number = data[0];
+      const height: number = data[1];
+      const pos: number[] = [data[2], data[3], data[4]];
+      const euler: number[] = [data[5], data[6], data[7]];
+      const color: number[] = [data[8], data[9], data[10], data[11]];
+      this.createCylinder(
+        command.cylinder.key,
+        radius,
+        height,
+        pos,
+        euler,
+        color,
+        command.cylinder.layer,
+        command.cylinder.cast_shadows === true,
+        command.cylinder.receive_shadows === true
+      );
+    }
+    else if (command.capsule != null) {
+      const data = command.capsule.data;
+      const radius: number = data[0];
+      const height: number = data[1];
+      const pos: number[] = [data[2], data[3], data[4]];
+      const euler: number[] = [data[5], data[6], data[7]];
+      const color: number[] = [data[8], data[9], data[10], data[11]];
       this.createCapsule(
-        command.key,
-        command.radius,
-        command.height,
-        command.pos,
-        command.euler,
-        command.color,
-        command.cast_shadows,
-        command.receive_shadows
+        command.capsule.key,
+        radius,
+        height,
+        pos,
+        euler,
+        color,
+        command.capsule.layer,
+        command.capsule.cast_shadows === true,
+        command.capsule.receive_shadows === true
       );
-    } else if (command.type === "create_line") {
-      this.createLine(command.key, command.points, command.color);
-    } else if (command.type === "create_mesh") {
+    }
+    else if (command.set_object_tooltip != null) {
+      this.setTooltip(command.set_object_tooltip.key, command.set_object_tooltip.tooltip);
+    }
+    else if (command.delete_object_tooltip != null) {
+      this.deleteTooltip(command.delete_object_tooltip.key);
+    }
+    else if (command.set_object_warning != null) {
+      this.setObjectWarning(command.set_object_warning.key, command.set_object_warning.warning_key, command.set_object_warning.warning);
+    }
+    else if (command.delete_object_warning != null) {
+      this.deleteObjectWarning(command.delete_object_warning.key, command.delete_object_warning.warning_key);
+    }
+    else if (command.line != null) {
+      const color: number[] = [command.line.color[0], command.line.color[1], command.line.color[2], command.line.color[3]];
+      const vertices: number[][] = [];
+      for (let i = 0; i < command.line.points.length; i++) {
+        if (i % 3 == 0) {
+          vertices.push([]);
+        }
+        vertices[vertices.length-1].push(command.line.points[i]);
+      }
+      const width: number[] = command.line.width;
+
+      this.createMeshLine(
+        command.line.key,
+        vertices,
+        color,
+        command.line.layer,
+        width
+      );
+    }
+    else if (command.mesh != null) {
+      const vertices: number[][] = [];
+      const vertexNormals: number[][] = [];
+      for (let i = 0; i < command.mesh.vertex.length; i++) {
+        if (i % 3 == 0) {
+          vertices.push([]);
+          vertexNormals.push([]);
+        }
+        vertices[vertices.length-1].push(command.mesh.vertex[i]);
+        vertexNormals[vertexNormals.length-1].push(command.mesh.vertex_normal[i]);
+      }
+      const faces: number[][] = [];
+      for (let i = 0; i < command.mesh.face.length; i++) {
+        if (i % 3 == 0) {
+          faces.push([]);
+        }
+        faces[faces.length-1].push(command.mesh.face[i]);
+      }
+      const uvs: number[][] = [];
+      for (let i = 0; i < command.mesh.uv.length; i++) {
+        if (i % 2 == 0) {
+          uvs.push([]);
+        }
+        uvs[uvs.length-1].push(command.mesh.uv[i]);
+      }
+      const texture_starts: {
+        key: number,
+        start: number
+      }[] = [];
+      for (let i = 0; i < command.mesh.texture.length; i++) {
+        texture_starts.push({
+          key: command.mesh.texture[i],
+          start: command.mesh.texture_start[i]
+        });
+      }
+      const data = command.mesh.data;
+      const scale: number[] = [data[0], data[1], data[2]];
+      const pos: number[] = [data[3], data[4], data[5]];
+      const euler: number[] = [data[6], data[7], data[8]];
+      const color: number[] = [data[9], data[10], data[11], data[12]];
       this.createMesh(
-        command.key,
-        command.vertices,
-        command.vertex_normals,
-        command.faces,
-        command.uv,
-        command.texture_starts,
-        command.pos,
-        command.euler,
-        command.scale,
-        command.color,
-        command.cast_shadows,
-        command.receive_shadows
+        command.mesh.key,
+        vertices,
+        vertexNormals,
+        faces,
+        uvs,
+        texture_starts,
+        pos,
+        euler,
+        scale,
+        color,
+        command.mesh.layer,
+        command.mesh.cast_shadows === true,
+        command.mesh.receive_shadows === true
       );
-    } else if (command.type === "create_texture") {
-      this.createTexture(command.key, command.base64);
-    } else if (command.type === "set_object_pos") {
-      this.setObjectPos(command.key, command.pos);
-    } else if (command.type === "set_object_rotation") {
-      this.setObjectRotation(command.key, command.euler);
-    } else if (command.type === "set_object_color") {
-      this.setObjectColor(command.key, command.color);
-    } else if (command.type === "set_object_scale") {
-      this.setObjectScale(command.key, command.scale);
-    } else if (command.type === "enable_mouse") {
-      this.enableMouseInteraction(command.key);
-    } else if (command.type === "disable_mouse") {
-      this.disableMouseInteraction(command.key);
-    } else if (command.type === "create_text") {
+    }
+    else if (command.texture != null) {
+      this.createTexture(command.texture.key, command.texture.base64);
+    }
+    else if (command.set_object_position != null) {
+      const data = command.set_object_position.data;
+      const pos: number[] = [data[0], data[1], data[2]];
+      this.setObjectPos(command.set_object_position.key, pos);
+    }
+    else if (command.set_object_rotation != null) {
+      const data = command.set_object_rotation.data;
+      const euler: number[] = [data[0], data[1], data[2]];
+      this.setObjectRotation(command.set_object_rotation.key, euler);
+    }
+    else if (command.set_object_scale != null) {
+      const data = command.set_object_scale.data;
+      const scale: number[] = [data[0], data[1], data[2]];
+      this.setObjectScale(command.set_object_scale.key, scale);
+    }
+    else if (command.set_object_color != null) {
+      const data = command.set_object_color.data;
+      const color: number[] = [data[0], data[1], data[2], data[3]];
+      this.setObjectColor(command.set_object_color.key, color, true);
+    }
+    else if (command.enable_drag != null) {
+      this.enableDrag(command.enable_drag.key);
+    }
+    else if (command.enable_edit_tooltip != null) {
+      this.enableEditTooltip(command.enable_edit_tooltip.key);
+    }
+    else if (command.text != null) {
+      const from_top_left: number[] = [command.text.pos[0], command.text.pos[1]];
+      const size: number[] = [command.text.pos[2], command.text.pos[3]];
       this.createText(
-        command.key,
-        command.from_top_left,
-        command.size,
-        command.contents
+        command.text.key,
+        from_top_left,
+        size,
+        command.text.contents,
+        command.text.layer
       );
-    } else if (command.type === "create_plot") {
+    }
+    else if (command.plot != null) {
+      const from_top_left: number[] = [command.plot.pos[0], command.plot.pos[1]];
+      const size: number[] = [command.plot.pos[2], command.plot.pos[3]];
+      const minX = command.plot.bounds[0];
+      const maxX = command.plot.bounds[1];
+      const minY = command.plot.bounds[2];
+      const maxY = command.plot.bounds[3];
       this.createSimplePlot(
-        command.key,
-        command.from_top_left,
-        command.size,
-        command.min_x,
-        command.max_x,
-        command.xs,
-        command.min_y,
-        command.max_y,
-        command.ys,
-        command.plot_type
+        command.plot.key,
+        from_top_left,
+        size,
+        minX,
+        maxX,
+        command.plot.xs,
+        minY,
+        maxY,
+        command.plot.ys,
+        command.plot.plot_type as any,
+        command.plot.layer
       );
-    } else if (command.type === "create_rich_plot") {
+    }
+    else if (command.rich_plot != null) {
+      const from_top_left: number[] = [command.rich_plot.pos[0], command.rich_plot.pos[1]];
+      const size: number[] = [command.rich_plot.pos[2], command.rich_plot.pos[3]];
+      const minX = command.rich_plot.bounds[0];
+      const maxX = command.rich_plot.bounds[1];
+      const minY = command.rich_plot.bounds[2];
+      const maxY = command.rich_plot.bounds[3];
       this.createRichPlot(
-        command.key,
-        command.from_top_left,
-        command.size,
-        command.min_x,
-        command.max_x,
-        command.min_y,
-        command.max_y,
-        command.title,
-        command.x_axis_label,
-        command.y_axis_label
+        command.rich_plot.key,
+        from_top_left,
+        size,
+        minX,
+        maxX,
+        minY,
+        maxY,
+        command.rich_plot.title,
+        command.rich_plot.x_axis_label,
+        command.rich_plot.y_axis_label,
+        command.rich_plot.layer
       );
-    } else if (command.type === "set_rich_plot_data") {
+    }
+    else if (command.set_rich_plot_data != null) {
       this.setRichPlotData(
-        command.key,
-        command.name,
-        command.xs,
-        command.ys,
-        command.color,
-        command.plot_type
+        command.set_rich_plot_data.key,
+        command.set_rich_plot_data.name,
+        command.set_rich_plot_data.xs,
+        command.set_rich_plot_data.ys,
+        command.set_rich_plot_data.color,
+        command.set_rich_plot_data.plot_type as any
       );
-    } else if (command.type === "set_rich_plot_bounds") {
+    }
+    else if (command.set_rich_plot_bounds != null) {
+      const minX = command.set_rich_plot_bounds.bounds[0];
+      const maxX = command.set_rich_plot_bounds.bounds[1];
+      const minY = command.set_rich_plot_bounds.bounds[2];
+      const maxY = command.set_rich_plot_bounds.bounds[3];
       this.setRichPlotBounds(
-        command.key,
-        command.min_x,
-        command.max_x,
-        command.min_y,
-        command.max_y,
+        command.set_rich_plot_bounds.key,
+        minX,
+        maxX,
+        minY,
+        maxY,
       );
-    } else if (command.type === "set_ui_elem_pos") {
-      this.setUIElementPosition(command.key, command.from_top_left);
-    } else if (command.type === "set_ui_elem_size") {
-      this.setUIElementSize(command.key, command.size);
-    } else if (command.type === "delete_ui_elem") {
-      this.deleteUIElement(command.key);
-    } else if (command.type === "delete_object") {
-      this.deleteObject(command.key);
-    } else if (command.type === "set_text_contents") {
-      this.setTextContents(command.key, command.contents);
-    } else if (command.type === "set_button_label") {
-      this.setButtonLabel(command.key, command.label);
-    } else if (command.type === "set_slider_value") {
-      this.setSliderValue(command.key, command.value);
-    } else if (command.type === "set_slider_min") {
-      this.setSliderMin(command.key, command.min);
-    } else if (command.type === "set_slider_max") {
-      this.setSliderMax(command.key, command.max);
-    } else if (command.type === "set_plot_data") {
+    } else if (command.set_ui_elem_pos != null) {
+      this.setUIElementPosition(command.set_ui_elem_pos.key, command.set_ui_elem_pos.fromTopLeft);
+    } else if (command.set_ui_elem_size != null) {
+      this.setUIElementSize(command.set_ui_elem_size.key, command.set_ui_elem_size.size);
+    } else if (command.delete_ui_elem != null) {
+      this.deleteUIElement(command.delete_ui_elem.key);
+    } else if (command.delete_object != null) {
+      this.deleteObject(command.delete_object.key);
+    } else if (command.set_text_contents != null) {
+      this.setTextContents(command.set_text_contents.key, command.set_text_contents.contents);
+    } else if (command.set_button_label != null) {
+      this.setButtonLabel(command.set_button_label.key, command.set_button_label.label);
+    } else if (command.set_slider_value != null) {
+      this.setSliderValue(command.set_slider_value.key, command.set_slider_value.value);
+    } else if (command.set_slider_min != null) {
+      this.setSliderMin(command.set_slider_min.key, command.set_slider_min.value);
+    } else if (command.set_slider_max != null) {
+      this.setSliderMax(command.set_slider_max.key, command.set_slider_max.value);
+    } else if (command.set_plot_data != null) {
+      const minX = command.set_plot_data.bounds[0];
+      const maxX = command.set_plot_data.bounds[1];
+      const minY = command.set_plot_data.bounds[2];
+      const maxY = command.set_plot_data.bounds[3];
       this.setPlotData(
-        command.key,
-        command.min_x,
-        command.max_x,
-        command.xs,
-        command.min_y,
-        command.max_y,
-        command.ys
+        command.set_plot_data.key,
+        minX,
+        maxX,
+        command.set_plot_data.xs,
+        minY,
+        maxY,
+        command.set_plot_data.ys
       );
     }
   };
@@ -383,27 +948,74 @@ class DARTView {
   /**
    * This adds a listener for dragging events
    */
-  addDragListener = (dragListener: (key: string, pos: number[]) => void) => {
+  addDragListener = (dragListener: (key: number, pos: number[]) => void) => {
     this.dragListeners.push(dragListener);
+  };
+
+  addDragEndListener = (dragEndListener: (key: number) => void) => {
+    this.dragEndListeners.push(dragEndListener);
+  };
+
+  /**
+   * This adds a listener for tooltip edit events
+   */
+  addTooltipEditListener = (tooltipListener: (key: number, tooltip: string) => void) => {
+    this.tooltipEditListeners.push(tooltipListener);
   };
 
   /**
    * This enables mouse interaction on a specific object by key
    */
-  enableMouseInteraction = (key: string) => {
+  enableDrag = (key: number) => {
     const obj = this.objects.get(key);
     if (obj != null) {
-      this.view.enableMouseInteraction(obj);
+      this.view.enableDrag(key);
     }
   };
 
   /**
    * This enables mouse interaction on a specific object by key
    */
-  disableMouseInteraction = (key: string) => {
+  disableDrag = (key: number) => {
     const obj = this.objects.get(key);
     if (obj != null) {
-      this.view.disableMouseInteraction(obj);
+      this.view.disableDrag(key);
+    }
+  };
+
+  /**
+   * This enables mouse interaction on a specific object by key
+   */
+  enableEditTooltip = (key: number) => {
+    const obj = this.objects.get(key);
+    if (obj != null) {
+      this.view.enableEditTooltip(key);
+    }
+  };
+
+  /**
+   * This enables mouse interaction on a specific object by key
+   */
+  disableEditTooltip = (key: number) => {
+    const obj = this.objects.get(key);
+    if (obj != null) {
+      this.view.disableEditTooltip(key);
+    }
+  };
+
+  /**
+   * This creates a layer
+   */
+  createLayer = (
+    key: number,
+    name: string,
+    color: number[],
+    shown: boolean
+  ) => {
+    let layer = this.layers.get(key);
+    if (layer == null) {
+      layer = new Layer(key, name, color, shown, this);
+      this.layers.set(key, layer);
     }
   };
 
@@ -413,48 +1025,76 @@ class DARTView {
    * Must call render() to see results!
    */
   createBox = (
-    key: string,
+    key: number,
     size: number[],
     pos: number[],
     euler: number[],
     color: number[],
+    layer: number | undefined,
     castShadows: boolean,
     receiveShadows: boolean
   ) => {
+    this.objectColors.set(key, color);
     if (this.objects.has(key)) {
-      this.deleteObject(key);
-    }
-    const material = new THREE.MeshLambertMaterial({
-      color: new THREE.Color(color[0], color[1], color[2]),
-    });
-    if (color.length > 3 && color[3] < 1.0) {
-      material.transparent = true;
-      material.opacity = color[3];
-    }
-    const geometry = new THREE.BoxBufferGeometry(
-      SCALE_FACTOR,
-      SCALE_FACTOR,
-      SCALE_FACTOR
-    );
-    const mesh = new THREE.Mesh(geometry, material);
-    mesh.position.x = pos[0] * SCALE_FACTOR;
-    mesh.position.y = pos[1] * SCALE_FACTOR;
-    mesh.position.z = pos[2] * SCALE_FACTOR;
-    mesh.rotation.x = euler[0];
-    mesh.rotation.y = euler[1];
-    mesh.rotation.z = euler[2];
-    mesh.castShadow = castShadows;
-    mesh.receiveShadow = receiveShadows;
-    mesh.scale.set(size[0], size[1], size[2]);
+      const mesh = this.objects.get(key) as THREE.Mesh;
+      mesh.position.x = pos[0] * SCALE_FACTOR;
+      mesh.position.y = pos[1] * SCALE_FACTOR;
+      mesh.position.z = pos[2] * SCALE_FACTOR;
+      mesh.rotation.x = euler[0];
+      mesh.rotation.y = euler[1];
+      mesh.rotation.z = euler[2];
+      mesh.castShadow = castShadows;
+      mesh.receiveShadow = receiveShadows;
+      mesh.scale.set(size[0], size[1], size[2]);
 
-    this.objects.set(key, mesh);
-    this.disposeHandlers.set(key, () => {
-      material.dispose();
-      geometry.dispose();
-    });
-    this.keys.set(mesh, key);
+      const material = mesh.material as THREE.MeshLambertMaterial;
+      material.color.r = color[0];
+      material.color.g = color[1];
+      material.color.b = color[2];
+      if (color.length > 3 && color[3] < 1.0) {
+        material.transparent = true;
+        material.opacity = color[3];
+        material.depthWrite = castShadows;
+      }
+    }
+    else {
+      const material = new THREE.MeshLambertMaterial({
+        color: new THREE.Color(color[0], color[1], color[2]),
+      });
+      if (color.length > 3 && color[3] < 1.0) {
+        material.transparent = true;
+        material.opacity = color[3];
+        material.depthWrite = castShadows;
+      }
+      const geometry = new THREE.BoxBufferGeometry(
+        SCALE_FACTOR,
+        SCALE_FACTOR,
+        SCALE_FACTOR
+      );
+      const mesh = new THREE.Mesh(geometry, material);
+      mesh.position.x = pos[0] * SCALE_FACTOR;
+      mesh.position.y = pos[1] * SCALE_FACTOR;
+      mesh.position.z = pos[2] * SCALE_FACTOR;
+      mesh.rotation.x = euler[0];
+      mesh.rotation.y = euler[1];
+      mesh.rotation.z = euler[2];
+      mesh.castShadow = castShadows;
+      mesh.receiveShadow = receiveShadows;
+      mesh.scale.set(size[0], size[1], size[2]);
 
-    this.view.add(mesh);
+      this.objects.set(key, mesh);
+      this.disposeHandlers.set(key, () => {
+        material.dispose();
+        geometry.dispose();
+      });
+      this.keys.set(mesh, key);
+
+      this.view.add(key, mesh);
+
+      if (layer != null && this.layers.get(layer) != null) {
+        this.layers.get(layer).addObject(key);
+      }
+    }
   };
 
   /**
@@ -463,16 +1103,18 @@ class DARTView {
    * Must call render() to see results!
    */
   createSphere = (
-    key: string,
-    radius: number,
+    key: number,
+    radii: number[],
     pos: number[],
     color: number[],
+    layer: number | undefined,
     castShadows: boolean,
     receiveShadows: boolean
   ) => {
     if (this.objects.has(key)) {
       this.deleteObject(key);
     }
+    this.objectColors.set(key, color);
     const material = new THREE.MeshLambertMaterial({
       color: new THREE.Color(color[0], color[1], color[2]),
     });
@@ -486,7 +1128,7 @@ class DARTView {
     mesh.position.z = pos[2] * SCALE_FACTOR;
     mesh.castShadow = castShadows;
     mesh.receiveShadow = receiveShadows;
-    mesh.scale.set(radius, radius, radius);
+    mesh.scale.set(radii[0], radii[1], radii[2]);
 
     this.objects.set(key, mesh);
     this.disposeHandlers.set(key, () => {
@@ -494,7 +1136,113 @@ class DARTView {
     });
     this.keys.set(mesh, key);
 
-    this.view.add(mesh);
+    this.view.add(key, mesh);
+
+    if (layer != null && this.layers.has(layer)) {
+      this.layers.get(layer).addObject(key);
+    }
+  };
+
+  /**
+   * This adds a cone to the scene
+   *
+   * Must call render() to see results!
+   */
+  createCone = (
+    key: number,
+    radius: number,
+    height: number,
+    pos: number[],
+    euler: number[],
+    color: number[],
+    layer: number | undefined,
+    castShadows: boolean,
+    receiveShadows: boolean
+  ) => {
+    if (this.objects.has(key)) {
+      this.deleteObject(key);
+    }
+    this.objectColors.set(key, color);
+    const material = new THREE.MeshLambertMaterial({
+      color: new THREE.Color(color[0], color[1], color[2]),
+    });
+    if (color.length > 3 && color[3] < 1.0) {
+      material.transparent = true;
+      material.opacity = color[3];
+    }
+    const mesh = new THREE.Mesh(this.coneGeometry, material);
+    mesh.position.x = pos[0] * SCALE_FACTOR;
+    mesh.position.y = pos[1] * SCALE_FACTOR;
+    mesh.position.z = pos[2] * SCALE_FACTOR;
+    mesh.rotation.x = euler[0];
+    mesh.rotation.y = euler[1];
+    mesh.rotation.z = euler[2];
+    mesh.castShadow = castShadows;
+    mesh.receiveShadow = receiveShadows;
+    mesh.scale.set(radius, height, radius);
+
+    this.objects.set(key, mesh);
+    this.disposeHandlers.set(key, () => {
+      material.dispose();
+    });
+    this.keys.set(mesh, key);
+
+    this.view.add(key, mesh);
+
+    if (layer != null && this.layers.has(layer)) {
+      this.layers.get(layer).addObject(key);
+    }
+  };
+
+  /**
+   * This adds a cylinder to the scene
+   *
+   * Must call render() to see results!
+   */
+  createCylinder = (
+    key: number,
+    radius: number,
+    height: number,
+    pos: number[],
+    euler: number[],
+    color: number[],
+    layer: number | undefined,
+    castShadows: boolean,
+    receiveShadows: boolean
+  ) => {
+    if (this.objects.has(key)) {
+      this.deleteObject(key);
+    }
+    this.objectColors.set(key, color);
+    const material = new THREE.MeshLambertMaterial({
+      color: new THREE.Color(color[0], color[1], color[2]),
+    });
+    if (color.length > 3 && color[3] < 1.0) {
+      material.transparent = true;
+      material.opacity = color[3];
+    }
+    const mesh = new THREE.Mesh(this.cylinderGeometry, material);
+    mesh.position.x = pos[0] * SCALE_FACTOR;
+    mesh.position.y = pos[1] * SCALE_FACTOR;
+    mesh.position.z = pos[2] * SCALE_FACTOR;
+    mesh.rotation.x = euler[0];
+    mesh.rotation.y = euler[1];
+    mesh.rotation.z = euler[2];
+    mesh.castShadow = castShadows;
+    mesh.receiveShadow = receiveShadows;
+    mesh.scale.set(radius, height, radius);
+
+    this.objects.set(key, mesh);
+    this.disposeHandlers.set(key, () => {
+      material.dispose();
+    });
+    this.keys.set(mesh, key);
+
+    this.view.add(key, mesh);
+
+    if (layer != null && this.layers.has(layer)) {
+      this.layers.get(layer).addObject(key);
+    }
   };
 
   /**
@@ -503,12 +1251,13 @@ class DARTView {
    * Must call render() to see results!
    */
   createCapsule = (
-    key: string,
+    key: number,
     radius: number,
     height: number,
     pos: number[],
     euler: number[],
     color: number[],
+    layer: number | undefined,
     castShadows: boolean,
     receiveShadows: boolean
   ) => {
@@ -516,6 +1265,7 @@ class DARTView {
       this.deleteObject(key);
     }
     this.objectType.set(key, "capsule");
+    this.objectColors.set(key, color);
     const material = new THREE.MeshLambertMaterial({
       color: new THREE.Color(color[0], color[1], color[2]),
     });
@@ -558,11 +1308,15 @@ class DARTView {
     this.objects.set(key, mesh);
     this.disposeHandlers.set(key, () => {
       material.dispose();
-      geometry.dispose();
+      (geometry as any).dispose();
     });
     this.keys.set(mesh, key);
 
-    this.view.add(mesh);
+    this.view.add(key, mesh);
+
+    if (layer != null && this.layers.has(layer)) {
+      this.layers.get(layer).addObject(key);
+    }
   };
 
   /**
@@ -570,8 +1324,9 @@ class DARTView {
    *
    * Must call render() to see results!
    */
-  createLine = (key: string, points: number[][], color: number[]) => {
+  createLine = (key: number, points: number[][], color: number[], layer: number | undefined, width: number[]) => {
     this.objectType.set(key, "line");
+    this.objectColors.set(key, color);
     // Try not to recreate geometry. If we already created a line in the past,
     // let's just update its buffers instead of creating fresh ones.
     if (this.objects.has(key)) {
@@ -591,11 +1346,12 @@ class DARTView {
         positions[cursor++] = points[i][2] * SCALE_FACTOR;
       }
 
+      (line as any).geometry.setDrawRange( 0, points.length );
       (line as any).geometry.attributes.position.needsUpdate = true; // required after the first render
       // line.geometry.computeBoundingBox();
       // line.geometry.computeBoundingSphere();
 
-      this.view.add(line);
+      this.view.add(key, line);
     } else {
       const pathMaterial = new THREE.LineBasicMaterial({
         color: new THREE.Color(color[0], color[1], color[2]),
@@ -613,6 +1369,7 @@ class DARTView {
       }
       const pathGeometry = new THREE.BufferGeometry().setFromPoints(pathPoints);
       const path = new THREE.Line(pathGeometry, pathMaterial);
+      path.frustumCulled = false;
 
       this.objects.set(key, path);
       this.disposeHandlers.set(key, () => {
@@ -621,14 +1378,240 @@ class DARTView {
       });
       this.keys.set(path, key);
 
-      this.view.add(path);
+      this.view.add(key, path);
+    }
+
+    if (layer != null && this.layers.has(layer)) {
+      // console.log(this.layers.get(layer).name + ": " + this.layers.get(layer).shown);
+      this.layers.get(layer).addObject(key);
     }
   };
 
   /**
+   * This adds a line to the scene
+   *
+   * Must call render() to see results!
+   */
+  createMeshLine = (key: number, points: number[][], color: number[], layer: number | undefined, width: number[]) => {
+    this.objectType.set(key, "line");
+    this.objectColors.set(key, color);
+    // Try not to recreate geometry. If we already created a line in the past,
+    // let's just update its buffers instead of creating fresh ones.
+    if (this.objects.has(key)) {
+      // console.log("Not creating line " + key);
+      const mesh: THREE.Mesh = this.objects.get(key) as any;
+      const line: MeshLine = this.meshLines.get(key) as any;
+
+      (mesh as any).material.color = new THREE.Color(
+        color[0],
+        color[1],
+        color[2]
+      );
+      if (color.length > 3 && color[3] < 1.0) {
+        (mesh as any).material.transparent = true;
+        (mesh as any).material.opacity = color[3];
+      }
+
+      const positions = line._attributes.position.array;
+      const next = line._attributes.next.array;
+      const previous = line._attributes.previous.array;
+
+      for (let i = 0; i < points.length; i++) {
+        positions[i*6] = points[i][0] * SCALE_FACTOR;
+        positions[i*6 + 1] = points[i][1] * SCALE_FACTOR;
+        positions[i*6 + 2] = points[i][2] * SCALE_FACTOR;
+        positions[i*6 + 3] = points[i][0] * SCALE_FACTOR;
+        positions[i*6 + 4] = points[i][1] * SCALE_FACTOR;
+        positions[i*6 + 5] = points[i][2] * SCALE_FACTOR;
+      }
+
+      ///////////////////////////////////////////////
+      var l = positions.length / 6;
+
+      const compareV3 = function(a, b) {
+        var aa = a * 6;
+        var ab = b * 6;
+        return (
+          positions[aa] === positions[ab] &&
+          positions[aa + 1] === positions[ab + 1] &&
+          positions[aa + 2] === positions[ab + 2]
+        )
+      }
+      const copyV3 = function(a) {
+        var aa = a * 6
+        return [positions[aa], positions[aa + 1], positions[aa + 2]]
+      }
+
+      var v;
+      let previousCursor = 0;
+      let nextCursor = 0;
+
+      // initial previous points
+      if (compareV3(0, l - 1)) {
+        v = copyV3(l - 2)
+      } else {
+        v = copyV3(0)
+      }
+      // this.previous.push(v[0], v[1], v[2])
+      // this.previous.push(v[0], v[1], v[2])
+      previous[previousCursor++] = v[0];
+      previous[previousCursor++] = v[1];
+      previous[previousCursor++] = v[2];
+      previous[previousCursor++] = v[0];
+      previous[previousCursor++] = v[1];
+      previous[previousCursor++] = v[2];
+
+      for (var j = 0; j < l; j++) {
+        if (j < l - 1) {
+          // points previous to poisitions
+          v = copyV3(j)
+          // this.previous.push(v[0], v[1], v[2])
+          // this.previous.push(v[0], v[1], v[2])
+          previous[previousCursor++] = v[0];
+          previous[previousCursor++] = v[1];
+          previous[previousCursor++] = v[2];
+          previous[previousCursor++] = v[0];
+          previous[previousCursor++] = v[1];
+          previous[previousCursor++] = v[2];
+        }
+        if (j > 0) {
+          // points after poisitions
+          v = copyV3(j)
+          // this.next.push(v[0], v[1], v[2])
+          // this.next.push(v[0], v[1], v[2])
+          next[nextCursor++] = v[0];
+          next[nextCursor++] = v[1];
+          next[nextCursor++] = v[2];
+          next[nextCursor++] = v[0];
+          next[nextCursor++] = v[1];
+          next[nextCursor++] = v[2];
+        }
+      }
+
+      // last next point
+      if (compareV3(l - 1, 0)) {
+        v = copyV3(1)
+      } else {
+        v = copyV3(l - 1)
+      }
+      // this.next.push(v[0], v[1], v[2])
+      // this.next.push(v[0], v[1], v[2])
+      next[nextCursor++] = v[0];
+      next[nextCursor++] = v[1];
+      next[nextCursor++] = v[2];
+      next[nextCursor++] = v[0];
+      next[nextCursor++] = v[1];
+      next[nextCursor++] = v[2];
+      ///////////////////////////////////////////////
+
+      if (width.length > 0) {
+        const rawWidth = line._attributes.width.array;
+        for (let i = 0; i < width.length; i++) {
+          rawWidth[i*2] = width[i];
+          rawWidth[i*2 + 1] = width[i];
+        }
+        line._attributes.width.needsUpdate = true;
+      }
+
+      // (line as any).process();
+      line._attributes.position.needsUpdate = true;
+      line._attributes.previous.needsUpdate = true;
+      line._attributes.next.needsUpdate = true;
+    } else {
+      // Create the line geometry used for storing verticies
+      let linePoints: THREE.Vector3[] = [];
+      for (let i = 0; i < points.length; i++) {
+        linePoints.push(
+          new THREE.Vector3(
+            points[i][0] * SCALE_FACTOR,
+            points[i][1] * SCALE_FACTOR,
+            points[i][2] * SCALE_FACTOR
+          )
+        );
+      }
+
+      const pathMaterial = new MeshLineMaterial({
+        color: new THREE.Color(color[0], color[1], color[2]),
+        linewidth: 2,
+      });
+      if (color.length > 3 && color[3] < 1.0) {
+        pathMaterial.transparent = true;
+        pathMaterial.opacity = color[3];
+      }
+      const line = new MeshLine();
+      (line as any).setPoints(linePoints, p => p);
+
+      if (width.length > 0) {
+        const rawWidth = line._attributes.width.array;
+        for (let i = 0; i < width.length; i++) {
+          rawWidth[i*2] = width[i];
+          rawWidth[i*2 + 1] = width[i];
+        }
+        line._attributes.width.needsUpdate = true;
+      }
+
+      const mesh = new THREE.Mesh(line, pathMaterial);
+      mesh.frustumCulled = false;
+      // This is not in the API, it's just a hack to make it easier not center around mesh lines that are crazy outliers.
+      (mesh as any).isMeshLine = true;
+
+      this.meshLines.set(key, line);
+      this.objects.set(key, mesh);
+      this.disposeHandlers.set(key, () => {
+        pathMaterial.dispose();
+        line.dispose();
+      });
+      this.keys.set(mesh, key);
+
+      this.view.add(key, mesh);
+    }
+
+    if (layer != null && this.layers.has(layer)) {
+      // console.log(this.layers.get(layer).name + ": " + this.layers.get(layer).shown);
+      this.layers.get(layer).addObject(key);
+    }
+  };
+
+  /**
+   * This registers a tooltip for a specific object in the view
+   */
+  setTooltip = (key: number, tooltip: string) => {
+    this.view.setTooltip(key, tooltip);
+  }
+
+  /**
+   * This removes the tooltip for a specific object in the view
+   */
+  deleteTooltip = (key: number) => {
+    this.view.removeTooltip(key);
+  }
+
+  /**
+   * This registers a warning for a specific object in the view.
+   */
+  setObjectWarning = (key: number, warningKey: number, warning: string) => {
+    if (!this.objectWarnings.has(warningKey)) {
+      console.log("Creating ObjectWarning for key "+key);
+      const objectWarning = new ObjectWarning(this, key, warningKey, warning);
+      this.objectWarnings.set(warningKey, objectWarning);
+    }
+  }
+
+  /**
+   * This removes a warning for a specific object in the view.
+   */
+  deleteObjectWarning = (key: number, warningKey: number) => {
+    if (this.objectWarnings.has(warningKey)) {
+      const objectWarning = this.objectWarnings.get(warningKey);
+      objectWarning.remove();
+      this.objectWarnings.delete(warningKey);
+    }
+  }
+
+  /**
    * This loads a texture from a Base64 string encoding of it
    */
-  createTexture = (key: string, base64: string) => {
+  createTexture = (key: number, base64: string) => {
     if (!this.textures.has(key)) {
       this.textures.set(key, new THREE.TextureLoader().load(base64));
     }
@@ -640,16 +1623,17 @@ class DARTView {
    * Must call render() to see results!
    */
   createMesh = (
-    key: string,
+    key: number,
     vertices: number[][],
     vertexNormals: number[][],
     faces: number[][],
     uv: number[][],
-    texture_starts: { key: string; start: number }[],
+    texture_starts: { key: number; start: number }[],
     pos: number[],
     euler: number[],
     scale: number[],
     color: number[],
+    layer: number | undefined,
     castShadows: boolean,
     receiveShadows: boolean
   ) => {
@@ -666,7 +1650,7 @@ class DARTView {
       mesh.castShadow = castShadows;
       mesh.receiveShadow = receiveShadows;
       mesh.scale.set(scale[0], scale[1], scale[2]);
-      this.view.add(mesh);
+      this.view.add(key, mesh);
     } else {
       let meshMaterial;
       if (texture_starts.length > 0 && uv.length > 0) {
@@ -680,6 +1664,7 @@ class DARTView {
           color: new THREE.Color(color[0], color[1], color[2]),
         });
       }
+      this.objectColors.set(key, color);
       if (color.length > 3 && color[3] < 1.0) {
         meshMaterial.transparent = true;
         meshMaterial.opacity = color[3];
@@ -736,6 +1721,7 @@ class DARTView {
       mesh.rotation.y = euler[1];
       mesh.rotation.z = euler[2];
       mesh.castShadow = castShadows;
+      mesh.material.depthWrite = castShadows;
       mesh.receiveShadow = receiveShadows;
       mesh.scale.set(scale[0], scale[1], scale[2]);
 
@@ -746,7 +1732,11 @@ class DARTView {
       });
       this.keys.set(mesh, key);
 
-      this.view.add(mesh);
+      this.view.add(key, mesh);
+    }
+
+    if (layer != null && this.layers.has(layer)) {
+      this.layers.get(layer).addObject(key);
     }
   };
 
@@ -755,7 +1745,7 @@ class DARTView {
    *
    * Must call render() to see results!
    */
-  setObjectPos = (key: string, pos: number[]) => {
+  setObjectPos = (key: number, pos: number[]) => {
     const obj = this.objects.get(key);
     if (obj) {
       obj.position.x = pos[0] * SCALE_FACTOR;
@@ -769,7 +1759,7 @@ class DARTView {
    *
    * Must call render() to see results!
    */
-  setObjectRotation = (key: string, euler: number[]) => {
+  setObjectRotation = (key: number, euler: number[]) => {
     const obj = this.objects.get(key);
     if (obj) {
       obj.rotation.x = euler[0];
@@ -783,8 +1773,15 @@ class DARTView {
    *
    * Must call render() to see results!
    */
-  setObjectColor = (key: string, color: number[]) => {
+  setObjectColor = (key: number, color: number[], save: boolean = true) => {
     const obj = this.objects.get(key);
+    if (obj == null) {
+      // console.warn("Object "+key+" attempted to setColor(), but is missing");
+      return;
+    }
+    if (save) {
+      this.objectColors.set(key, color);
+    }
     (obj as any).material.color = new THREE.Color(color[0], color[1], color[2]);
     if (color.length > 3) {
       if (color[3] == 1.0) {
@@ -798,15 +1795,49 @@ class DARTView {
   };
 
   /**
+   * This resets an object to the saved color
+   */
+  resetObjectColor = (key: number) => {
+    this.setObjectColor(key, this.objectColors.get(key));
+  };
+
+  /**
    * Changes the scale of an object
    *
    * Must call render() to see results!
    */
-  setObjectScale = (key: string, scale: number[]) => {
+  setObjectScale = (key: number, scale: number[]) => {
     const obj = this.objects.get(key);
-    // Don't dynamically set scales on capsules
-    if (obj && this.objectType.get(key) != "capsule") {
+    // // Don't dynamically set scales on capsules
+    // if (obj && this.objectType.get(key) != "capsule") {
+    //   (obj as any).scale.set(scale[0], scale[1], scale[2]);
+    // }
+    if (obj) {
       (obj as any).scale.set(scale[0], scale[1], scale[2]);
+    }
+  };
+
+  /**
+   * This removes an objects from the view, without deleting the reference to the object.
+   * 
+   * @param key 
+   */
+  hideObject = (key: number) => {
+    const obj = this.objects.get(key);
+    if (obj) {
+      this.view.remove(key);
+    }
+  };
+
+  /**
+   * This shows an object in the view, if there's a reference to the object in maps.
+   * 
+   * @param key 
+   */
+  showObject = (key: number) => {
+    const obj = this.objects.get(key);
+    if (obj) {
+      this.view.add(key, obj);
     }
   };
 
@@ -815,10 +1846,10 @@ class DARTView {
    *
    * @param key The key of the object (box, sphere, line, mesh) to be removed
    */
-  deleteObject = (key: string) => {
+  deleteObject = (key: number) => {
     const obj = this.objects.get(key);
     if (obj) {
-      this.view.remove(obj);
+      this.view.remove(key);
       this.keys.delete(obj);
       this.scene.remove(obj);
       // Keep lines around, and just update the buffers if they ever get recreated
@@ -833,7 +1864,7 @@ class DARTView {
   };
 
   _createUIElementContainer = (
-    key: string,
+    key: number,
     from_top_left: number[],
     size: number[]
   ) => {
@@ -852,10 +1883,11 @@ class DARTView {
    * This adds a text box to the GUI. This is visible immediately even if you don't call render()
    */
   createText = (
-    key: string,
+    key: number,
     from_top_left: number[],
     size: number[],
-    contents: string
+    contents: string,
+    layer: number
   ) => {
     this.deleteUIElement(key);
     let text: Text = {
@@ -874,11 +1906,12 @@ class DARTView {
    * This adds a button to the GUI. This is visible immediately even if you don't call render()
    */
   createButton = (
-    key: string,
+    key: number,
     from_top_left: number[],
     size: number[],
     label: string,
-    onClick: () => void
+    onClick: () => void,
+    layer: number
   ) => {
     this.deleteUIElement(key);
     let container: HTMLDivElement = this._createUIElementContainer(
@@ -907,7 +1940,7 @@ class DARTView {
    * This adds a slider to the GUI. This is visible immediately even if you don't call render()
    */
   createSlider = (
-    key: string,
+    key: number,
     from_top_left: number[],
     size: number[],
     min: number,
@@ -915,7 +1948,8 @@ class DARTView {
     value: number,
     onlyInts: boolean,
     horizontal: boolean,
-    onChange: (value) => void
+    onChange: (value) => void,
+    layer: number
   ) => {
     this.deleteUIElement(key);
     let container: HTMLDivElement = this._createUIElementContainer(
@@ -942,7 +1976,7 @@ class DARTView {
    * This adds a plot to the GUI. This is visible immediately even if you don't call render()
    */
   createSimplePlot = (
-    key: string,
+    key: number,
     from_top_left: number[],
     size: number[],
     minX: number,
@@ -951,7 +1985,8 @@ class DARTView {
     minY: number,
     maxY: number,
     ys: number[],
-    plotType: "line" | "scatter"
+    plotType: "line" | "scatter",
+    layer: number
   ) => {
     this.deleteUIElement(key);
     let container: HTMLDivElement = this._createUIElementContainer(
@@ -979,7 +2014,7 @@ class DARTView {
    * This adds a plot to the GUI. This is visible immediately even if you don't call render()
    */
   createRichPlot = (
-    key: string,
+    key: number,
     from_top_left: number[],
     size: number[],
     minX: number,
@@ -988,7 +2023,8 @@ class DARTView {
     maxY: number,
     title: string,
     xAxisLabel: string,
-    yAxisLabel: string
+    yAxisLabel: string,
+    layer: number
   ) => {
     this.deleteUIElement(key);
     let container: HTMLDivElement = this._createUIElementContainer(
@@ -1023,7 +2059,7 @@ class DARTView {
    * @param plotType the type of plot (line or scatter)
    */
   setRichPlotData = (
-    key: string,
+    key: number,
     dataName: string,
     xs: number[],
     ys: number[],
@@ -1047,7 +2083,7 @@ class DARTView {
    * @param maxY 
    */
   setRichPlotBounds = (
-    key: string,
+    key: number,
     minX: number,
     maxX: number,
     minY: number,
@@ -1063,7 +2099,7 @@ class DARTView {
   /**
    * This deletes a UI element (e.g. text, button, slider, plot) by key
    */
-  deleteUIElement = (key: string) => {
+  deleteUIElement = (key: number) => {
     if (this.uiElements.has(key)) {
       this.uiElements.get(key).container.remove();
       this.uiElements.delete(key);
@@ -1073,7 +2109,7 @@ class DARTView {
   /**
    * This moves a UI element (e.g. text, button, slider, plot) by key
    */
-  setUIElementPosition = (key: string, fromTopLeft: number[]) => {
+  setUIElementPosition = (key: number, fromTopLeft: number[]) => {
     if (this.uiElements.has(key)) {
       const elem = this.uiElements.get(key);
       elem.from_top_left = fromTopLeft;
@@ -1086,7 +2122,7 @@ class DARTView {
   /**
    * This resizes a UI element (e.g. text, button, slider, plot) by key
    */
-  setUIElementSize = (key: string, size: number[]) => {
+  setUIElementSize = (key: number, size: number[]) => {
     if (this.uiElements.has(key)) {
       const elem = this.uiElements.get(key);
       elem.size = size;
@@ -1096,35 +2132,35 @@ class DARTView {
     }
   };
 
-  setTextContents = (key: string, contents: string) => {
+  setTextContents = (key: number, contents: string) => {
     if (this.uiElements.has(key)) {
       const elem = this.uiElements.get(key);
       if (elem.type === "text") elem.container.innerHTML = contents;
     }
   };
 
-  setButtonLabel = (key: string, label: string) => {
+  setButtonLabel = (key: number, label: string) => {
     if (this.uiElements.has(key)) {
       const elem = this.uiElements.get(key);
       if (elem.type === "button") elem.buttonElem.innerHTML = label;
     }
   };
 
-  setSliderValue = (key: string, value: number) => {
+  setSliderValue = (key: number, value: number) => {
     if (this.uiElements.has(key)) {
       const elem = this.uiElements.get(key);
       if (elem.type === "slider") elem.setValue(value);
     }
   };
 
-  setSliderMin = (key: string, value: number) => {
+  setSliderMin = (key: number, value: number) => {
     if (this.uiElements.has(key)) {
       const elem = this.uiElements.get(key);
       if (elem.type === "slider") elem.setMin(value);
     }
   };
 
-  setSliderMax = (key: string, value: number) => {
+  setSliderMax = (key: number, value: number) => {
     if (this.uiElements.has(key)) {
       const elem = this.uiElements.get(key);
       if (elem.type === "slider") elem.setMax(value);
@@ -1132,7 +2168,7 @@ class DARTView {
   };
 
   setPlotData = (
-    key: string,
+    key: number,
     minX: number,
     maxX: number,
     xs: number[],
@@ -1155,7 +2191,7 @@ class DARTView {
    */
   clear() {
     this.objects.forEach((v, k) => {
-      this.view.remove(v);
+      this.view.remove(k);
     });
     this.disposeHandlers.forEach((v, k) => v());
     this.objects.clear();

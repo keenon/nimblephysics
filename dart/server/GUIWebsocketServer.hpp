@@ -94,9 +94,17 @@ public:
 
   /// This enables mouse events on an object (if they're not already), and
   /// calls "listener" whenever the object is dragged with the desired drag
-  /// coordinates
+  /// coordinates. The "endDrag" function is called whenever the user releases
+  /// their mouse.
   GUIWebsocketServer& registerDragListener(
-      const std::string& key, std::function<void(Eigen::Vector3s)> listener);
+      const std::string& key,
+      std::function<void(Eigen::Vector3s)> listener,
+      std::function<void()> endDrag);
+
+  /// This enables the user to edit the tooltip on an object, and calls this
+  /// listener when the tooltip changes.
+  GUIWebsocketServer& registerTooltipChangeListener(
+      const std::string& key, std::function<void(std::string)> listener);
 
   /// This gets the current screen size
   Eigen::Vector2i getScreenSize();
@@ -127,6 +135,10 @@ protected:
       std::string,
       std::vector<std::function<void(Eigen::Vector3s)>>>
       mDragListeners;
+  std::unordered_map<std::string, std::vector<std::function<void()>>>
+      mDragEndListeners;
+  std::unordered_map<std::string, std::vector<std::function<void(std::string)>>>
+      mTooltipChangeListeners;
   std::vector<std::function<void(Eigen::Vector2i)>> mScreenResizeListeners;
   // This is a list of all the objects with mouse interaction enabled
   std::unordered_set<std::string> mMouseInteractionEnabled;

@@ -46,6 +46,10 @@ namespace python {
 
 void MarkerFitter(py::module& m)
 {
+  auto markerFitter = ::py::class_<
+      dart::biomechanics::MarkerFitter,
+      std::shared_ptr<dart::biomechanics::MarkerFitter>>(m, "MarkerFitter");
+
   ::py::class_<dart::biomechanics::MarkerFitterState>(m, "MarkerFitterState")
       .def_readwrite(
           "bodyNames", &dart::biomechanics::MarkerFitterState::bodyNames)
@@ -102,10 +106,21 @@ void MarkerFitter(py::module& m)
 
   ::py::class_<dart::biomechanics::MarkerInitialization>(
       m, "MarkerInitialization")
+      .def(::py::init<>())
       .def_readwrite("poses", &dart::biomechanics::MarkerInitialization::poses)
       .def_readwrite(
           "jointCenters",
           &dart::biomechanics::MarkerInitialization::jointCenters)
+      .def_readwrite(
+          "jointAxis", &dart::biomechanics::MarkerInitialization::jointAxis)
+      .def_readwrite(
+          "jointsAdjacentMarkers",
+          &dart::biomechanics::MarkerInitialization::jointsAdjacentMarkers)
+      .def_readwrite(
+          "jointWeights",
+          &dart::biomechanics::MarkerInitialization::jointWeights)
+      .def_readwrite(
+          "axisWeights", &dart::biomechanics::MarkerInitialization::axisWeights)
       .def_readwrite(
           "joints", &dart::biomechanics::MarkerInitialization::joints)
       .def_readwrite(
@@ -115,11 +130,51 @@ void MarkerFitter(py::module& m)
           &dart::biomechanics::MarkerInitialization::updatedMarkerMap)
       .def_readwrite(
           "markerOffsets",
-          &dart::biomechanics::MarkerInitialization::markerOffsets);
+          &dart::biomechanics::MarkerInitialization::markerOffsets)
+      .def_readwrite("error", &dart::biomechanics::MarkerInitialization::error)
+      .def_readwrite(
+          "errorMsg", &dart::biomechanics::MarkerInitialization::errorMsg);
+
+  ::py::class_<
+      dart::biomechanics::IMUFineTuneProblem,
+      std::shared_ptr<dart::biomechanics::IMUFineTuneProblem>>(
+      m, "IMUFineTuneProblem")
+      .def(
+          "getProblemSize",
+          &dart::biomechanics::IMUFineTuneProblem::getProblemSize)
+      .def(
+          "setWeightGyros",
+          &dart::biomechanics::IMUFineTuneProblem::setWeightGyros,
+          ::py::arg("weight"))
+      .def(
+          "setWeightAccs",
+          &dart::biomechanics::IMUFineTuneProblem::setWeightAccs,
+          ::py::arg("weight"))
+      .def(
+          "setWeightPoses",
+          &dart::biomechanics::IMUFineTuneProblem::setRegularizePoses,
+          ::py::arg("weight"))
+      .def("flatten", &dart::biomechanics::IMUFineTuneProblem::flatten)
+      .def(
+          "unflatten",
+          &dart::biomechanics::IMUFineTuneProblem::unflatten,
+          ::py::arg("x"))
+      .def("getLoss", &dart::biomechanics::IMUFineTuneProblem::getLoss)
+      .def("getPoses", &dart::biomechanics::IMUFineTuneProblem::getPoses)
+      .def("getVels", &dart::biomechanics::IMUFineTuneProblem::getVels)
+      .def("getAccs", &dart::biomechanics::IMUFineTuneProblem::getAccs)
+      .def("getGrad", &dart::biomechanics::IMUFineTuneProblem::getGrad);
 
   ::py::class_<dart::biomechanics::InitialMarkerFitParams>(
       m, "InitialMarkerFitParams")
       .def(::py::init<>())
+      .def(
+          "__repr__",
+          [](dart::biomechanics::InitialMarkerFitParams* self) -> std::string {
+            // TODO: add remaining params
+            return "InitialMarkerFitParams(numBlocks="
+                   + std::to_string(self->numBlocks) + ")";
+          })
       .def_readwrite(
           "markerWeights",
           &dart::biomechanics::InitialMarkerFitParams::markerWeights)
@@ -144,6 +199,14 @@ void MarkerFitter(py::module& m)
       .def_readwrite(
           "dontRescaleBodies",
           &dart::biomechanics::InitialMarkerFitParams::dontRescaleBodies)
+      .def_readwrite(
+          "maxTrialsToUseForMultiTrialScaling",
+          &dart::biomechanics::InitialMarkerFitParams::
+              maxTrialsToUseForMultiTrialScaling)
+      .def_readwrite(
+          "maxTimestepsToUseForMultiTrialScaling",
+          &dart::biomechanics::InitialMarkerFitParams::
+              maxTimestepsToUseForMultiTrialScaling)
       .def(
           "setMarkerWeights",
           &dart::biomechanics::InitialMarkerFitParams::setMarkerWeights,
@@ -156,11 +219,16 @@ void MarkerFitter(py::module& m)
           "setJointCenters",
           &dart::biomechanics::InitialMarkerFitParams::setJointCenters,
           ::py::arg("joints"),
-          ::py::arg("jointCenters"))
+          ::py::arg("jointCenters"),
+          ::py::arg("jointAdjacentMarkers"))
       .def(
           "setNumBlocks",
           &dart::biomechanics::InitialMarkerFitParams::setNumBlocks,
           ::py::arg("numBlocks"))
+      .def(
+          "setNumIKTries",
+          &dart::biomechanics::InitialMarkerFitParams::setNumIKTries,
+          ::py::arg("tries"))
       .def(
           "setInitPoses",
           &dart::biomechanics::InitialMarkerFitParams::setInitPoses,
@@ -174,24 +242,49 @@ void MarkerFitter(py::module& m)
           &dart::biomechanics::InitialMarkerFitParams::setDontRescaleBodies,
           ::py::arg("dontRescaleBodies"))
       .def(
+          "setUseAnalyticalIKToInitialize",
+          &dart::biomechanics::InitialMarkerFitParams::
+              setUseAnalyticalIKToInitialize,
+          ::py::arg("useAnalyticalIK"))
+      .def(
+          "setSkipBilevel",
+          &dart::biomechanics::InitialMarkerFitParams::setSkipBilevel,
+          ::py::arg("skipBilevel"))
+      .def(
+          "setApplyInnerProblemGradientConstraints",
+          &dart::biomechanics::InitialMarkerFitParams::
+              setApplyInnerProblemGradientConstraints,
+          ::py::arg("applyConstraints"))
+      .def(
+          "setMaxTrialsToUseForMultiTrialScaling",
+          &dart::biomechanics::InitialMarkerFitParams::
+              setMaxTrialsToUseForMultiTrialScaling,
+          ::py::arg("numTrials"))
+      .def(
+          "setMaxTimestepsToUseForMultiTrialScaling",
+          &dart::biomechanics::InitialMarkerFitParams::
+              setMaxTimestepsToUseForMultiTrialScaling,
+          ::py::arg("numTimesteps"))
+      .def(
           "setJointCentersAndWeights",
           &dart::biomechanics::InitialMarkerFitParams::
               setJointCentersAndWeights,
           ::py::arg("joints"),
           ::py::arg("jointCenters"),
+          ::py::arg("jointAdjacentMarkers"),
           ::py::arg("jointWeights"));
 
-  ::py::class_<
-      dart::biomechanics::MarkerFitter,
-      std::shared_ptr<dart::biomechanics::MarkerFitter>>(m, "MarkerFitter")
+  markerFitter
       .def(
           ::py::init<
               std::shared_ptr<dynamics::Skeleton>,
               std::map<
                   std::string,
-                  std::pair<dynamics::BodyNode*, Eigen::Vector3s>>>(),
+                  std::pair<dynamics::BodyNode*, Eigen::Vector3s>>,
+              bool>(),
           ::py::arg("skeleton"),
-          ::py::arg("markers"))
+          ::py::arg("markers"),
+          ::py::arg("ignoreVirtualJointCenterMarkers") = false)
       .def(
           "setInitialIKSatisfactoryLoss",
           &dart::biomechanics::MarkerFitter::setInitialIKSatisfactoryLoss,
@@ -201,9 +294,29 @@ void MarkerFitter(py::module& m)
           &dart::biomechanics::MarkerFitter::setInitialIKMaxRestarts,
           ::py::arg("starts"))
       .def(
+          "setParallelIKWarps",
+          &dart::biomechanics::MarkerFitter::setParallelIKWarps,
+          ::py::arg("parallelWarps"),
+          R"pydoc(If True, this processes "single threaded" IK tasks 32 timesteps at a time
+            (a "warp"), in parallel, using the first timestep of the warp as the
+            initialization for the whole warp. Defaults to False.
+          )pydoc")
+      .def(
           "setMaxMarkerOffset",
           &dart::biomechanics::MarkerFitter::setMaxMarkerOffset,
           ::py::arg("offset"))
+      .def(
+          "setIgnoreJointLimits",
+          &dart::biomechanics::MarkerFitter::setIgnoreJointLimits,
+          ::py::arg("ignore"))
+      .def(
+          "setLBFGSHistory",
+          &dart::biomechanics::MarkerFitter::setLBFGSHistory,
+          ::py::arg("historyLen"))
+      .def(
+          "setDebugLoss",
+          &dart::biomechanics::MarkerFitter::setDebugLoss,
+          ::py::arg("debug"))
       .def(
           "setIterationLimit",
           &dart::biomechanics::MarkerFitter::setIterationLimit,
@@ -213,6 +326,62 @@ void MarkerFitter(py::module& m)
           &dart::biomechanics::MarkerFitter::setAnthropometricPrior,
           ::py::arg("prior"),
           ::py::arg("weight") = 0.001)
+      .def(
+          "setExplicitHeightPrior",
+          &dart::biomechanics::MarkerFitter::setExplicitHeightPrior,
+          ::py::arg("prior"),
+          ::py::arg("weight") = 1e3)
+      .def(
+          "setStaticTrial",
+          &dart::biomechanics::MarkerFitter::setStaticTrial,
+          ::py::arg("markerObservationsMapAtStaticPose"),
+          ::py::arg("staticPose"))
+      .def(
+          "setStaticTrialWeight",
+          &dart::biomechanics::MarkerFitter::setStaticTrialWeight,
+          ::py::arg("weight"))
+      .def(
+          "setJointForceFieldThresholdDistance",
+          &dart::biomechanics::MarkerFitter::
+              setJointForceFieldThresholdDistance,
+          ::py::arg("minDistance"),
+          R"pydoc(
+  This sets the minimum distance joints have to be apart in order to get
+  zero "force field" loss. Any joints closer than this (in world space) will
+  incur a penalty.
+          )pydoc")
+      .def(
+          "setJointForceFieldSoftness",
+          &dart::biomechanics::MarkerFitter::setJointForceFieldSoftness,
+          ::py::arg("softness"),
+          R"pydoc(
+  Larger values will increase the softness of the threshold penalty. Smaller
+  values, as they approach zero, will have an almost perfectly vertical
+  penality for going below the threshold distance. That would be hard to
+  optimize, so don't make it too small.
+          )pydoc")
+      .def(
+          "setPostprocessAnatomicalMarkerOffsets",
+          &dart::biomechanics::MarkerFitter::
+              setPostprocessAnatomicalMarkerOffsets,
+          ::py::arg("postprocess"),
+          R"pydoc(
+  If we set this to true, then after the main optimization completes we will
+  do a final step to "center" the error of the anatomical markers. This
+  minimizes marker RMSE, but does NOT respect the weights about how far
+  markers should be allowed to move.
+          )pydoc")
+      .def(
+          "setPostprocessTrackingMarkerOffsets",
+          &dart::biomechanics::MarkerFitter::
+              setPostprocessTrackingMarkerOffsets,
+          ::py::arg("postprocess"),
+          R"pydoc(
+  If we set this to true, then after the main optimization completes we will
+  do a final step to "center" the error of the tracking markers. This
+  minimizes marker RMSE, but does NOT respect the weights about how far
+  markers should be allowed to move.
+          )pydoc")
       .def(
           "setCustomLossAndGrad",
           &dart::biomechanics::MarkerFitter::setCustomLossAndGrad,
@@ -227,27 +396,77 @@ void MarkerFitter(py::module& m)
           &dart::biomechanics::MarkerFitter::removeZeroConstraint,
           ::py::arg("name"))
       .def(
+          "writeCSVData",
+          &dart::biomechanics::MarkerFitter::writeCSVData,
+          ::py::arg("path"),
+          ::py::arg("init"),
+          ::py::arg("rmsMarkerErrors"),
+          ::py::arg("maxMarkerErrors"),
+          ::py::arg("timestamps"))
+      .def(
           "getInitialization",
           &dart::biomechanics::MarkerFitter::getInitialization,
           ::py::arg("markerObservations"),
+          ::py::arg("newClip"),
           ::py::arg("params") = dart::biomechanics::InitialMarkerFitParams())
       .def(
           "findJointCenters",
           &dart::biomechanics::MarkerFitter::findJointCenters,
           ::py::arg("initializations"),
+          ::py::arg("newClip"),
           ::py::arg("markerObservations"))
       .def(
           "optimizeBilevel",
           &dart::biomechanics::MarkerFitter::optimizeBilevel,
           ::py::arg("markerObservations"),
+          ::py::arg("newClip"),
           ::py::arg("initialization"),
-          ::py::arg("numSamples"))
+          ::py::arg("numSamples"),
+          ::py::arg("applyInnerProblemGradientConstraints") = true)
+      .def(
+          "checkForEnoughMarkers",
+          &dart::biomechanics::MarkerFitter::checkForEnoughMarkers,
+          ::py::arg("markerObservations"))
+      .def(
+          "generateDataErrorsReport",
+          &dart::biomechanics::MarkerFitter::generateDataErrorsReport,
+          ::py::arg("markerObservations"),
+          ::py::arg("dt"),
+          ::py::arg("rippleReduce") = true,
+          ::py::arg("rippleReduceUseSparse") = true,
+          ::py::arg("rippleReduceUseIterativeSolver") = true,
+          ::py::arg("rippleReduceSolverIterations") = 1e5)
+      .def(
+          "checkForFlippedMarkers",
+          &dart::biomechanics::MarkerFitter::checkForFlippedMarkers,
+          ::py::arg("markerObservations"),
+          ::py::arg("init"),
+          ::py::arg("report"))
+      .def(
+          "runMultiTrialKinematicsPipeline",
+          &dart::biomechanics::MarkerFitter::runMultiTrialKinematicsPipeline,
+          ::py::arg("markerTrials"),
+          ::py::arg("params"),
+          ::py::arg("numSamples") = 50)
+      .def_static(
+          "getMarkerLossGradientWrtJoints",
+          &dart::biomechanics::MarkerFitter::getMarkerLossGradientWrtJoints,
+          ::py::arg("skeleton"),
+          ::py::arg("markers"),
+          ::py::arg("lossGradWrtMarkerError"))
       .def(
           "runKinematicsPipeline",
           &dart::biomechanics::MarkerFitter::runKinematicsPipeline,
           ::py::arg("markerObservations"),
+          ::py::arg("newClip"),
           ::py::arg("params"),
-          ::py::arg("numSamples") = 20)
+          ::py::arg("numSamples") = 20,
+          ::py::arg("skipFinalIK") = false)
+      .def(
+          "runPrescaledPipeline",
+          &dart::biomechanics::MarkerFitter::runPrescaledPipeline,
+          ::py::arg("markerObservations"),
+          ::py::arg("params"))
       .def(
           "setMinJointVarianceCutoff",
           &dart::biomechanics::MarkerFitter::setMinJointVarianceCutoff,
@@ -261,6 +480,14 @@ void MarkerFitter(py::module& m)
           &dart::biomechanics::MarkerFitter::setMinAxisFitScore,
           ::py::arg("score"))
       .def(
+          "setMaxJointWeight",
+          &dart::biomechanics::MarkerFitter::setMaxJointWeight,
+          ::py::arg("weight"))
+      .def(
+          "setMaxAxisWeight",
+          &dart::biomechanics::MarkerFitter::setMaxAxisWeight,
+          ::py::arg("weight"))
+      .def(
           "setRegularizeAnatomicalMarkerOffsets",
           &dart::biomechanics::MarkerFitter::
               setRegularizeAnatomicalMarkerOffsets,
@@ -270,21 +497,73 @@ void MarkerFitter(py::module& m)
           &dart::biomechanics::MarkerFitter::setRegularizeTrackingMarkerOffsets,
           ::py::arg("weight"))
       .def(
+          "setRegularizeIndividualBodyScales",
+          &dart::biomechanics::MarkerFitter::setRegularizeIndividualBodyScales,
+          ::py::arg("weight"))
+      .def(
+          "setRegularizeAllBodyScales",
+          &dart::biomechanics::MarkerFitter::setRegularizeAllBodyScales,
+          ::py::arg("weight"))
+      .def(
+          "setRegularizeJointBounds",
+          &dart::biomechanics::MarkerFitter::setRegularizeJointBounds,
+          ::py::arg("weight"))
+      .def(
+          "setRegularizeMovementSmoothness",
+          &dart::biomechanics::MarkerFitter::setRegularizeMovementSmoothness,
+          ::py::arg("weight"))
+      .def(
           "setDebugJointVariability",
           &dart::biomechanics::MarkerFitter::setDebugJointVariability,
           ::py::arg("debug"))
+      .def(
+          "setAnatomicalMarkerDefaultWeight",
+          &dart::biomechanics::MarkerFitter::setAnatomicalMarkerDefaultWeight,
+          ::py::arg("weight"))
+      .def(
+          "setTrackingMarkerDefaultWeight",
+          &dart::biomechanics::MarkerFitter::setTrackingMarkerDefaultWeight,
+          ::py::arg("weight"))
+      .def(
+          "setRegularizeJointWithVirtualSpring",
+          &dart::biomechanics::MarkerFitter::
+              setRegularizeJointWithVirtualSpring,
+          ::py::arg("jointName"),
+          ::py::arg("weight"))
+      .def(
+          "setRegularizePelvisJointsWithVirtualSpring",
+          &dart::biomechanics::MarkerFitter::
+              setRegularizePelvisJointsWithVirtualSpring,
+          ::py::arg("weight"))
+      .def(
+          "setJointSphereFitSGDIterations",
+          &dart::biomechanics::MarkerFitter::setJointSphereFitSGDIterations,
+          ::py::arg("iters"))
+      .def(
+          "setJointAxisFitSGDIterations",
+          &dart::biomechanics::MarkerFitter::setJointAxisFitSGDIterations,
+          ::py::arg("iters"))
       .def(
           "debugTrajectoryAndMarkersToGUI",
           &dart::biomechanics::MarkerFitter::debugTrajectoryAndMarkersToGUI,
           ::py::arg("server"),
           ::py::arg("init"),
-          ::py::arg("markerObservations"))
+          ::py::arg("markerObservations"),
+          ::py::arg("forcePlates") = nullptr,
+          ::py::arg("goldOsim") = nullptr,
+          ::py::arg("goldPoses") = Eigen::MatrixXs::Zero(0, 0))
       .def(
           "saveTrajectoryAndMarkersToGUI",
           &dart::biomechanics::MarkerFitter::saveTrajectoryAndMarkersToGUI,
           ::py::arg("path"),
           ::py::arg("init"),
-          ::py::arg("markerObservations"))
+          ::py::arg("markerObservations"),
+          ::py::arg("accObservations"),
+          ::py::arg("gyroObservations"),
+          ::py::arg("frameRate"),
+          ::py::arg("forcePlates") = nullptr,
+          ::py::arg("goldOsim") = nullptr,
+          ::py::arg("goldPoses") = Eigen::MatrixXs::Zero(0, 0))
       .def_static(
           "pickSubset",
           &dart::biomechanics::MarkerFitter::pickSubset,
@@ -302,7 +581,70 @@ void MarkerFitter(py::module& m)
       .def(
           "setTriadsToTracking",
           &dart::biomechanics::MarkerFitter::setTriadsToTracking)
-      .def("getNumMarkers", &dart::biomechanics::MarkerFitter::getNumMarkers);
+      .def(
+          "setTrackingMarkers",
+          &dart::biomechanics::MarkerFitter::setTrackingMarkers,
+          ::py::arg("trackingMarkerNames"))
+      .def(
+          "autorotateC3D",
+          &dart::biomechanics::MarkerFitter::autorotateC3D,
+          ::py::arg("c3d"))
+      .def("getNumMarkers", &dart::biomechanics::MarkerFitter::getNumMarkers)
+      .def(
+          "setImuMap",
+          &dart::biomechanics::MarkerFitter::setImuMap,
+          ::py::arg("imuMap"))
+      .def("getImuMap", &dart::biomechanics::MarkerFitter::getImuMap)
+      .def("getImuList", &dart::biomechanics::MarkerFitter::getImuList)
+      .def("getImuNames", &dart::biomechanics::MarkerFitter::getImuNames)
+      .def(
+          "rotateIMUs",
+          &dart::biomechanics::MarkerFitter::rotateIMUs,
+          ::py::arg("accObservations"),
+          ::py::arg("gyroObservations"),
+          ::py::arg("newClip"),
+          ::py::arg("init"),
+          ::py::arg("dt"))
+      .def(
+          "measureAccelerometerRMS",
+          &dart::biomechanics::MarkerFitter::measureAccelerometerRMS,
+          ::py::arg("accObservations"),
+          ::py::arg("newClip"),
+          ::py::arg("init"),
+          ::py::arg("dt"))
+      .def(
+          "measureGyroRMS",
+          &dart::biomechanics::MarkerFitter::measureGyroRMS,
+          ::py::arg("gyroObservations"),
+          ::py::arg("newClip"),
+          ::py::arg("init"),
+          ::py::arg("dt"))
+      .def(
+          "getIMUFineTuneProblem",
+          &dart::biomechanics::MarkerFitter::getIMUFineTuneProblem,
+          ::py::arg("accObservations"),
+          ::py::arg("gyroObservations"),
+          ::py::arg("markerObservations"),
+          ::py::arg("init"),
+          ::py::arg("dt"),
+          ::py::arg("start"),
+          ::py::arg("end"))
+      .def(
+          "fineTuneWithIMU",
+          &dart::biomechanics::MarkerFitter::fineTuneWithIMU,
+          ::py::arg("accObservations"),
+          ::py::arg("gyroObservations"),
+          ::py::arg("markerObservations"),
+          ::py::arg("newClip"),
+          ::py::arg("init"),
+          ::py::arg("dt"),
+          ::py::arg("weightAccs") = 1.0,
+          ::py::arg("weightGyros") = 1.0,
+          ::py::arg("weightMarkers") = 100.0,
+          ::py::arg("regularizePoses") = 1.0,
+          ::py::arg("useIPOPT") = true,
+          ::py::arg("iterations") = 300,
+          ::py::arg("lbfgsMemory") = 100);
 }
 
 } // namespace python

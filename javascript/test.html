@@ -1,0 +1,19 @@
+<!DOCTYPE html>
+
+<head>
+  <meta charset="utf-8">
+  <script src="dist/embeddable.js"></script>
+  <script>
+    window.addEventListener("load", function () {
+      console.log("Attempting to embed Nimble Visualizer!");
+      var div = document.getElementById("window");
+      console.log(div);
+      window.embedNimbleVisualizer(div, "https://keenon.github.io/data/sprinting_energy.bin.gz");
+    });
+  </script>
+</head>
+
+<body>
+  <div style="width: 100vw; height: 100vh;" id="window">
+  </div>
+</body>

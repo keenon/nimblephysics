@@ -33,7 +33,11 @@
 #include <iostream>
 
 #include <dart/math/Geometry.hpp>
+#include <pybind11/eigen.h>
 #include <pybind11/pybind11.h>
+#include <pybind11/stl.h>
+
+#include "dart/math/MathTypes.hpp"
 
 #include "eigen_geometry_pybind.h"
 #include "eigen_pybind.h"
@@ -125,6 +129,42 @@ void Geometry(py::module& m)
         // std::cout << "T: " << std::endl << T.matrix() << std::endl;
         // std::cout << "S: " << std::endl << S << std::endl;
         Eigen::Vector6s result = dart::math::AdT(T, S);
+        // std::cout << "AdT(T,S): " << std::endl << result << std::endl;
+        return result;
+      },
+      ::py::arg("R"),
+      ::py::arg("p"),
+      ::py::arg("S"));
+
+  m.def(
+      "dAdT",
+      +[](const Eigen::Matrix3s& R,
+          const Eigen::Vector3s& p,
+          const Eigen::Vector6s& S) -> Eigen::Vector6s {
+        Eigen::Isometry3s T = Eigen::Isometry3s::Identity();
+        T.linear() = R;
+        T.translation() = p;
+        // std::cout << "T: " << std::endl << T.matrix() << std::endl;
+        // std::cout << "S: " << std::endl << S << std::endl;
+        Eigen::Vector6s result = dart::math::dAdT(T, S);
+        // std::cout << "AdT(T,S): " << std::endl << result << std::endl;
+        return result;
+      },
+      ::py::arg("R"),
+      ::py::arg("p"),
+      ::py::arg("S"));
+
+  m.def(
+      "dAdInvT",
+      +[](const Eigen::Matrix3s& R,
+          const Eigen::Vector3s& p,
+          const Eigen::Vector6s& S) -> Eigen::Vector6s {
+        Eigen::Isometry3s T = Eigen::Isometry3s::Identity();
+        T.linear() = R;
+        T.translation() = p;
+        // std::cout << "T: " << std::endl << T.matrix() << std::endl;
+        // std::cout << "S: " << std::endl << S << std::endl;
+        Eigen::Vector6s result = dart::math::dAdInvT(T, S);
         // std::cout << "AdT(T,S): " << std::endl << result << std::endl;
         return result;
       },
@@ -227,6 +267,53 @@ void Geometry(py::module& m)
           const Eigen::Vector3s& p) -> Eigen::Vector3s { return T * p; },
       ::py::arg("T"),
       ::py::arg("p"));
+
+  m.def(
+      "distancePointToConvexHull2D",
+      +[](Eigen::Vector2s P, std::vector<Eigen::Vector2s>& points) -> s_t {
+        return dart::math::distancePointToConvexHull2D(P, points);
+      },
+      ::py::arg("P"),
+      ::py::arg("points"));
+
+  m.def(
+      "distancePointToConvexHullProjectedTo2D",
+      +[](Eigen::Vector3s P,
+          std::vector<Eigen::Vector3s>& points,
+          Eigen::Vector3s normal) -> s_t {
+        return dart::math::distancePointToConvexHullProjectedTo2D(
+            P, points, normal);
+      },
+      ::py::arg("P"),
+      ::py::arg("points"),
+      ::py::arg("normal") = Eigen::Vector3s::UnitY());
+
+  ::py::class_<dart::math::BoundingBox>(m, "BoundingBox")
+      .def(::py::init())
+      .def(
+          ::py::init<const Eigen::Vector3s&, const Eigen::Vector3s&>(),
+          ::py::arg("min"),
+          ::py::arg("max"))
+      .def("getMax", &dart::math::BoundingBox::getMax)
+      .def("getMin", &dart::math::BoundingBox::getMin)
+      .def("computeCenter", &dart::math::BoundingBox::computeCenter)
+      .def("computeFullExtents", &dart::math::BoundingBox::computeFullExtents)
+      .def("computeHalfExtents", &dart::math::BoundingBox::computeHalfExtents);
+}
+
+void EulerGeometry(py::module& m)
+{
+  m.def(
+      "roundEulerAnglesToNearest",
+      +[](Eigen::Vector3s angle,
+          Eigen::Vector3s previousAngle,
+          dynamics::detail::AxisOrder axisOrder) -> Eigen::Vector3s {
+        return dart::math::roundEulerAnglesToNearest(
+            angle, previousAngle, axisOrder);
+      },
+      ::py::arg("angle"),
+      ::py::arg("previousAngle"),
+      ::py::arg("axisOrder") = dart::dynamics::detail::AxisOrder::XYZ);
 }
 
 } // namespace python

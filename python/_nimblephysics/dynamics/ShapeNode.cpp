@@ -31,6 +31,7 @@
  */
 
 #include <dart/dynamics/ShapeNode.hpp>
+#include <pybind11/detail/common.h>
 #include <pybind11/pybind11.h>
 
 #include "eigen_geometry_pybind.h"
@@ -43,10 +44,10 @@ namespace python {
 
 void ShapeNode(py::module& m)
 {
-  ::py::class_<
-      dart::dynamics::ShapeNode,
-      dart::dynamics::ShapeFrame,
-      std::shared_ptr<dart::dynamics::ShapeNode>>(m, "ShapeNode")
+  ::py::class_<dart::dynamics::ShapeNode::Properties>(m, "ShapeNodeProperties");
+
+  ::py::class_<dart::dynamics::ShapeNode, dart::dynamics::ShapeFrame>(
+      m, "ShapeNode")
       .def(
           "setProperties",
           +[](dart::dynamics::ShapeNode* self,
@@ -106,7 +107,32 @@ void ShapeNode(py::module& m)
           "getOffset",
           +[](const dart::dynamics::ShapeNode* self) -> Eigen::Vector3s {
             return self->getOffset();
-          });
+          })
+      .def(
+          "getShape",
+          +[](const dart::dynamics::ShapeNode* self)
+              -> std::shared_ptr<const dart::dynamics::Shape> {
+            return self->getShape();
+          },
+          py::return_value_policy::reference_internal)
+      .def(
+          "getWorldTransform",
+          +[](const dart::dynamics::ShapeNode* self) -> Eigen::Isometry3s {
+            return self->getWorldTransform();
+          })
+      .def("getName", &dart::dynamics::ShapeNode::getName)
+      .def(
+          "createVisualAspect",
+          &dart::dynamics::ShapeNode::createVisualAspect<>,
+          py::return_value_policy::reference_internal)
+      .def(
+          "createCollisionAspect",
+          &dart::dynamics::ShapeNode::createCollisionAspect<>,
+          py::return_value_policy::reference_internal)
+      .def(
+          "createDynamicsAspect",
+          &dart::dynamics::ShapeNode::createDynamicsAspect<>,
+          py::return_value_policy::reference_internal);
 }
 
 } // namespace python

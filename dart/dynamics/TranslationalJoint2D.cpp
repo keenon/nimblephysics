@@ -193,6 +193,16 @@ Eigen::Matrix<s_t, 6, 2> TranslationalJoint2D::getRelativeJacobianStatic(
 }
 
 //==============================================================================
+/// Returns the value for q that produces the nearest rotation to
+/// `relativeRotation` passed in.
+Eigen::VectorXs TranslationalJoint2D::getNearestPositionToDesiredRotation(
+    const Eigen::Matrix3s& relativeRotation)
+{
+  (void)relativeRotation;
+  return getPositions();
+}
+
+//==============================================================================
 TranslationalJoint2D::TranslationalJoint2D(const Properties& properties)
   : detail::TranslationalJoint2DBase(properties)
 {

@@ -1,9 +1,11 @@
 #!/bin/bash
 
-CONVERT=~/Desktop/libs/ConvertFile/build/ConvertFile
+CONVERT="assimp export "
 
-$CONVERT
-for file in ./Geometry/*.vtp
+rm ./Geometry/*.stl
+rm ./Geometry/*.obj
+rm ./Geometry/*.mtl
+for file in ./Geometry/*.ply
 do
-  $CONVERT "$file" "${file}"
+  assimp export $file ${file}.stl -fstlb
 done

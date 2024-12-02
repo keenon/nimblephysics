@@ -127,6 +127,129 @@ void eigen_geometry(pybind11::module& parent_m)
   // Do not return references to matrices (e.g. `Eigen::Ref<>`) so that we have
   // tighter control over validation.
 
+  // Quaternion.
+  // Since the Eigen API for Quaternion is insufficiently explicit, we will
+  // deviate some from the API to maintain clarity.
+  // TODO(eric.cousineau): Should this not be restricted to a unit quaternion?
+  {
+    using Class = Eigen::Quaternion<T>;
+    ::pybind11::class_<Class> py_class(m, "Quaternion");
+    py_class.attr("__doc__")
+        = "Provides a unit quaternion binding of Eigen::Quaternion<>.";
+    ::pybind11::object py_class_obj = py_class;
+    py_class.def(::pybind11::init([]() { return Class::Identity(); }))
+        .def_static("Identity", []() { return Class::Identity(); })
+        .def(
+            ::pybind11::init([](const Eigen::Matrix<T, 4, 1>& wxyz) {
+              Class out(wxyz(0), wxyz(1), wxyz(2), wxyz(3));
+              CheckQuaternion(out);
+              return out;
+            }),
+            ::pybind11::arg("wxyz"))
+        .def(
+            ::pybind11::init([](T w, T x, T y, T z) {
+              Class out(w, x, y, z);
+              CheckQuaternion(out);
+              return out;
+            }),
+            ::pybind11::arg("w"),
+            ::pybind11::arg("x"),
+            ::pybind11::arg("y"),
+            ::pybind11::arg("z"))
+        .def(
+            ::pybind11::init([](const Eigen::Matrix<T, 3, 3>& rotation) {
+              Class out(rotation);
+              CheckQuaternion(out);
+              return out;
+            }),
+            ::pybind11::arg("rotation"))
+        .def(
+            ::pybind11::init([](const Class& other) {
+              CheckQuaternion(other);
+              return other;
+            }),
+            ::pybind11::arg("other"))
+        .def("w", [](const Class* self) { return self->w(); })
+        .def("x", [](const Class* self) { return self->x(); })
+        .def("y", [](const Class* self) { return self->y(); })
+        .def("z", [](const Class* self) { return self->z(); })
+        .def("xyz", [](const Class* self) { return self->vec(); })
+        .def(
+            "wxyz",
+            [](Class* self) {
+              Eigen::Matrix<T, 4, 1> wxyz;
+              wxyz << self->w(), self->vec();
+              return wxyz;
+            })
+        .def(
+            "set_wxyz",
+            [](Class* self, const Eigen::Matrix<T, 4, 1>& wxyz) {
+              Class update;
+              update.w() = wxyz(0);
+              update.vec() = wxyz.tail(3);
+              CheckQuaternion(update);
+              *self = update;
+            },
+            ::pybind11::arg("wxyz"))
+        .def(
+            "set_wxyz",
+            [](Class* self, T w, T x, T y, T z) {
+              Class update(w, x, y, z);
+              CheckQuaternion(update);
+              *self = update;
+            },
+            ::pybind11::arg("w"),
+            ::pybind11::arg("x"),
+            ::pybind11::arg("y"),
+            ::pybind11::arg("z"))
+        .def(
+            "rotation",
+            [](const Class* self) { return self->toRotationMatrix(); })
+        .def(
+            "set_rotation",
+            [](Class* self, const Eigen::Matrix<T, 3, 3>& rotation) {
+              Class update(rotation);
+              CheckQuaternion(update);
+              *self = update;
+            })
+        .def(
+            "__str__",
+            [py_class_obj](const Class* self) {
+              return ::pybind11::str("{}(w={}, x={}, y={}, z={})")
+                  .format(
+                      py_class_obj.attr("__name__"),
+                      self->w(),
+                      self->x(),
+                      self->y(),
+                      self->z());
+            })
+        // Do not define operator `__mul__` until we have the Python3 `@`
+        // operator so that operations are similar to those of arrays.
+        .def(
+            "multiply",
+            [](const Class& self, const Class& other) { return self * other; })
+        .def(
+            "multiply",
+            [](const Class& self, const Eigen::Matrix<T, 3, 1>& position) {
+              return self * position;
+            },
+            ::pybind11::arg("position"))
+        .def("inverse", [](const Class* self) { return self->inverse(); })
+        .def("conjugate", [](const Class* self) { return self->conjugate(); })
+        //========================
+        // Begin: added by dartpy
+        //========================
+        .def(
+            "to_rotation_matrix",
+            [](Class* self) -> Eigen::Matrix<T, 3, 3> {
+              return self->toRotationMatrix();
+            })
+        //========================
+        // End: added by dartpy
+        //========================
+        ;
+  }
+
   // Isometry3s.
   // @note `linear` implies rotation, and `affine` implies translation.
   {
@@ -251,129 +374,6 @@ void eigen_geometry(pybind11::module& parent_m)
         //========================
         ;
     ::pybind11::implicitly_convertible<Eigen::Matrix<T, 4, 4>, Class>();
-  }
-
-  // Quaternion.
-  // Since the Eigen API for Quaternion is insufficiently explicit, we will
-  // deviate some from the API to maintain clarity.
-  // TODO(eric.cousineau): Should this not be restricted to a unit quaternion?
-  {
-    using Class = Eigen::Quaternion<T>;
-    ::pybind11::class_<Class> py_class(m, "Quaternion");
-    py_class.attr("__doc__")
-        = "Provides a unit quaternion binding of Eigen::Quaternion<>.";
-    ::pybind11::object py_class_obj = py_class;
-    py_class.def(::pybind11::init([]() { return Class::Identity(); }))
-        .def_static("Identity", []() { return Class::Identity(); })
-        .def(
-            ::pybind11::init([](const Eigen::Matrix<T, 4, 1>& wxyz) {
-              Class out(wxyz(0), wxyz(1), wxyz(2), wxyz(3));
-              CheckQuaternion(out);
-              return out;
-            }),
-            ::pybind11::arg("wxyz"))
-        .def(
-            ::pybind11::init([](T w, T x, T y, T z) {
-              Class out(w, x, y, z);
-              CheckQuaternion(out);
-              return out;
-            }),
-            ::pybind11::arg("w"),
-            ::pybind11::arg("x"),
-            ::pybind11::arg("y"),
-            ::pybind11::arg("z"))
-        .def(
-            ::pybind11::init([](const Eigen::Matrix<T, 3, 3>& rotation) {
-              Class out(rotation);
-              CheckQuaternion(out);
-              return out;
-            }),
-            ::pybind11::arg("rotation"))
-        .def(
-            ::pybind11::init([](const Class& other) {
-              CheckQuaternion(other);
-              return other;
-            }),
-            ::pybind11::arg("other"))
-        .def("w", [](const Class* self) { return self->w(); })
-        .def("x", [](const Class* self) { return self->x(); })
-        .def("y", [](const Class* self) { return self->y(); })
-        .def("z", [](const Class* self) { return self->z(); })
-        .def("xyz", [](const Class* self) { return self->vec(); })
-        .def(
-            "wxyz",
-            [](Class* self) {
-              Eigen::Matrix<T, 4, 1> wxyz;
-              wxyz << self->w(), self->vec();
-              return wxyz;
-            })
-        .def(
-            "set_wxyz",
-            [](Class* self, const Eigen::Matrix<T, 4, 1>& wxyz) {
-              Class update;
-              update.w() = wxyz(0);
-              update.vec() = wxyz.tail(3);
-              CheckQuaternion(update);
-              *self = update;
-            },
-            ::pybind11::arg("wxyz"))
-        .def(
-            "set_wxyz",
-            [](Class* self, T w, T x, T y, T z) {
-              Class update(w, x, y, z);
-              CheckQuaternion(update);
-              *self = update;
-            },
-            ::pybind11::arg("w"),
-            ::pybind11::arg("x"),
-            ::pybind11::arg("y"),
-            ::pybind11::arg("z"))
-        .def(
-            "rotation",
-            [](const Class* self) { return self->toRotationMatrix(); })
-        .def(
-            "set_rotation",
-            [](Class* self, const Eigen::Matrix<T, 3, 3>& rotation) {
-              Class update(rotation);
-              CheckQuaternion(update);
-              *self = update;
-            })
-        .def(
-            "__str__",
-            [py_class_obj](const Class* self) {
-              return ::pybind11::str("{}(w={}, x={}, y={}, z={})")
-                  .format(
-                      py_class_obj.attr("__name__"),
-                      self->w(),
-                      self->x(),
-                      self->y(),
-                      self->z());
-            })
-        // Do not define operator `__mul__` until we have the Python3 `@`
-        // operator so that operations are similar to those of arrays.
-        .def(
-            "multiply",
-            [](const Class& self, const Class& other) { return self * other; })
-        .def(
-            "multiply",
-            [](const Class& self, const Eigen::Matrix<T, 3, 1>& position) {
-              return self * position;
-            },
-            ::pybind11::arg("position"))
-        .def("inverse", [](const Class* self) { return self->inverse(); })
-        .def("conjugate", [](const Class* self) { return self->conjugate(); })
-        //========================
-        // Begin: added by dartpy
-        //========================
-        .def(
-            "to_rotation_matrix",
-            [](Class* self) -> Eigen::Matrix<T, 3, 3> {
-              return self->toRotationMatrix();
-            })
-        //========================
-        // End: added by dartpy
-        //========================
-        ;
   }
 
   // Angle-axis.

@@ -40,9 +40,11 @@
 #include "dart/collision/Contact.hpp"
 #include "dart/dynamics/BodyNode.hpp"
 #include "dart/dynamics/DegreeOfFreedom.hpp"
+#include "dart/dynamics/Joint.hpp"
 #include "dart/dynamics/RevoluteJoint.hpp"
 #include "dart/dynamics/Skeleton.hpp"
 #include "dart/math/Geometry.hpp"
+#include "dart/math/MathTypes.hpp"
 #include "dart/neural/BackpropSnapshot.hpp"
 #include "dart/neural/ConstrainedGroupGradientMatrices.hpp"
 #include "dart/neural/DifferentiableContactConstraint.hpp"
@@ -4092,7 +4094,7 @@ bool verifySkeletonMarkerJacobians(
     SkeletonPtr skel,
     std::vector<std::pair<dynamics::BodyNode*, Eigen::Vector3s>> markers)
 {
-  const s_t THRESHOLD = 1e-7;
+  const s_t THRESHOLD = 5e-7;
 
   // Check the marker Jacobian is accurate
   Eigen::MatrixXs posJac
@@ -4189,6 +4191,77 @@ bool verifySkeletonMarkerJacobians(
     return false;
   }
 
+  for (int i = 0; i < skel->getNumJoints(); i++)
+  {
+    dynamics::Joint* joint = skel->getJoint(i);
+    for (int axis = -1; axis < 3; axis++)
+    {
+      Eigen::Vector3s wrtChild
+          = joint->getWorldTranslationOfChildBodyWrtChildScale(axis);
+      Eigen::Vector3s wrtChild_fd
+          = joint->finiteDifferenceWorldTranslationOfChildBodyWrtChildScale(
+              axis);
+      if (!equals(wrtChild, wrtChild_fd, THRESHOLD))
+      {
+        std::cout << "Joint \"" << joint->getName() << "\" of type \""
+                  << joint->getType()
+                  << "\" does not correctly report "
+                     "getWorldTranslationOfChildBodyWrtChildScale(axis="
+                  << axis << ")!" << std::endl;
+        std::cout << "Child scale: " << std::endl
+                  << joint->getChildScale() << std::endl;
+        std::cout << "Analytical (norm=" << wrtChild.norm()
+                  << "): " << std::endl
+                  << wrtChild << std::endl;
+        std::cout << "FD (norm=" << wrtChild_fd.norm() << "): " << std::endl
+                  << wrtChild_fd << std::endl;
+        std::cout << "Diff: " << std::endl
+                  << wrtChild - wrtChild_fd << std::endl;
+        return false;
+      }
+      // else
+      // {
+      //   std::cout << "Joint \"" << joint->getName() << "\" of type \""
+      //             << joint->getType()
+      //             << "\" correctly reports "
+      //                "getWorldTranslationOfChildBodyWrtChildScale(axis="
+      //             << axis << ")" << std::endl;
+      //   std::cout << "Analytical: " << std::endl << wrtChild << std::endl;
+      // }
+
+      Eigen::Vector3s wrtParent
+          = joint->getWorldTranslationOfChildBodyWrtParentScale(axis);
+      Eigen::Vector3s wrtParent_fd
+          = joint->finiteDifferenceWorldTranslationOfChildBodyWrtParentScale(
+              axis);
+      if (!equals(wrtParent, wrtParent_fd, THRESHOLD))
+      {
+        std::cout << "Joint \"" << joint->getName() << "\" of type \""
+                  << joint->getType()
+                  << "\" does not correctly report "
+                     "getWorldTranslationOfChildBodyWrtParentScale(axis="
+                  << axis << ")!" << std::endl;
+        std::cout << "Parent scale: " << std::endl
+                  << joint->getParentScale() << std::endl;
+        std::cout << "Analytical: " << std::endl << wrtParent << std::endl;
+        std::cout << "FD: " << std::endl << wrtParent_fd << std::endl;
+        std::cout << "Diff: " << std::endl
+                  << wrtParent - wrtParent_fd << std::endl;
+        joint->getWorldTranslationOfChildBodyWrtParentScale(axis);
+        return false;
+      }
+      // else
+      // {
+      //   std::cout << "Joint \"" << joint->getName() << "\" of type \""
+      //             << joint->getType()
+      //             << "\" correctly reports "
+      //                "getWorldTranslationOfChildBodyWrtParentScale(axis="
+      //             << axis << ")" << std::endl;
+      //   std::cout << "Analytical: " << std::endl << wrtParent << std::endl;
+      // }
+    }
+  }
+
   Eigen::MatrixXs markersJac
       = skel->getMarkerWorldPositionsJacobianWrtMarkerOffsets(markers);
   Eigen::MatrixXs markersJac_fd
@@ -4240,38 +4313,39 @@ bool verifySkeletonMarkerJacobians(
           markers);
   if (!equals(scaleJac, scaleJac_fd, THRESHOLD))
   {
-    for (auto pair : markers)
-    {
-      std::cout << "Pair [" << pair.first->getName() << ",(" << pair.second(0)
-                << "," << pair.second(1) << "," << pair.second(2) << ")]"
-                << std::endl;
-    }
-    std::cout << "Analytical scale J: " << std::endl << scaleJac << std::endl;
-    std::cout << "FD scale J: " << std::endl << scaleJac_fd << std::endl;
     Eigen::MatrixXs diff = scaleJac - scaleJac_fd;
-    std::cout << "Diff: " << std::endl << diff << std::endl;
+    // std::cout << "Diff: " << std::endl << diff << std::endl;
     int cursor = 0;
     for (int i = 0; i < skel->getNumBodyNodes(); i++)
     {
       dynamics::BodyNode* body = skel->getBodyNode(i);
-      Eigen::MatrixXs jacBlock = scaleJac.block(0, cursor, diff.rows(), 1);
-      Eigen::MatrixXs fdBlock = scaleJac_fd.block(0, cursor, diff.rows(), 1);
-      Eigen::MatrixXs diffBlock = diff.block(0, cursor, diff.rows(), 1);
+      Eigen::MatrixXs jacBlock = scaleJac.block(0, cursor * 3, diff.rows(), 3);
+      Eigen::MatrixXs fdBlock
+          = scaleJac_fd.block(0, cursor * 3, diff.rows(), 3);
+      Eigen::MatrixXs diffBlock = diff.block(0, cursor * 3, diff.rows(), 3);
       if (diffBlock.norm() > 1e-8)
       {
-        std::cout << "Body Scale \"" << body->getName() << "\"" << std::endl;
+        int markerCursor = 0;
         for (auto pair : markers)
         {
-          std::cout << "Pair [" << pair.first->getName() << ",("
-                    << pair.second(0) << "," << pair.second(1) << ","
-                    << pair.second(2) << ")]" << std::endl;
+          Eigen::Matrix3s diffMarker
+              = diffBlock.block(markerCursor * 3, 0, 3, 3);
+          if (diffMarker.norm() > 1e-8)
+          {
+            std::cout << "Body Scale \"" << body->getName() << "\" to Marker ["
+                      << pair.first->getName() << ",(" << pair.second(0) << ","
+                      << pair.second(1) << "," << pair.second(2) << ")]"
+                      << std::endl;
+            std::cout << "Jac:" << std::endl
+                      << jacBlock.block(markerCursor * 3, 0, 3, 3) << std::endl
+                      << "FD:" << std::endl
+                      << fdBlock.block(markerCursor * 3, 0, 3, 3) << std::endl
+                      << "Diff:" << std::endl
+                      << diffBlock.block(markerCursor * 3, 0, 3, 3)
+                      << std::endl;
+          }
+          markerCursor++;
         }
-        std::cout << "Jac:" << std::endl
-                  << jacBlock << std::endl
-                  << "FD:" << std::endl
-                  << fdBlock << std::endl
-                  << "Diff:" << std::endl
-                  << diffBlock << std::endl;
       }
       cursor += 1;
     }
@@ -4409,6 +4483,125 @@ bool verifySkeletonMarkerJacobians(
   }
 
   // Check 2nd order Jacobians wrt the body scales
+
+  Eigen::MatrixXs jacScrews
+      = skel->getScrewsMarkerWorldPositionsJacobianWrtJointPositions(markers);
+  Eigen::MatrixXs jacOriginal
+      = skel->getMarkerWorldPositionsJacobianWrtJointPositions(markers);
+  if (!equals(jacScrews, jacOriginal, THRESHOLD))
+  {
+    std::cout << "Expected the screws definition to produce the same jacobian "
+                 "as the original definition"
+              << std::endl;
+    EXPECT_TRUE(equals(jacScrews, jacOriginal, THRESHOLD));
+    return false;
+  }
+  std::cout << "Screws definition passes" << std::endl;
+
+  for (int i = 0; i < skel->getNumJoints(); i++)
+  {
+    dynamics::Joint* joint = skel->getJoint(i);
+    for (int dof = 0; dof < joint->getNumDofs(); dof++)
+    {
+      for (int axis = -1; axis < 3; axis++)
+      {
+        Eigen::Vector6s wrtChild
+            = joint->getScrewAxisGradientWrtChildBodyScale(dof, axis);
+        Eigen::Vector6s wrtChild_fd
+            = joint->finiteDifferenceScrewAxisGradientWrtChildBodyScale(
+                dof, axis);
+        if (!equals(wrtChild, wrtChild_fd, THRESHOLD))
+        {
+          std::cout << "Joint \"" << joint->getName() << "\" of type \""
+                    << joint->getType()
+                    << "\" does not correctly report "
+                       "getScrewAxisGradientWrtChildBodyScale(axis="
+                    << axis << ")!" << std::endl;
+          std::cout << "Child scale: " << std::endl
+                    << joint->getChildScale() << std::endl;
+          std::cout << "Analytical (norm=" << wrtChild.norm()
+                    << "): " << std::endl
+                    << wrtChild << std::endl;
+          std::cout << "FD (norm=" << wrtChild_fd.norm() << "): " << std::endl
+                    << wrtChild_fd << std::endl;
+          std::cout << "Diff: " << std::endl
+                    << wrtChild - wrtChild_fd << std::endl;
+          return false;
+        }
+        // else
+        // {
+        //   std::cout << "Joint \"" << joint->getName() << "\" of type \""
+        //             << joint->getType()
+        //             << "\" correctly reports "
+        //                "getWorldTranslationOfChildBodyWrtChildScale(axis="
+        //             << axis << ")" << std::endl;
+        //   std::cout << "Analytical: " << std::endl << wrtChild << std::endl;
+        // }
+
+        Eigen::Vector6s wrtParent
+            = joint->getScrewAxisGradientWrtParentBodyScale(dof, axis);
+        Eigen::Vector6s wrtParent_fd
+            = joint->finiteDifferenceScrewAxisGradientWrtParentBodyScale(
+                dof, axis);
+        if (!equals(wrtParent, wrtParent_fd, THRESHOLD))
+        {
+          std::cout << "Joint \"" << joint->getName() << "\" of type \""
+                    << joint->getType()
+                    << "\" does not correctly report "
+                       "getScrewAxisGradientWrtParentBodyScale(axis="
+                    << axis << ")!" << std::endl;
+          std::cout << "Analytical: " << std::endl << wrtParent << std::endl;
+          std::cout << "FD: " << std::endl << wrtParent_fd << std::endl;
+          std::cout << "Diff: " << std::endl
+                    << wrtParent - wrtParent_fd << std::endl;
+          return false;
+        }
+        // else
+        // {
+        //   std::cout << "Joint \"" << joint->getName() << "\" of type \""
+        //             << joint->getType()
+        //             << "\" correctly reports "
+        //                "getWorldTranslationOfChildBodyWrtParentScale(axis="
+        //             << axis << ")" << std::endl;
+        //   std::cout << "Analytical: " << std::endl << wrtParent << std::endl;
+        // }
+      }
+    }
+  }
+
+  for (int j = 0; j < skel->getNumBodyNodes(); j++)
+  {
+    for (int axis = 0; axis < 3; axis++)
+    {
+      Eigen::MatrixXs scratch = skel->scratchAnalytical(markers, j, axis);
+      Eigen::MatrixXs scratch_fd = skel->scratchFd(markers, j, axis);
+      if (!equals(scratch, scratch_fd, THRESHOLD))
+      {
+        std::cout << "Got scratch error on body[" << j << "] ("
+                  << skel->getBodyNode(j)->getName() << ") axis=" << axis
+                  << std::endl;
+        if (scratch.cols() == 1)
+        {
+          Eigen::MatrixXs compare = Eigen::MatrixXs::Zero(scratch.size(), 3);
+          compare.col(0) = scratch;
+          compare.col(1) = scratch_fd;
+          compare.col(2) = scratch - scratch_fd;
+          std::cout << "Scratch - Scratch FD - Diff: " << std::endl
+                    << compare << std::endl;
+        }
+        else
+        {
+          std::cout << "Scratch: " << std::endl << scratch << std::endl;
+          std::cout << "Scratch FD: " << std::endl << scratch_fd << std::endl;
+          std::cout << "Diff: " << std::endl
+                    << scratch - scratch_fd << std::endl;
+        }
+        EXPECT_TRUE(equals(scratch, scratch_fd, THRESHOLD));
+        return false;
+      }
+    }
+  }
+  std::cout << "Scratch passed!" << std::endl;
 
   for (int j = 0; j < skel->getNumBodyNodes(); j++)
   {

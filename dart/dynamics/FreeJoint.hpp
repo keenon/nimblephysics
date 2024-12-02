@@ -317,7 +317,8 @@ public:
   Eigen::Matrix6s finiteDifferenceRelativeJacobianStatic(
       const Eigen::Vector6s& _positions) const;
 
-  math::Jacobian getRelativeJacobianDeriv(std::size_t index) const override;
+  Eigen::Matrix6s getRelativeJacobianDerivWrtPositionStatic(
+      std::size_t index) const override;
   math::Jacobian finiteDifferenceRelativeJacobianDeriv(std::size_t index) const;
 
   math::Jacobian getRelativeJacobianTimeDerivDerivWrtPosition(
@@ -358,10 +359,17 @@ public:
       int axisDof, int rotateDof, s_t eps);
 
   // Returns the gradient of the screw axis with respect to the rotate dof
-  Eigen::Vector6s getScrewAxisGradientForPosition(int axisDof, int rotateDof) override;
+  Eigen::Vector6s getScrewAxisGradientForPosition(
+      int axisDof, int rotateDof) override;
 
   // Returns the gradient of the screw axis with respect to the rotate dof
-  Eigen::Vector6s getScrewAxisGradientForForce(int axisDof, int rotateDof) override;
+  Eigen::Vector6s getScrewAxisGradientForForce(
+      int axisDof, int rotateDof) override;
+
+  /// Returns the value for q that produces the nearest rotation to
+  /// `relativeRotation` passed in.
+  Eigen::VectorXs getNearestPositionToDesiredRotation(
+      const Eigen::Matrix3s& relativeRotation) override;
 
 protected:
   /// Constructor called by Skeleton class

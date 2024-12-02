@@ -275,6 +275,68 @@ public:
   /// as a single vector
   Eigen::VectorXs getControlForces();
 
+  /// Gets the dimension of the group scales for all skeletons in the world
+  /// concatenated together as a single vector
+  int getGroupScaleDim();
+
+  /// Gets the sum of the number of the scale groups for all skeletons in the
+  /// world
+  int getNumScaleGroups();
+
+  /// Gets the group scales for all skeletons in the world concatenated together
+  /// as a single vector
+  Eigen::VectorXs getGroupScales();
+
+  /// This gets the masses of each scale group, concatenated
+  Eigen::VectorXs getGroupMasses();
+
+  /// This sets the masses of each scale group, concatenated
+  void setGroupMasses(Eigen::VectorXs masses);
+
+  /// This gets the upper bound for each group's mass, concatenated
+  Eigen::VectorXs getGroupMassesUpperBound();
+
+  /// This gets the lower bound for each group's mass, concatenated
+  Eigen::VectorXs getGroupMassesLowerBound();
+
+  /// This gets the masses of each scale group, concatenated
+  Eigen::VectorXs getLinearizedMasses();
+
+  /// This sets the masses of each scale group, concatenated
+  void setLinearizedMasses(Eigen::VectorXs masses);
+
+  /// This gets the upper bound for each group's mass, concatenated
+  Eigen::VectorXs getLinearizedMassesUpperBound();
+
+  /// This gets the lower bound for each group's mass, concatenated
+  Eigen::VectorXs getLinearizedMassesLowerBound();
+
+  /// This gets the COMs of each scale group, concatenated
+  Eigen::VectorXs getGroupCOMs();
+
+  /// This gets the upper bound for each axis of each group's COM, concatenated
+  Eigen::VectorXs getGroupCOMUpperBound();
+
+  /// This gets the lower bound for each axis of each group's COM, concatenated
+  Eigen::VectorXs getGroupCOMLowerBound();
+
+  /// This sets the COMs of each scale group, concatenated
+  void setGroupCOMs(Eigen::VectorXs coms);
+
+  /// This gets the Inertias of each scale group (the 6 vector), concatenated
+  Eigen::VectorXs getGroupInertias();
+
+  /// This sets the Inertias of each scale group (the 6 vector), concatenated
+  void setGroupInertias(Eigen::VectorXs inertias);
+
+  /// This gets the upper bound for each axis of each group's inertias,
+  /// concatenated
+  Eigen::VectorXs getGroupInertiasUpperBound();
+
+  /// This gets the lower bound for each axis of each group's inertias,
+  /// concatenated
+  Eigen::VectorXs getGroupInertiasLowerBound();
+
   /// Gets the masses of all the nodes in the world concatenated together as a
   /// single vector
   Eigen::VectorXs getMasses();
@@ -314,6 +376,22 @@ public:
   // This gives the vector of position lower limits for all the DOFs in this
   // world
   Eigen::VectorXs getVelocityLowerLimits();
+
+  // This gives the vector of position upper limits for all the DOFs in this
+  // world
+  Eigen::VectorXs getAccelerationUpperLimits();
+
+  // This gives the vector of position lower limits for all the DOFs in this
+  // world
+  Eigen::VectorXs getAccelerationLowerLimits();
+
+  // This gives the vector of position upper limits for all the scale groups in
+  // this world
+  Eigen::VectorXs getGroupScalesUpperLimits();
+
+  // This gives the vector of position lower limits for all the scale groups in
+  // this world
+  Eigen::VectorXs getGroupScalesLowerLimits();
 
   // This gives the vector of mass upper limits for all the registered bodies in
   // this world
@@ -397,6 +475,10 @@ public:
   /// Sets the forces of all the skeletons in the world from a single
   /// concatenated state vector
   void setControlForces(Eigen::VectorXs torques);
+
+  /// Sets the scales of all the scale groups in the world from a single
+  /// concatenated state vector
+  void setGroupScales(Eigen::VectorXs scales);
 
   // Sets the upper limits of all the joints from a single vector
   void setControlForceUpperLimits(Eigen::VectorXs limits);

@@ -36,11 +36,43 @@
 #include <Eigen/Dense>
 
 #include "dart/common/Deprecated.hpp"
+#include "dart/dynamics/detail/EulerJointAxisOrder.hpp"
 #include "dart/math/Constants.hpp"
 #include "dart/math/MathTypes.hpp"
 
 namespace dart {
 namespace math {
+
+/// This is necessary preparation for rapidly checking if another point is
+/// contained within the convex shape. This sorts the shape by angle from
+/// the center, and trims out any points that lie inside the convex polygon.
+void prepareConvex2DShape(
+    std::vector<Eigen::Vector3s>& shape,
+    const Eigen::Vector3s& origin,
+    const Eigen::Vector3s& basis2dX,
+    const Eigen::Vector3s& basis2dY);
+
+/// This checks whether a 2D shape contains a point. This assumes that shape was
+/// sorted using prepareConvex2DShape().
+bool convex2DShapeContains(
+    const Eigen::Vector3s& point,
+    const std::vector<Eigen::Vector3s>& shape,
+    const Eigen::Vector3s& origin,
+    const Eigen::Vector3s& basis2dX,
+    const Eigen::Vector3s& basis2dY);
+
+/// This transforms a 3D point down to a 2D point in the given 3D plane
+Eigen::Vector2s pointInPlane(
+    const Eigen::Vector3s& point,
+    const Eigen::Vector3s& origin,
+    const Eigen::Vector3s& basis2dX,
+    const Eigen::Vector3s& basis2dY);
+
+s_t angle2D(const Eigen::Vector2s& from, const Eigen::Vector2s& to);
+
+// This implements the "2D cross product" as redefined here:
+// https://stackoverflow.com/a/565282/13177487
+inline s_t crossProduct2D(const Eigen::Vector2s& v, const Eigen::Vector2s& w);
 
 /// \brief
 Eigen::Matrix3s makeSkewSymmetric(const Eigen::Vector3s& _v);
@@ -76,7 +108,15 @@ Eigen::Matrix3s quatSecondDeriv(
 Eigen::Vector3s attemptToClampEulerAnglesToBounds(
     const Eigen::Vector3s& angle,
     const Eigen::Vector3s& upperBounds,
-    const Eigen::Vector3s& lowerBounds);
+    const Eigen::Vector3s& lowerBounds,
+    dynamics::detail::AxisOrder axisOrder = dynamics::detail::AxisOrder::XYZ);
+
+/// This will find an equivalent set of euler angles that is closest in joint
+/// space to `previousAngle`
+Eigen::Vector3s roundEulerAnglesToNearest(
+    const Eigen::Vector3s& angle,
+    const Eigen::Vector3s& previousAngle,
+    dynamics::detail::AxisOrder axisOrder = dynamics::detail::AxisOrder::XYZ);
 
 //------------------------------------------------------------------------------
 /// \brief Given Euler XYX angles, return a 3x3 rotation matrix, which is
@@ -320,6 +360,12 @@ Eigen::Matrix3s expMapJacDeriv(const Eigen::Vector3s& _expmap, int _qi);
 /// indexed dof; _qi \f$ \in \f$ {0,1,2}
 Eigen::Vector3s expMapGradient(const Eigen::Vector3s& pos, int _qi);
 
+/// \brief computes the gradient of expMapRot(screw * eps) wrt to eps
+Eigen::Matrix3s expMapMagGradient(const Eigen::Vector3s& screw);
+
+Eigen::Matrix3s finiteDifferenceExpMapMagGradient(
+    const Eigen::Vector3s& screw, bool useRidders = true);
+
 /// \brief computes the gradient of logMap(expMapRot(screw * eps) *
 /// expMapRot(original)) wrt to eps
 Eigen::Vector3s expMapNestedGradient(
@@ -336,12 +382,30 @@ Eigen::Vector3s finiteDifferenceExpMapNestedGradient(
 Eigen::Vector3s logMap(const Eigen::Matrix3s& _R);
 
 /// \brief Log mapping
+/// \note This gets the value of d/dt logMap(R), given R and d/dt R
+Eigen::Vector3s dLogMap(const Eigen::Matrix3s& R, const Eigen::Matrix3s& dR);
+
+Eigen::Vector3s finiteDifferenceDLogMap(
+    const Eigen::Matrix3s& R,
+    const Eigen::Matrix3s& dR,
+    bool useRidders = true);
+
+/// \brief Log mapping
 Eigen::Vector6s logMap(const Eigen::Isometry3s& _T);
 
 /// This takes a screw axis and a point, and gives us the direction that the
 /// point will move if we increase theta by an infinitesimal amount.
 Eigen::Vector3s gradientWrtTheta(
     const Eigen::Vector6s& screwAxis, const Eigen::Vector3s& point, s_t theta);
+
+/// This takes a screw axis and a point, and gives us the direction that the
+/// point will move if we increase theta by an infinitesimal amount.
+Eigen::Vector3s gradientWrtThetaSecondGrad(
+    const Eigen::Vector6s& screwAxis,
+    const Eigen::Vector6s& dScrewAxis,
+    const Eigen::Vector3s& point,
+    const Eigen::Vector3s& dPoint,
+    s_t theta);
 
 /// This takes a rotation axis and a point, and gives us the direction that the
 /// point will move if we increase the theta by an infinitesimal amount.
@@ -667,6 +731,20 @@ bool verifyRotation(const Eigen::Matrix3s& _R);
 /// all the elements are not NaN values.
 bool verifyTransform(const Eigen::Isometry3s& _T);
 
+/// This projects a global wrench to a [CoP, tau, f] vector
+Eigen::Vector9s projectWrenchToCoP(
+    Eigen::Vector6s worldWrench, s_t groundHeight, int verticalAxis);
+
+/// This gets the relationship between changes in the world wrench and the
+/// resulting [CoP, tau, f] vector
+Eigen::Matrix<s_t, 9, 6> getProjectWrenchToCoPJacobian(
+    Eigen::Vector6s worldWrench, s_t groundHeight, int verticalAxis);
+
+/// This gets the relationship between changes in the world wrench and the
+/// resulting [CoP, tau, f] vector
+Eigen::Matrix<s_t, 9, 6> finiteDifferenceProjectWrenchToCoPJacobian(
+    Eigen::Vector6s worldWrench, s_t groundHeight, int verticalAxis);
+
 /// Compute the angle (in the range of -pi to +pi) which ignores any full
 /// rotations
 #ifdef DART_USE_ARBITRARY_PRECISION
@@ -811,6 +889,66 @@ Eigen::Vector3s closestPointOnLineGradient(
     const Eigen::Vector3s& lineDirectionGradient,
     const Eigen::Vector3s& goalPoint,
     const Eigen::Vector3s& goalPointGradient);
+
+/// This computes and returns the distance to the closest point on a line
+/// segment
+s_t distanceToSegment(
+    const Eigen::Vector3s& segmentPointA,
+    const Eigen::Vector3s& segmentPointB,
+    const Eigen::Vector3s& goalPoint);
+
+/// This gets the closest approximation to `desiredRotation` that we can get,
+/// rotating around `axis`
+s_t getClosestRotationalApproximation(
+    const Eigen::Vector3s& axis, const Eigen::Matrix3s& desiredRotation);
+
+/// This will rotate and translate a point cloud to match the first N points
+/// as closely as possible to the passed in matrix
+Eigen::MatrixXs mapPointCloudToData(
+    const Eigen::MatrixXs& pointCloud,
+    std::vector<Eigen::Vector3s> firstNPoints);
+
+/// This will give the world transform necessary to apply to the local points
+/// (worldT * p[i] for all localPoints) to get the local points to match the
+/// world points as closely as possible.
+Eigen::Isometry3s getPointCloudToPointCloudTransform(
+    std::vector<Eigen::Vector3s> localPoints,
+    std::vector<Eigen::Vector3s> worldPoints,
+    std::vector<s_t> weights);
+
+/// This will give the world transform necessary to apply to the local points
+/// (worldT * p[i] for all localPoints) to get the local points to match the
+/// world points as closely as possible. This does not require any mapping
+/// between the vertices, and instead just iteratively builds a correspondance.
+Eigen::Isometry3s iterativeClosestPoint(
+    std::vector<Eigen::Vector3s> localPoints,
+    std::vector<Eigen::Vector3s> worldPoints,
+    Eigen::Isometry3s transform = Eigen::Isometry3s::Identity(),
+    bool verbose = false);
+
+// Convex hull algorithm: Andrew's monotone chain algorithm
+std::vector<Eigen::Vector2s> convexHull2D(std::vector<Eigen::Vector2s>& P);
+
+// Check if a point is inside a convex polygon (assumes the polygon is already
+// sorted by convex hull)
+bool isPointInsideConvexPolygon2D(
+    const Eigen::Vector2s& P, const std::vector<Eigen::Vector2s>& polygon);
+
+// Compute the distance from a point to a line segment
+s_t distancePointToSegment2D(
+    const Eigen::Vector2s& P,
+    const Eigen::Vector2s& A,
+    const Eigen::Vector2s& B);
+
+// Compute the distance from a point to the convex hull
+s_t distancePointToConvexHull2D(
+    const Eigen::Vector2s& P, std::vector<Eigen::Vector2s>& points);
+
+/// Compute the distance from a point to the convex hull projected to a plane
+s_t distancePointToConvexHullProjectedTo2D(
+    const Eigen::Vector3s& P,
+    std::vector<Eigen::Vector3s>& points,
+    Eigen::Vector3s normal = Eigen::Vector3s::UnitY());
 
 // Represents a bounding box with minimum and maximum coordinates.
 class BoundingBox

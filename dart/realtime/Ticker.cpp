@@ -43,6 +43,19 @@ void Ticker::stop()
   delete mMainThread;
 }
 
+void Ticker::toggle()
+{
+  if (mRunning)
+    stop();
+  else
+    start();
+}
+
+bool Ticker::isRunning()
+{
+  return mRunning;
+}
+
 void Ticker::mainLoop()
 {
   while (mRunning)

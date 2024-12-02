@@ -64,6 +64,8 @@ void dart_constraint(py::module& m)
   JointConstraint(sm);
   JointLimitConstraint(sm);
   JointCoulombFrictionConstraint(sm);
+  ConstrainedGroup(sm);
+  LcpInputs(sm);
 
   BoxedLcpSolver(sm);
   DantzigBoxedLcpSolver(sm);
@@ -71,9 +73,6 @@ void dart_constraint(py::module& m)
 
   ConstraintSolver(sm);
   BoxedLcpConstraintSolver(sm);
-  ConstrainedGroup(sm);
-
-  LcpInputs(sm);
 
   // ConstraintBase(sm);
   // ConstraintBase(sm);

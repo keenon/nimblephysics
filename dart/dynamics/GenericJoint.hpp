@@ -515,6 +515,14 @@ public:
   getRelativeJacobianStatic() const;
 
   // Documentation inherited
+  virtual math::Jacobian getRelativeJacobianDerivWrtPosition(
+      std::size_t index) const override;
+
+  /// Fixed-size version of getRelativeJacobianDerivWrtPosition()
+  virtual typename GenericJoint<ConfigSpaceT>::JacobianMatrix
+  getRelativeJacobianDerivWrtPositionStatic(std::size_t index) const;
+
+  // Documentation inherited
   math::Jacobian getRelativeJacobian(
       const Eigen::VectorXs& _positions) const override;
 

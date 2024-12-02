@@ -36,6 +36,7 @@
 #include <string>
 
 #include "dart/dynamics/GenericJoint.hpp"
+#include "dart/dynamics/detail/EulerJointAxisOrder.hpp"
 
 namespace dart {
 namespace dynamics {
@@ -43,16 +44,6 @@ namespace dynamics {
 class EulerJoint;
 
 namespace detail {
-
-//==============================================================================
-/// Axis order
-enum class AxisOrder : int
-{
-  ZYX = 0,
-  XYZ = 1,
-  ZXY = 2,
-  XZY = 3,
-};
 
 //==============================================================================
 struct EulerJointUniqueProperties

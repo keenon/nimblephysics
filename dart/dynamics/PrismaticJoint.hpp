@@ -42,7 +42,6 @@ namespace dynamics {
 class PrismaticJoint : public detail::PrismaticJointBase
 {
 public:
-
   friend class Skeleton;
   using Base = detail::PrismaticJointBase;
   using UniqueProperties = detail::PrismaticJointUniqueProperties;
@@ -75,7 +74,7 @@ public:
 
   /// Same as copy(const PrismaticJoint&)
   PrismaticJoint& operator=(const PrismaticJoint& _otherJoint);
-  
+
   // Documentation inherited
   const std::string& getType() const override;
 
@@ -95,8 +94,12 @@ public:
   GenericJoint<math::R1Space>::JacobianMatrix getRelativeJacobianStatic(
       const GenericJoint<math::R1Space>::Vector& positions) const override;
 
-protected:
+  /// Returns the value for q that produces the nearest rotation to
+  /// `relativeRotation` passed in.
+  Eigen::VectorXs getNearestPositionToDesiredRotation(
+      const Eigen::Matrix3s& relativeRotation) override;
 
+protected:
   /// Constructor called by Skeleton class
   PrismaticJoint(const Properties& properties);
 
@@ -110,13 +113,13 @@ protected:
   void updateRelativeTransform() const override;
 
   // Documentation inherited
-  void updateRelativeJacobian(bool _mandatory=true) const override;
+  void updateRelativeJacobian(bool _mandatory = true) const override;
 
   // Documentation inherited
   void updateRelativeJacobianTimeDeriv() const override;
 };
 
-}  // namespace dynamics
-}  // namespace dart
+} // namespace dynamics
+} // namespace dart
 
-#endif  // DART_DYNAMICS_PRISMATICJOINT_HPP_
+#endif // DART_DYNAMICS_PRISMATICJOINT_HPP_

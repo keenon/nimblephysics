@@ -278,7 +278,7 @@ protected:
                                    const Eigen::Vector3s& _gravity) override;
 
   // Documentation inherited.
-  void updateCombinedVector() override;
+  void updateCombinedVector(bool includeExplicitAcc = false) override;
 
   // Documentation inherited.
   void aggregateCombinedVector(Eigen::VectorXs& _Cg,

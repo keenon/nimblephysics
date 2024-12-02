@@ -137,7 +137,8 @@ Eigen::Matrix<s_t, 6, 3> BallJoint::getRelativeJacobianStatic(
 }
 
 //==============================================================================
-math::Jacobian BallJoint::getRelativeJacobianDeriv(std::size_t index) const
+Eigen::Matrix<s_t, 6, 3> BallJoint::getRelativeJacobianDerivWrtPositionStatic(
+    std::size_t index) const
 {
 #ifdef DART_USE_IDENTITY_JACOBIAN
   // return finiteDifferenceRelativeJacobianDeriv(index);
@@ -467,6 +468,19 @@ void BallJoint::updateRelativeJacobianTimeDeriv() const
   mJacobianDeriv.bottomRows(3).noalias()
       = math::makeSkewSymmetric(T.translation()) * mJacobianDeriv.topRows(3);
 #endif
+}
+
+//==============================================================================
+/// Returns the value for q that produces the nearest rotation to
+/// `relativeRotation` passed in.
+Eigen::VectorXs BallJoint::getNearestPositionToDesiredRotation(
+    const Eigen::Matrix3s& relativeRotationGlobal)
+{
+  Eigen::Matrix3s relativeRotation
+      = Joint::mAspectProperties.mT_ParentBodyToJoint.linear().transpose()
+        * relativeRotationGlobal
+        * Joint::mAspectProperties.mT_ChildBodyToJoint.linear();
+  return math::logMap(relativeRotation);
 }
 
 /*

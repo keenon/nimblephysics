@@ -138,12 +138,12 @@ public:
   Eigen::Vector6s getContactWorldForceGradient(dynamics::DegreeOfFreedom* dof);
 
   /// Returns the gradient of the screw axis with respect to the rotate dof
-  Eigen::Vector6s getScrewAxisForPositionGradient(
+  static Eigen::Vector6s getScrewAxisForPositionGradient(
       dynamics::DegreeOfFreedom* screwDof,
       dynamics::DegreeOfFreedom* rotateDof);
 
   /// Returns the gradient of the screw axis with respect to the rotate dof
-  Eigen::Vector6s getScrewAxisForForceGradient(
+  static Eigen::Vector6s getScrewAxisForForceGradient(
       dynamics::DegreeOfFreedom* screwDof,
       dynamics::DegreeOfFreedom* rotateDof);
 
@@ -151,7 +151,7 @@ public:
   ///
   /// Unlike its sibling, getScrewAxisForForceGradient(), this allows passing
   /// in values that are otherwise repeatedly computed.
-  Eigen::Vector6s getScrewAxisForForceGradient_Optimized(
+  static Eigen::Vector6s getScrewAxisForForceGradient_Optimized(
       dynamics::DegreeOfFreedom* screwDof,
       dynamics::DegreeOfFreedom* rotateDof,
       const Eigen::Vector6s& axisWorldTwist);

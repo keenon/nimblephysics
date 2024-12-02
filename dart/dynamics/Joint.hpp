@@ -161,6 +161,10 @@ public:
   /// Return true if this joint is dynamic joint.
   bool isDynamic() const;
 
+  /// Return true if this joint has the same upperlimit and lowerlimit on
+  /// positions
+  bool isFixed() const;
+
   /// Get the child BodyNode of this Joint
   BodyNode* getChildBodyNode();
 
@@ -190,6 +194,12 @@ public:
 
   /// Get transformation from child body node to this joint
   const Eigen::Isometry3s& getTransformFromChildBodyNode() const;
+
+  /// Get the unscaled transformation from parent body node to this joint
+  const Eigen::Vector3s& getOriginalTransformFromParentBodyNode() const;
+
+  /// Get the unscaled transformation from child body node to this joint
+  const Eigen::Vector3s& getOriginalTransformFromChildBodyNode() const;
 
   /// Copy the transfromFromParentNode and transfromFromChildNode, and their
   /// scales, from another joint
@@ -594,6 +604,18 @@ public:
   /// \}
 
   //----------------------------------------------------------------------------
+  /// \{ \name Integrating sensor observations
+  //----------------------------------------------------------------------------
+
+  /// Returns the value for q that produces the nearest rotation to
+  /// `relativeRotation` passed in.
+  virtual Eigen::VectorXs getNearestPositionToDesiredRotation(
+      const Eigen::Matrix3s& relativeRotation)
+      = 0;
+
+  /// \}
+
+  //----------------------------------------------------------------------------
   /// \{ \name Passive forces - spring, viscous friction, Coulomb friction
   //----------------------------------------------------------------------------
 
@@ -699,12 +721,41 @@ public:
   virtual math::Jacobian getRelativeJacobian(
       const Eigen::VectorXs& positions) const = 0;
 
-  // TODO(JS): Rename and add documentation
-  virtual math::Jacobian getRelativeJacobianDeriv(std::size_t /*index*/) const
-  {
-    // TODO(JS): Remove
-    return math::Jacobian::Zero(6, getNumDofs());
-  }
+  /// Gets the derivative of the spatial Jacobian of the child BodyNode relative
+  /// to the parent BodyNode expressed in the child BodyNode frame, with respect
+  /// to the position of one of the joint's DOFs
+  virtual math::Jacobian getRelativeJacobianDerivWrtPosition(
+      std::size_t /*index*/) const = 0;
+
+  /// Gets the derivative of the spatial Jacobian of the child BodyNode relative
+  /// to the parent BodyNode expressed in the child BodyNode frame, with respect
+  /// to the scaling of the parent body along a specific axis.
+  ///
+  /// Use axis = -1 for uniform scaling of all the axis.
+  virtual math::Jacobian getRelativeJacobianDerivWrtParentScale(
+      int /*axis*/) const;
+
+  /// This uses finite differencing to compute the changes to the relative
+  /// Jacobian with respect to changes in the parent body's scale along a
+  /// specific axis.
+  ///
+  /// Use axis = -1 for uniform scaling of all the axis.
+  Eigen::MatrixXs finiteDifferenceRelativeJacobianDerivWrtParentScale(int axis);
+
+  /// Gets the derivative of the spatial Jacobian of the child BodyNode relative
+  /// to the parent BodyNode expressed in the child BodyNode frame, with respect
+  /// to the scaling of the child body along a specific axis.
+  ///
+  /// Use axis = -1 for uniform scaling of all the axis.
+  virtual math::Jacobian getRelativeJacobianDerivWrtChildScale(
+      int /*axis*/) const;
+
+  /// This uses finite differencing to compute the changes to the relative
+  /// Jacobian with respect to changes in the child body's scale along a
+  /// specific axis.
+  ///
+  /// Use axis = -1 for uniform scaling of all the axis.
+  Eigen::MatrixXs finiteDifferenceRelativeJacobianDerivWrtChildScale(int axis);
 
   /// Get time derivative of spatial Jacobian of the child BodyNode relative to
   /// the parent BodyNode expressed in the child BodyNode frame
@@ -725,6 +776,86 @@ public:
     // TODO(JS): Remove
     return math::Jacobian::Zero(6, getNumDofs());
   }
+
+  /// This gets the change in world translation of the child body, with respect
+  /// to an axis of parent scaling. Use axis = -1 for uniform scaling of all the
+  /// axis.
+  virtual Eigen::Vector3s getWorldTranslationOfChildBodyWrtParentScale(
+      int axis) const;
+
+  /// This gets the change in world translation of the child body, with respect
+  /// to an axis of child scaling. Use axis = -1 for uniform scaling of all the
+  /// axis.
+  virtual Eigen::Vector3s getWorldTranslationOfChildBodyWrtChildScale(
+      int axis) const;
+
+  Eigen::Vector3s finiteDifferenceWorldTranslationOfChildBodyWrtParentScale(
+      int axis);
+
+  Eigen::Vector3s finiteDifferenceWorldTranslationOfChildBodyWrtChildScale(
+      int axis);
+
+  /// This gets the column of "H" for the GEAR paper derivations, which is
+  /// defined as: log(T_{parent,self}^{-1} * dT_{parent,self}/dp) where "p" is
+  /// the scalar value we are changing.
+  ///
+  /// Use axis = -1 for uniform scaling of all the axis.
+  Eigen::Vector6s getLocalTransformScrewWrtParentScale(int axis) const;
+
+  /// This gets the column of "H" for the GEAR paper derivations, which is
+  /// defined as: log(T_{parent,self}^{-1} * dT_{parent,self}/dp) where "p" is
+  /// the scalar value we are changing.
+  ///
+  /// Use axis = -1 for uniform scaling of all the axis.
+  Eigen::Vector6s finiteDifferenceLocalTransformScrewWrtParentScale(int axis);
+
+  /// This gets the column of "H" for the GEAR paper derivations, which is
+  /// defined as: log(T_{parent,self}^{-1} * dT_{parent,self}/dp) where "p" is
+  /// the scalar value we are changing.
+  ///
+  /// Use axis = -1 for uniform scaling of all the axis.
+  Eigen::Vector6s getLocalTransformScrewWrtChildScale(int axis) const;
+
+  /// This gets the column of "H" for the GEAR paper derivations, which is
+  /// defined as: log(T_{parent,self}^{-1} * dT_{parent,self}/dp) where "p" is
+  /// the scalar value we are changing.
+  ///
+  /// Use axis = -1 for uniform scaling of all the axis.
+  Eigen::Vector6s finiteDifferenceLocalTransformScrewWrtChildScale(int axis);
+
+  /// Gets the derivative of the time derivative of the spatial Jacobian of the
+  /// child BodyNode relative to the parent BodyNode expressed in the child
+  /// BodyNode frame, with respect to the scaling of the parent body along a
+  /// specific axis.
+  ///
+  /// Use axis = -1 for uniform scaling of all the axis.
+  virtual math::Jacobian getRelativeJacobianTimeDerivDerivWrtParentScale(
+      int /*axis*/) const;
+
+  /// This uses finite differencing to compute the changes to the time deriv of
+  /// the relative Jacobian with respect to changes in the parent body's scale
+  /// along a specific axis.
+  ///
+  /// Use axis = -1 for uniform scaling of all the axis.
+  Eigen::MatrixXs finiteDifferenceRelativeJacobianTimeDerivDerivWrtParentScale(
+      int axis);
+
+  /// Gets the derivative of the time derivative of the spatial Jacobian of the
+  /// child BodyNode relative to the parent BodyNode expressed in the child
+  /// BodyNode frame, with respect to the scaling of the child body along a
+  /// specific axis.
+  ///
+  /// Use axis = -1 for uniform scaling of all the axis.
+  virtual math::Jacobian getRelativeJacobianTimeDerivDerivWrtChildScale(
+      int /*axis*/) const;
+
+  /// This uses finite differencing to compute the changes to the time deriv of
+  /// the relative Jacobian with respect to changes in the child body's scale
+  /// along a specific axis.
+  ///
+  /// Use axis = -1 for uniform scaling of all the axis.
+  Eigen::MatrixXs finiteDifferenceRelativeJacobianTimeDerivDerivWrtChildScale(
+      int axis);
 
   /// Get spatial Jacobian of the child BodyNode relative to the parent BodyNode
   /// expressed in the child BodyNode frame, in the `q` vector space. This is
@@ -754,9 +885,31 @@ public:
   virtual void updateRelativeJacobianInPositionSpace(
       bool mandatory = true) const = 0;
 
+  /// This gets the relative spatial velocity of the joint, with finite
+  /// differencing
+  Eigen::Vector6s finiteDifferenceRelativeSpatialVelocity();
+
   /// This uses finite differencing to compute the relative Jacobian in velocity
   /// space
   Eigen::MatrixXs finiteDifferenceRelativeJacobian();
+
+  /// This uses finite differencing to compute the relative Jacobian derivative
+  /// wrt the position of `dof`
+  Eigen::MatrixXs finiteDifferenceRelativeJacobianDerivWrtPosition(int dof);
+
+  /// This uses finite differencing to compute the relative Jacobian time
+  /// derivative
+  Eigen::MatrixXs finiteDifferenceRelativeJacobianTimeDeriv();
+
+  /// This uses finite differencing to compute the relative Jacobian time
+  /// derivative, derivative wrt position of `dof`
+  Eigen::MatrixXs finiteDifferenceRelativeJacobianTimeDerivDerivWrtPosition(
+      int dof);
+
+  /// This uses finite differencing to compute the relative Jacobian time
+  /// derivative, derivative wrt velocity of `dof`
+  Eigen::MatrixXs finiteDifferenceRelativeJacobianTimeDerivDerivWrtVelocity(
+      int dof);
 
   /// This uses finite differencing to compute the relative Jacobian in position
   /// space
@@ -795,6 +948,24 @@ public:
   /// `axisDof` as we rotate `rotateDof`.
   Eigen::Vector6s finiteDifferenceScrewAxisGradientForForce(
       int axisDof, int rotateDof);
+
+  // Returns the gradient of the screw axis with respect to the scaling axis of
+  // the child body
+  Eigen::Vector6s getScrewAxisGradientWrtChildBodyScale(int axisDof, int axis);
+
+  // Returns the gradient of the screw axis with respect to the scaling axis of
+  // the parent body
+  Eigen::Vector6s getScrewAxisGradientWrtParentBodyScale(int axisDof, int axis);
+
+  // Returns the gradient of the screw axis with respect to the scaling axis of
+  // the child body
+  Eigen::Vector6s finiteDifferenceScrewAxisGradientWrtChildBodyScale(
+      int axisDof, int axis);
+
+  // Returns the gradient of the screw axis with respect to the scaling axis of
+  // the parent body
+  Eigen::Vector6s finiteDifferenceScrewAxisGradientWrtParentBodyScale(
+      int axisDof, int axis);
 
   /// Get constraint wrench expressed in body node frame
   virtual Eigen::Vector6s getBodyConstraintWrench() const = 0;
@@ -913,6 +1084,11 @@ protected:
   /// Create a clone of this Joint. This may only be called by the Skeleton
   /// class.
   virtual Joint* clone() const = 0;
+
+  /// Create a clone of this Joint, or (if this joint cannot be represented in
+  /// SDF or MJCF, like CustomJoint's) create a simplified approximation of this
+  /// joint.
+  virtual Joint* simplifiedClone() const;
 
   /// Called by the Skeleton class
   virtual void registerDofs() = 0;

@@ -34,8 +34,10 @@
 
 #include <algorithm>
 #include <array>
+#include <limits>
 #include <queue>
 #include <string>
+#include <valarray>
 #include <vector>
 
 #include "dart/common/Console.hpp"
@@ -47,6 +49,7 @@
 #include "dart/dynamics/DegreeOfFreedom.hpp"
 #include "dart/dynamics/EndEffector.hpp"
 #include "dart/dynamics/EulerFreeJoint.hpp"
+#include "dart/dynamics/Frame.hpp"
 #include "dart/dynamics/FreeJoint.hpp"
 #include "dart/dynamics/Joint.hpp"
 #include "dart/dynamics/Marker.hpp"
@@ -55,11 +58,13 @@
 #include "dart/dynamics/RevoluteJoint.hpp"
 #include "dart/dynamics/ShapeNode.hpp"
 #include "dart/dynamics/SoftBodyNode.hpp"
+#include "dart/dynamics/detail/EulerJointAxisOrder.hpp"
 #include "dart/math/FiniteDifference.hpp"
 #include "dart/math/Geometry.hpp"
 #include "dart/math/Helpers.hpp"
 #include "dart/math/MathTypes.hpp"
 #include "dart/neural/ConstrainedGroupGradientMatrices.hpp"
+#include "dart/neural/WithRespectTo.hpp"
 
 #define SET_ALL_FLAGS(X)                                                       \
   for (auto& cache : mTreeCache)                                               \
@@ -475,6 +480,111 @@ SkeletonPtr Skeleton::cloneSkeleton(const std::string& cloneName) const
   {
     // Create a clone of the parent Joint
     Joint* joint = getJoint(i)->clone();
+
+    // Identify the original parent BodyNode
+    const BodyNode* originalParent = getBodyNode(i)->getParentBodyNode();
+
+    // Grab the parent BodyNode clone (using its name, which is guaranteed to be
+    // unique), or use nullptr if this is a root BodyNode
+    BodyNode* parentClone
+        = (originalParent == nullptr)
+              ? nullptr
+              : skelClone->getBodyNode(originalParent->getName());
+
+    if ((nullptr != originalParent) && (nullptr == parentClone))
+    {
+      dterr << "[Skeleton::clone] Failed to find a clone of BodyNode named ["
+            << originalParent->getName() << "] which is needed as the parent "
+            << "of the BodyNode named [" << getBodyNode(i)->getName()
+            << "] and should already have been created. Please report this as "
+            << "a bug!\n";
+    }
+
+    BodyNode* newBody = getBodyNode(i)->clone(parentClone, joint, false);
+
+    skelClone->registerBodyNode(newBody);
+  }
+
+  // Clone over the nodes in such a way that their indexing will match up with
+  // the original
+  for (const auto& nodeType : mNodeMap)
+  {
+    for (const auto& node : nodeType.second)
+    {
+      const BodyNode* originalBn = node->getBodyNodePtr();
+      BodyNode* newBn = skelClone->getBodyNode(originalBn->getName());
+      node->cloneNode(newBn)->attach();
+    }
+  }
+
+  skelClone->setProperties(getAspectProperties());
+  skelClone->setName(cloneName);
+  skelClone->setState(getState());
+
+  // Fix mimic joint references
+  for (std::size_t i = 0; i < getNumJoints(); ++i)
+  {
+    Joint* joint = skelClone->getJoint(i);
+    if (joint->getActuatorType() == Joint::MIMIC)
+    {
+      const Joint* mimicJoint
+          = skelClone->getJoint(joint->getMimicJoint()->getName());
+      if (mimicJoint)
+      {
+        joint->setMimicJoint(
+            mimicJoint, joint->getMimicMultiplier(), joint->getMimicOffset());
+      }
+      else
+      {
+        dterr << "[Skeleton::clone] Failed to clone mimic joint successfully: "
+              << "Unable to find the mimic joint ["
+              << joint->getMimicJoint()->getName()
+              << "] in the cloned Skeleton. Please report this as a bug!\n";
+      }
+    }
+  }
+
+  // Copy the scale groups
+  skelClone->mBodyScaleGroups.clear();
+  for (int i = 0; i < mBodyScaleGroups.size(); i++)
+  {
+    skelClone->mBodyScaleGroups.emplace_back();
+    auto& thisGroup = mBodyScaleGroups[i];
+    auto& cloneGroup = skelClone->mBodyScaleGroups[i];
+
+    cloneGroup.flipAxis = thisGroup.flipAxis;
+    cloneGroup.uniformScaling = thisGroup.uniformScaling;
+    for (auto& node : thisGroup.nodes)
+    {
+      cloneGroup.nodes.push_back(skelClone->getBodyNode(node->getName()));
+    }
+  }
+  skelClone->updateGroupScaleIndices();
+
+  return skelClone;
+}
+
+//==============================================================================
+/// Creates and returns a clone of this Skeleton, where we merge the provided
+/// bodies together and approximate the CustomJoints with simpler joint types.
+SkeletonPtr Skeleton::simplifySkeleton(
+    const std::string& cloneName,
+    std::map<std::string, std::string> mergeBodiesInto) const
+{
+  (void)mergeBodiesInto;
+
+  SkeletonPtr skelClone = Skeleton::create(cloneName);
+
+  for (std::size_t i = 0; i < getNumBodyNodes(); ++i)
+  {
+    // Create a clone of the parent Joint
+    Joint* joint = getJoint(i)->simplifiedClone();
+    if (joint == nullptr)
+    {
+      std::cout << "WARNING: Skeleton " << getName() << " cannot be simplified"
+                << std::endl;
+      return nullptr;
+    }
 
     // Identify the original parent BodyNode
     const BodyNode* originalParent = getBodyNode(i)->getParentBodyNode();
@@ -1670,15 +1780,24 @@ void Skeleton::setGradientConstraintMatrices(
 Eigen::MatrixXs Skeleton::getJacobianOfC(neural::WithRespectTo* wrt)
 {
   const int dofs = static_cast<int>(getNumDofs());
-  Eigen::MatrixXs DCg_Dp = Eigen::MatrixXs::Zero(dofs, dofs);
+  Eigen::MatrixXs DCg_Dp = Eigen::MatrixXs::Zero(dofs, wrt->dim(this));
 
   if (wrt == neural::WithRespectTo::FORCE)
   {
     return DCg_Dp;
   }
+  else if (wrt == neural::WithRespectTo::LINEARIZED_MASSES)
+  {
+    Eigen::MatrixXs groupFromLin = getGroupMassesJacobianWrtLinearizedMasses();
+    return getJacobianOfC(neural::WithRespectTo::GROUP_MASSES) * groupFromLin;
+  }
   else if (
       wrt == neural::WithRespectTo::POSITION
-      || wrt == neural::WithRespectTo::VELOCITY)
+      || wrt == neural::WithRespectTo::VELOCITY
+      || wrt == neural::WithRespectTo::GROUP_SCALES
+      || wrt == neural::WithRespectTo::GROUP_MASSES
+      || wrt == neural::WithRespectTo::GROUP_COMS
+      || wrt == neural::WithRespectTo::GROUP_INERTIAS)
   {
     std::vector<BodyNode*>& bodyNodes = mSkelCache.mBodyNodes;
 
@@ -1715,14 +1834,25 @@ Eigen::MatrixXs Skeleton::getJacobianOfM(
     const Eigen::VectorXs& x, neural::WithRespectTo* wrt)
 {
   const int dofs = static_cast<int>(getNumDofs());
-  Eigen::MatrixXs DM_Dq = Eigen::MatrixXs::Zero(dofs, dofs);
+  Eigen::MatrixXs DM_Dp = Eigen::MatrixXs::Zero(dofs, wrt->dim(this));
 
   if (wrt == neural::WithRespectTo::VELOCITY
       || wrt == neural::WithRespectTo::FORCE)
   {
-    return DM_Dq;
+    return DM_Dp;
   }
-  else if (wrt == neural::WithRespectTo::POSITION)
+  else if (wrt == neural::WithRespectTo::LINEARIZED_MASSES)
+  {
+    Eigen::MatrixXs groupFromLin = getGroupMassesJacobianWrtLinearizedMasses();
+    return getJacobianOfM(x, neural::WithRespectTo::GROUP_MASSES)
+           * groupFromLin;
+  }
+  else if (
+      wrt == neural::WithRespectTo::POSITION
+      || wrt == neural::WithRespectTo::GROUP_SCALES
+      || wrt == neural::WithRespectTo::GROUP_COMS
+      || wrt == neural::WithRespectTo::GROUP_INERTIAS
+      || wrt == neural::WithRespectTo::GROUP_MASSES)
   {
     const auto old_ddq = getAccelerations();
     setAccelerations(x);
@@ -1737,12 +1867,12 @@ Eigen::MatrixXs Skeleton::getJacobianOfM(
     for (int i = bodyNodes.size() - 1; i >= 0; i--)
     {
       BodyNode* bodyNode = bodyNodes[i];
-      bodyNode->computeJacobianOfMBackward(wrt, DM_Dq);
+      bodyNode->computeJacobianOfMBackward(wrt, DM_Dp);
     }
 
     setAccelerations(old_ddq);
 
-    return DM_Dq;
+    return DM_Dp;
   }
   else
   {
@@ -2399,6 +2529,8 @@ s_t Skeleton::getHeight(Eigen::VectorXs pose, Eigen::Vector3s up)
   Eigen::Vector3s minVertex = Eigen::Vector3s::Zero();
   dynamics::BodyNode* minBodyNode = nullptr;
 
+  int numMeshes = 0;
+  int numVertices = 0;
   for (int i = 0; i < getNumBodyNodes(); i++)
   {
     dynamics::BodyNode* node = getBodyNode(i);
@@ -2410,9 +2542,21 @@ s_t Skeleton::getHeight(Eigen::VectorXs pose, Eigen::Vector3s up)
       {
         dynamics::MeshShape* mesh
             = static_cast<dynamics::MeshShape*>(shape.get());
+        Eigen::Vector3s scale = mesh->getScale();
+        if (!isfinite(scale[0]) || !isfinite(scale[1]) || !isfinite(scale[2]))
+        {
+          std::cout << "WARNING: getHeight() found a mesh with a non-finite "
+                       "scale, attached to body node "
+                    << node->getName()
+                    << ". This means that the skeleton is in an invalid state. Exiting..."
+                    << std::endl;
+      throw std::runtime_error("getHeight() computed a height of 0");
+        }
+        numMeshes++;
         for (Eigen::Vector3s rawVertex : mesh->getVertices())
         {
-          Eigen::Vector3s vertex = node->getScale().cwiseProduct(rawVertex);
+          numVertices++;
+          Eigen::Vector3s vertex = mesh->getScale().cwiseProduct(rawVertex);
           Eigen::Vector3s worldVertex = shapeNode->getWorldTransform() * vertex;
           s_t upDist = up.dot(worldVertex);
           if (upDist > maxUp)
@@ -2447,12 +2591,46 @@ s_t Skeleton::getHeight(Eigen::VectorXs pose, Eigen::Vector3s up)
 
   setPositions(originalPose);
 
-  if (std::isfinite(maxUp) && std::isfinite(minUp))
+  if (numMeshes == 0 || numVertices == 0)
   {
-    return maxUp - minUp;
+    std::cout << "WARNING: getHeight() found no mesh shapes in the Skeleton, "
+                 "or only empty mesh shapes with no vertices. numMeshes="
+              << numMeshes << ", numVertices=" << numVertices
+              << ". "
+                 "Exiting..."
+              << std::endl;
+    throw std::runtime_error("getHeight() computed a height of 0");
   }
-  // Fallback
-  return 0.0;
+
+  s_t height = 0;
+  if (!isfinite(maxUp) || !isfinite(minUp))
+  {
+    std::cout << "ERROR: getHeight() computed a bad value. maxUp=" << maxUp
+              << ", minUp=" << minUp << ". Exiting..." << std::endl;
+    throw std::runtime_error("getHeight() computed a height of 0");
+  }
+  if (isfinite(maxUp) && isfinite(minUp))
+  {
+    height = maxUp - minUp;
+  }
+
+  // Check that we computed a valid height.
+  if (height == 0)
+  {
+    std::cout << "ERROR: getHeight() computed a height of 0. Exiting..."
+              << std::endl;
+    throw std::runtime_error("getHeight() computed a height of 0");
+  }
+  else if (height < 0)
+  {
+    std::cout << "WARNING: getHeight() computed a negative height of " << height
+              << ". Exiting..." << std::endl;
+    throw std::runtime_error("getHeight() computed a negative height");
+  }
+  else
+  {
+    return height;
+  }
 }
 
 //==============================================================================
@@ -2481,8 +2659,9 @@ Eigen::VectorXs Skeleton::getGradientOfHeightWrtBodyScales(
       {
         dynamics::MeshShape* mesh
             = static_cast<dynamics::MeshShape*>(shape.get());
-        for (Eigen::Vector3s vertex : mesh->getVertices())
+        for (Eigen::Vector3s rawVertex : mesh->getVertices())
         {
+          Eigen::Vector3s vertex = mesh->getScale().cwiseProduct(rawVertex);
           Eigen::Vector3s worldVertex = shapeNode->getWorldTransform() * vertex;
           s_t upDist = up.dot(worldVertex);
           if (upDist > maxUp)
@@ -2509,6 +2688,15 @@ Eigen::VectorXs Skeleton::getGradientOfHeightWrtBodyScales(
                   << std::endl;
       }
     }
+  }
+
+  // This can happen if the skeleton has no mesh shapes, in which case it will
+  // not have a "highest mesh vertex" and "lowest mesh vertex", because there
+  // are no vertices and no meshes.
+  if (minBodyNode == nullptr || maxBodyNode == nullptr)
+  {
+    setPositions(originalPose);
+    return Eigen::VectorXs::Zero(getNumBodyNodes() * 3);
   }
 
   std::vector<std::pair<dynamics::BodyNode*, Eigen::Vector3s>> markers;
@@ -2561,6 +2749,17 @@ Eigen::VectorXs Skeleton::finiteDifferenceGradientOfHeightWrtBodyScales(
 }
 
 //==============================================================================
+/// This computes the gradient of the height
+Eigen::VectorXs Skeleton::getGradientOfHeightWrtGroupScales(
+    Eigen::VectorXs pose, Eigen::Vector3s up)
+{
+  Eigen::VectorXs wrtBodyScales = getGradientOfHeightWrtBodyScales(pose, up);
+  Eigen::VectorXs result
+      = convertBodyScalesGradientToGroupScales(wrtBodyScales);
+  return result;
+}
+
+//==============================================================================
 /// This returns a marker set with at least one marker in it, that each
 /// represents the lowest point on the body, measure by the `up` vector, in
 /// the specified position. If there are no ties, this will be of length 1. If
@@ -2584,7 +2783,7 @@ Skeleton::getLowestPointMarkers(Eigen::Vector3s up)
             = static_cast<dynamics::MeshShape*>(shape.get());
         for (Eigen::Vector3s rawVertex : mesh->getVertices())
         {
-          Eigen::Vector3s vertex = node->getScale().cwiseProduct(rawVertex);
+          Eigen::Vector3s vertex = mesh->getScale().cwiseProduct(rawVertex);
           Eigen::Vector3s worldVertex = shapeNode->getWorldTransform() * vertex;
           s_t upDist = up.dot(worldVertex);
           if (upDist < minUp)
@@ -2740,19 +2939,72 @@ Eigen::VectorXs Skeleton::getRandomPose()
   Eigen::VectorXs pose = Eigen::VectorXs::Random(getNumDofs());
   for (int i = 0; i < getNumDofs(); i++)
   {
-    s_t upperLimit = getDof(i)->getPositionUpperLimit();
+    s_t upperLimit = getDof(i)->getPositionUpperLimit() - 0.02;
     if (upperLimit == std::numeric_limits<s_t>::infinity())
     {
       upperLimit = 5.0;
     }
-    s_t lowerLimit = getDof(i)->getPositionLowerLimit();
+    s_t lowerLimit = getDof(i)->getPositionLowerLimit() + 0.02;
     if (lowerLimit == -1 * std::numeric_limits<s_t>::infinity())
     {
       lowerLimit = -5.0;
     }
-    s_t withinBounds
-        = (((pose(i) + 1.0) / 2.0) * (upperLimit - lowerLimit)) + lowerLimit;
-    pose(i) = withinBounds;
+    // If there's no space in the bounds:
+    if (upperLimit < lowerLimit)
+    {
+      pose(i) = getDof(i)->getPositionUpperLimit();
+    }
+    else
+    {
+      s_t withinBounds
+          = (((abs(pose(i)) + 1.0) / 2.0) * (upperLimit - lowerLimit))
+            + lowerLimit;
+      pose(i) = withinBounds;
+    }
+  }
+
+  /*
+#ifndef NDEBUG
+  Eigen::VectorXs oldPose = getPositions();
+  setPositions(pose);
+  clampPositionsToLimits();
+  Eigen::VectorXs clampedPos = getPositions();
+  assert(clampedPos == pose);
+  setPositions(oldPose);
+#endif
+  */
+
+  return pose;
+}
+
+//==============================================================================
+/// This gets a random pose that's valid within joint limits
+Eigen::VectorXs Skeleton::getRandomVelocity()
+{
+  Eigen::VectorXs pose = Eigen::VectorXs::Random(getNumDofs());
+  for (int i = 0; i < getNumDofs(); i++)
+  {
+    s_t upperLimit = getDof(i)->getVelocityUpperLimit() - 0.015;
+    if (upperLimit == std::numeric_limits<s_t>::infinity())
+    {
+      upperLimit = 5.0;
+    }
+    s_t lowerLimit = getDof(i)->getVelocityLowerLimit() + 0.015;
+    if (lowerLimit == -1 * std::numeric_limits<s_t>::infinity())
+    {
+      lowerLimit = -5.0;
+    }
+    if (upperLimit < lowerLimit)
+    {
+      pose(i) = getDof(i)->getVelocityUpperLimit();
+    }
+    else
+    {
+      s_t withinBounds
+          = (((abs(pose(i)) + 1.0) / 2.0) * (upperLimit - lowerLimit))
+            + lowerLimit;
+      pose(i) = withinBounds;
+    }
   }
 
   /*
@@ -2778,11 +3030,19 @@ Eigen::VectorXs Skeleton::getRandomPoseForJoints(
   Eigen::VectorXs randomPose = getRandomPose();
   Eigen::VectorXs pose = Eigen::VectorXs::Zero(getNumDofs());
 
+  for (int i = 0; i < getNumDofs(); i++)
+  {
+    pose(i) = getDof(i)->getInitialPosition();
+  }
+
   for (auto joint : joints)
   {
-    pose.segment(joint->getDof(0)->getIndexInSkeleton(), joint->getNumDofs())
-        = randomPose.segment(
-            joint->getDof(0)->getIndexInSkeleton(), joint->getNumDofs());
+    if (joint->getNumDofs() > 0)
+    {
+      pose.segment(joint->getDof(0)->getIndexInSkeleton(), joint->getNumDofs())
+          = randomPose.segment(
+              joint->getDof(0)->getIndexInSkeleton(), joint->getNumDofs());
+    }
   }
 
   return pose;
@@ -3480,6 +3740,7 @@ void Skeleton::setLinkMasses(Eigen::VectorXs masses)
   {
     getBodyNode(i)->setMass(masses(i));
   }
+  updateTotalMass();
 }
 
 //==============================================================================
@@ -3513,6 +3774,7 @@ void Skeleton::clampPositionsToLimits()
   for (int i = 0; i < getNumDofs(); i++)
   {
     auto* dof = getDof(i);
+
     // Special case for rotational joints and euler joints, we're interested in
     // wrapping by 2*PI
     bool wrapByTwoPi = false;
@@ -3529,20 +3791,49 @@ void Skeleton::clampPositionsToLimits()
 
     if (wrapByTwoPi)
     {
-      double clampedPos = dof->getPosition();
+      std::vector<s_t> posesToTry;
+      s_t clampedPos = dof->getPosition();
+      posesToTry.push_back(clampedPos);
       while (clampedPos > dof->getPositionUpperLimit())
       {
         clampedPos -= 2 * M_PI;
+        posesToTry.push_back(clampedPos);
       }
       while (clampedPos < dof->getPositionLowerLimit())
       {
         clampedPos += 2 * M_PI;
+        posesToTry.push_back(clampedPos);
       }
-      // Only set the value if we ended up in bounds
-      if (clampedPos >= dof->getPositionLowerLimit()
-          && clampedPos <= dof->getPositionUpperLimit())
+
+      // Choose the value that results in the smallest constraint violation
+      s_t lowestViolation = std::numeric_limits<double>::infinity();
+      for (s_t pos : posesToTry)
       {
-        dof->setPosition(clampedPos);
+        // Set the value if we ended up in bounds
+        if (clampedPos >= dof->getPositionLowerLimit()
+            && clampedPos <= dof->getPositionUpperLimit())
+        {
+          dof->setPosition(pos);
+          break;
+        }
+        else if (clampedPos > dof->getPositionUpperLimit())
+        {
+          s_t violation = clampedPos - dof->getPositionUpperLimit();
+          if (violation < lowestViolation)
+          {
+            dof->setPosition(pos);
+            lowestViolation = violation;
+          }
+        }
+        else if (clampedPos < dof->getPositionLowerLimit())
+        {
+          s_t violation = dof->getPositionLowerLimit() - pos;
+          if (violation < lowestViolation)
+          {
+            dof->setPosition(pos);
+            lowestViolation = violation;
+          }
+        }
       }
     }
 
@@ -3575,6 +3866,126 @@ void Skeleton::clampPositionsToLimits()
 }
 
 //==============================================================================
+/// There is an annoying tendency for custom joints to encode the linear
+/// offset of the bone in their custom functions. We don't want that, so we
+/// want to move any relative transform caused by custom functions into the
+/// parent transform.
+void Skeleton::zeroTranslationInCustomFunctions()
+{
+  for (int i = 0; i < getNumJoints(); i++)
+  {
+    if (getJoint(i)->getType() == CustomJoint<1>::getStaticType())
+    {
+      static_cast<CustomJoint<1>*>(getJoint(i))
+          ->zeroTranslationInCustomFunctions();
+    }
+    if (getJoint(i)->getType() == CustomJoint<2>::getStaticType())
+    {
+      static_cast<CustomJoint<2>*>(getJoint(i))
+          ->zeroTranslationInCustomFunctions();
+    }
+    if (getJoint(i)->getType() == CustomJoint<3>::getStaticType())
+    {
+      static_cast<CustomJoint<3>*>(getJoint(i))
+          ->zeroTranslationInCustomFunctions();
+    }
+  }
+}
+
+//==============================================================================
+/// This is a utility that will find a body with this mesh attached, if one
+/// exists, and also the transform which relates the geometry frame to the
+/// body frame.
+std::pair<dynamics::BodyNode*, Eigen::Isometry3s>*
+Skeleton::getBodyAndTransformForMesh(std::string meshFileName)
+{
+  if (mMeshExistsCache.count(meshFileName)
+      && !mMeshExistsCache.at(meshFileName))
+  {
+    return nullptr;
+  }
+  if (mMeshBodyCache.count(meshFileName))
+  {
+    return &mMeshBodyCache.at(meshFileName);
+  }
+
+  for (int i = 0; i < getNumBodyNodes(); i++)
+  {
+    dynamics::BodyNode* node = getBodyNode(i);
+    for (int j = 0; j < node->getNumShapeNodes(); j++)
+    {
+      dynamics::ShapePtr shape = node->getShapeNode(j)->getShape();
+      dynamics::MeshShape* mesh
+          = dynamic_cast<dynamics::MeshShape*>(shape.get());
+      if (mesh == nullptr)
+        continue;
+      if (mesh->getMeshPath().find(meshFileName) != std::string::npos)
+      {
+        // Found it!
+        mMeshExistsCache[meshFileName] = true;
+        mMeshBodyCache[meshFileName] = std::make_pair(
+            node, node->getShapeNode(j)->getRelativeTransform());
+        return &mMeshBodyCache.at(meshFileName);
+      }
+    }
+  }
+
+  mMeshExistsCache[meshFileName] = false;
+  return nullptr;
+}
+
+//==============================================================================
+/// This is a utility that will find a body with this mesh attached, if one
+/// exists.
+dynamics::BodyNode* Skeleton::getBodyForMesh(std::string meshFileName)
+{
+  std::pair<dynamics::BodyNode*, Eigen::Isometry3s>* pair
+      = getBodyAndTransformForMesh(meshFileName);
+  if (pair == nullptr)
+    return nullptr;
+  return pair->first;
+}
+
+//==============================================================================
+/// This is a utility that will transform an isometry in the frame of a mesh
+/// to a transform in the parent body's frame.
+Eigen::Isometry3s Skeleton::getTransformFromMeshToParentBody(
+    std::string meshFileName, Eigen::Isometry3s relativeToGeometry)
+{
+  std::pair<dynamics::BodyNode*, Eigen::Isometry3s>* pair
+      = getBodyAndTransformForMesh(meshFileName);
+  if (pair == nullptr)
+    return relativeToGeometry;
+  return pair->second * relativeToGeometry;
+}
+
+//==============================================================================
+/// This is a utility that will transform a translation in the frame of a mesh
+/// to a translation in the parent body's frame.
+Eigen::Vector3s Skeleton::getTranslationFromMeshToParentBody(
+    std::string meshFileName, Eigen::Vector3s relativeToGeometry)
+{
+  std::pair<dynamics::BodyNode*, Eigen::Isometry3s>* pair
+      = getBodyAndTransformForMesh(meshFileName);
+  if (pair == nullptr)
+    return relativeToGeometry;
+  return pair->second * relativeToGeometry;
+}
+
+//==============================================================================
+/// This is a utility that will transform a rotation in the frame of a mesh
+/// to a rotation in the parent body's frame.
+Eigen::Matrix3s Skeleton::getRotationFromMeshToParentBody(
+    std::string meshFileName, Eigen::Matrix3s relativeToGeometry)
+{
+  std::pair<dynamics::BodyNode*, Eigen::Isometry3s>* pair
+      = getBodyAndTransformForMesh(meshFileName);
+  if (pair == nullptr)
+    return relativeToGeometry;
+  return pair->second * relativeToGeometry;
+}
+
+//==============================================================================
 const std::vector<BodyScaleGroup>& Skeleton::getBodyScaleGroups() const
 {
   return mBodyScaleGroups;
@@ -3600,8 +4011,10 @@ void Skeleton::ensureBodyScaleGroups()
       mBodyScaleGroups.emplace_back();
       BodyScaleGroup& group = mBodyScaleGroups.back();
       group.nodes.push_back(getBodyNode(i));
+      group.flipAxis.push_back(Eigen::Vector3s::Ones());
       group.uniformScaling = false;
     }
+    updateGroupScaleIndices();
   }
 }
 
@@ -3622,11 +4035,50 @@ int Skeleton::getScaleGroupIndex(dynamics::BodyNode* bodyNode)
 }
 
 //==============================================================================
+/// This returns the axis flips of this body in the scale group that this body
+/// node corresponds to
+Eigen::Vector3s Skeleton::getScaleGroupFlips(dynamics::BodyNode* bodyNode)
+{
+  ensureBodyScaleGroups();
+  for (int i = 0; i < mBodyScaleGroups.size(); i++)
+  {
+    for (int j = 0; j < mBodyScaleGroups[i].nodes.size(); j++)
+    {
+      if (mBodyScaleGroups[i].nodes[j]->getName() == bodyNode->getName())
+        return mBodyScaleGroups[i].flipAxis[j];
+    }
+  }
+  return Eigen::Vector3s::Ones();
+}
+
+//==============================================================================
 /// This takes two scale groups and merges their contents into a single group.
 /// After this operation, there is one fewer scale group.
 void Skeleton::mergeScaleGroups(dynamics::BodyNode* a, dynamics::BodyNode* b)
 {
   mergeScaleGroupsByIndex(getScaleGroupIndex(a), getScaleGroupIndex(b));
+}
+
+//==============================================================================
+/// The scale group axis flips
+void Skeleton::autodetectScaleGroupAxisFlips(int symmetryAxis)
+{
+  for (BodyScaleGroup& group : mBodyScaleGroups)
+  {
+    s_t midPoint = 0.0;
+    for (auto* node : group.nodes)
+    {
+      midPoint += node->getWorldTransform().translation()(symmetryAxis);
+    }
+    midPoint /= group.nodes.size();
+    for (int j = 0; j < group.nodes.size(); j++)
+    {
+      bool positive
+          = midPoint - 1e-8
+            <= group.nodes[j]->getWorldTransform().translation()(symmetryAxis);
+      group.flipAxis[j](symmetryAxis) = positive ? 1.0 : -1.0;
+    }
+  }
 }
 
 //==============================================================================
@@ -3672,11 +4124,60 @@ void Skeleton::autogroupSymmetricSuffixes(
 }
 
 //==============================================================================
+/// This finds all the pairs of bodies that share the same suffix, and
+/// different prefixes (for example "ulna_l" and "radius_l", sharing "_l")
+void Skeleton::autogroupSymmetricPrefixes(
+    std::string firstPrefix, std::string secondPrefix)
+{
+  for (int i = 0; i < getNumBodyNodes(); i++)
+  {
+    dynamics::BodyNode* firstBody = getBodyNode(i);
+    std::string firstBodyName = firstBody->getName();
+    if (firstBodyName.size() < firstPrefix.size())
+      continue;
+    std::string firstBodyPrefix = firstBodyName.substr(0, firstPrefix.size());
+    if (firstBodyPrefix != firstPrefix)
+      continue;
+    std::string firstBodySuffix = firstBodyName.substr(
+        firstPrefix.size(), firstBodyName.size() - firstPrefix.size());
+    for (int j = 0; j < getNumBodyNodes(); j++)
+    {
+      if (i == j)
+        continue;
+      dynamics::BodyNode* secondBody = getBodyNode(j);
+      std::string secondBodyName = secondBody->getName();
+      if (secondBodyName.size() < secondPrefix.size())
+        continue;
+      std::string secondBodyPrefix
+          = secondBodyName.substr(0, secondPrefix.size());
+      if (secondBodyPrefix != secondPrefix)
+        continue;
+      std::string secondBodySuffix = secondBodyName.substr(
+          secondPrefix.size(), secondBodyName.size() - secondPrefix.size());
+      if (firstBodySuffix == secondBodySuffix)
+      {
+        // If we make it here, then we have a genuine match, so merge the bodies
+        mergeScaleGroups(firstBody, secondBody);
+      }
+    }
+  }
+}
+
+//==============================================================================
 /// This means that we'll scale a group along all three axis equally. This
 /// constrains scaling.
 void Skeleton::setScaleGroupUniformScaling(dynamics::BodyNode* a, bool uniform)
 {
   mBodyScaleGroups[getScaleGroupIndex(a)].uniformScaling = uniform;
+  updateGroupScaleIndices();
+}
+
+//==============================================================================
+/// This returns the number of scale groups
+int Skeleton::getNumScaleGroups()
+{
+  ensureBodyScaleGroups();
+  return mBodyScaleGroups.size();
 }
 
 //==============================================================================
@@ -3752,6 +4253,8 @@ void Skeleton::mergeScaleGroupsByIndex(int a, int b)
     // Transfer all elems from A to B
     for (dynamics::BodyNode*& node : groupA.nodes)
       groupB.nodes.push_back(node);
+    for (Eigen::Vector3s& flips : groupA.flipAxis)
+      groupB.flipAxis.push_back(flips);
     // If either group has uniform scaling, merged group has it
     groupB.uniformScaling = groupA.uniformScaling || groupB.uniformScaling;
     // Then erase A
@@ -3762,11 +4265,14 @@ void Skeleton::mergeScaleGroupsByIndex(int a, int b)
     // Transfer all elems from B to A
     for (dynamics::BodyNode*& node : groupB.nodes)
       groupA.nodes.push_back(node);
+    for (Eigen::Vector3s& flips : groupB.flipAxis)
+      groupA.flipAxis.push_back(flips);
     // If either group has uniform scaling, merged group has it
     groupA.uniformScaling = groupA.uniformScaling || groupB.uniformScaling;
     // Then erase B
     mBodyScaleGroups.erase(mBodyScaleGroups.begin() + b);
   }
+  updateGroupScaleIndices();
 }
 
 //==============================================================================
@@ -3787,6 +4293,385 @@ int Skeleton::getGroupScaleDim()
     }
   }
   return sum;
+}
+
+//==============================================================================
+BodyScaleGroupAndIndex::BodyScaleGroupAndIndex(BodyScaleGroup& group, int axis)
+  : group(group), axis(axis)
+{
+}
+
+//==============================================================================
+/// This precomputes the array of group scale indices that we need for
+/// getGroupScaleIndexDetails()
+void Skeleton::updateGroupScaleIndices()
+{
+  mGroupScaleIndices.clear();
+  // Find the group and axis we're talking about
+  for (int i = 0; i < mBodyScaleGroups.size(); i++)
+  {
+    if (mBodyScaleGroups[i].uniformScaling)
+    {
+      mGroupScaleIndices.emplace_back(mBodyScaleGroups.at(i), -1);
+    }
+    else
+    {
+      mGroupScaleIndices.emplace_back(mBodyScaleGroups.at(i), 0);
+      mGroupScaleIndices.emplace_back(mBodyScaleGroups.at(i), 1);
+      mGroupScaleIndices.emplace_back(mBodyScaleGroups.at(i), 2);
+    }
+  }
+}
+
+//==============================================================================
+/// This grabs the details for what a group scale index corresponds to
+const BodyScaleGroupAndIndex& Skeleton::getGroupScaleIndexDetails(
+    int index) const
+{
+  return mGroupScaleIndices.at(index);
+}
+
+//==============================================================================
+/// This produces a human-readable description of the group scale vector index
+std::string Skeleton::debugGroupScaleIndex(int groupIdx)
+{
+  BodyScaleGroup* group = nullptr;
+  int axis = 0;
+
+  std::string result = std::to_string(groupIdx) + " ";
+  // Find the group and axis we're talking about
+  for (int i = 0; i < mBodyScaleGroups.size(); i++)
+  {
+    Eigen::Vector3s localScale;
+    if (mBodyScaleGroups[i].uniformScaling)
+    {
+      if (groupIdx == 0)
+      {
+        group = &mBodyScaleGroups[i];
+        break;
+      }
+      else
+      {
+        groupIdx--;
+      }
+    }
+    else
+    {
+      if (groupIdx < 3)
+      {
+        group = &mBodyScaleGroups[i];
+        axis = groupIdx;
+        break;
+      }
+      else
+      {
+        groupIdx -= 3;
+      }
+    }
+  }
+  assert(group != nullptr);
+
+  if (group->uniformScaling)
+  {
+    result += "[uniform]";
+  }
+  else if (axis == 0)
+  {
+    result += "[X]";
+  }
+  else if (axis == 1)
+  {
+    result += "[Y]";
+  }
+  else if (axis == 2)
+  {
+    result += "[Z]";
+  }
+  for (dynamics::BodyNode* node : group->nodes)
+  {
+    result += " " + node->getName();
+  }
+  return result;
+}
+
+//==============================================================================
+/// This returns the vector relating changing a group scale parameter to the
+/// location of the center of a body.
+Eigen::Vector3s Skeleton::getGroupScaleMovementOnBodyInWorldSpace(
+    int groupIdx, int bodyIdx)
+{
+  BodyScaleGroup* group = nullptr;
+  int axis = 0;
+
+  // Find the group and axis we're talking about
+  for (int i = 0; i < mBodyScaleGroups.size(); i++)
+  {
+    Eigen::Vector3s localScale;
+    if (mBodyScaleGroups[i].uniformScaling)
+    {
+      if (groupIdx == 0)
+      {
+        group = &mBodyScaleGroups[i];
+        break;
+      }
+      else
+      {
+        groupIdx--;
+      }
+    }
+    else
+    {
+      if (groupIdx < 3)
+      {
+        group = &mBodyScaleGroups[i];
+        axis = groupIdx;
+        break;
+      }
+      else
+      {
+        groupIdx -= 3;
+      }
+    }
+  }
+  assert(group != nullptr);
+
+  Eigen::Vector3s motionSum = Eigen::Vector3s::Zero();
+
+  const Eigen::MatrixXi& parents = getJointParentMap();
+
+  BodyNode* target = getBodyNode(bodyIdx);
+  int targetJointIdx = target->getParentJoint()->getJointIndexInSkeleton();
+
+  // //==============================================================================
+  // /// Set the scale of the child body
+  // void Joint::setChildScale(Eigen::Vector3s scale)
+  // {
+  //   mAspectProperties.mChildScale = scale;
+  //   mAspectProperties.mT_ChildBodyToJoint.translation()
+  //       = mAspectProperties.mOriginalChildTranslation.cwiseProduct(scale);
+  //   updateRelativeJacobian();
+  //   notifyPositionUpdated();
+  // }
+
+  // //==============================================================================
+  // /// Set the scale of the parent body
+  // void Joint::setParentScale(Eigen::Vector3s scale)
+  // {
+  //   mAspectProperties.mParentScale = scale;
+  //   mAspectProperties.mT_ParentBodyToJoint.translation()
+  //       = mAspectProperties.mOriginalParentTranslation.cwiseProduct(scale);
+  //   notifyPositionUpdated();
+  // }
+
+  // //==============================================================================
+  // void Joint::updateRelativeTransform()
+  // {
+  //    mT = Joint::mAspectProperties.mT_ParentBodyToJoint * mQ
+  //         * Joint::mAspectProperties.mT_ChildBodyToJoint.inverse();
+  // }
+
+  for (int i = 0; i < group->nodes.size(); i++)
+  {
+    BodyNode* source = group->nodes[i];
+    int sourceJointIdx = source->getParentJoint()->getJointIndexInSkeleton();
+
+    if (source == target || parents(sourceJointIdx, targetJointIdx) == 1)
+    {
+      Eigen::Vector3s localT
+          = source->getParentJoint()->getOriginalTransformFromChildBodyNode();
+      if (!group->uniformScaling)
+      {
+        localT = localT.cwiseProduct(Eigen::Vector3s::Unit(axis));
+      }
+
+      Eigen::Vector3s worldParentChildT
+          = source->getWorldTransform().linear() * -localT;
+      motionSum += worldParentChildT;
+    }
+
+    if (parents(sourceJointIdx, targetJointIdx) == 1)
+    {
+      for (int j = 0; j < source->getNumChildJoints(); j++)
+      {
+        dynamics::Joint* childJoint = source->getChildJoint(j);
+        if (childJoint == target->getParentJoint()
+            || parents(childJoint->getJointIndexInSkeleton(), targetJointIdx))
+        {
+          Eigen::Vector3s localT
+              = childJoint->getOriginalTransformFromParentBodyNode();
+          if (!group->uniformScaling)
+          {
+            localT = localT.cwiseProduct(Eigen::Vector3s::Unit(axis));
+          }
+          Eigen::Vector3s worldChildParentT
+              = source->getWorldTransform().linear() * localT;
+          motionSum += worldChildParentT;
+        }
+      }
+    }
+  }
+
+  return motionSum;
+}
+
+//==============================================================================
+/// This returns the vector relating changing a group scale parameter to the
+/// location of the center of a body.
+Eigen::Vector3s Skeleton::finiteDifferenceGroupScaleMovementOnBodyInWorldSpace(
+    int groupIdx, int bodyIdx)
+{
+  Eigen::VectorXs original = getGroupScales();
+  Eigen::Vector3s result;
+  math::finiteDifference<Eigen::Vector3s>(
+      [&](/* in*/ s_t eps,
+          /*out*/ Eigen::Vector3s& perturbed) {
+        Eigen::VectorXs tweaked = original;
+        tweaked(groupIdx) += eps;
+        setGroupScales(tweaked);
+        perturbed = getBodyNode(bodyIdx)->getWorldTransform().translation();
+        return true;
+      },
+      result,
+      1e-3,
+      true);
+  return result;
+}
+
+//==============================================================================
+/// This returns the vector relating changing a group scale parameter to the
+/// location of the center of a body.
+Eigen::Vector3s Skeleton::getGroupScaleMovementOnJointInWorldSpace(
+    int groupIdx, int jointIdx)
+{
+  BodyScaleGroup* group = nullptr;
+  int axis = 0;
+
+  // Find the group and axis we're talking about
+  for (int i = 0; i < mBodyScaleGroups.size(); i++)
+  {
+    Eigen::Vector3s localScale;
+    if (mBodyScaleGroups[i].uniformScaling)
+    {
+      if (groupIdx == 0)
+      {
+        group = &mBodyScaleGroups[i];
+        break;
+      }
+      else
+      {
+        groupIdx--;
+      }
+    }
+    else
+    {
+      if (groupIdx < 3)
+      {
+        group = &mBodyScaleGroups[i];
+        axis = groupIdx;
+        break;
+      }
+      else
+      {
+        groupIdx -= 3;
+      }
+    }
+  }
+  assert(group != nullptr);
+
+  Eigen::Vector3s motionSum = Eigen::Vector3s::Zero();
+
+  const Eigen::MatrixXi& parents = getJointParentMap();
+
+  // //==============================================================================
+  // /// Set the scale of the child body
+  // void Joint::setChildScale(Eigen::Vector3s scale)
+  // {
+  //   mAspectProperties.mChildScale = scale;
+  //   mAspectProperties.mT_ChildBodyToJoint.translation()
+  //       = mAspectProperties.mOriginalChildTranslation.cwiseProduct(scale);
+  //   updateRelativeJacobian();
+  //   notifyPositionUpdated();
+  // }
+
+  // //==============================================================================
+  // /// Set the scale of the parent body
+  // void Joint::setParentScale(Eigen::Vector3s scale)
+  // {
+  //   mAspectProperties.mParentScale = scale;
+  //   mAspectProperties.mT_ParentBodyToJoint.translation()
+  //       = mAspectProperties.mOriginalParentTranslation.cwiseProduct(scale);
+  //   notifyPositionUpdated();
+  // }
+
+  // //==============================================================================
+  // void Joint::updateRelativeTransform()
+  // {
+  //    mT = Joint::mAspectProperties.mT_ParentBodyToJoint * mQ
+  //         * Joint::mAspectProperties.mT_ChildBodyToJoint.inverse();
+  // }
+
+  for (int i = 0; i < group->nodes.size(); i++)
+  {
+    BodyNode* source = group->nodes[i];
+    int sourceJointIdx = source->getParentJoint()->getJointIndexInSkeleton();
+
+    if (parents(sourceJointIdx, jointIdx) == 1)
+    {
+      Eigen::Vector3s localT
+          = source->getParentJoint()->getOriginalTransformFromChildBodyNode();
+      if (!group->uniformScaling)
+      {
+        localT = localT.cwiseProduct(Eigen::Vector3s::Unit(axis));
+      }
+
+      Eigen::Vector3s worldParentChildT
+          = source->getWorldTransform().linear() * -localT;
+      motionSum += worldParentChildT;
+    }
+
+    for (int j = 0; j < source->getNumChildJoints(); j++)
+    {
+      dynamics::Joint* childJoint = source->getChildJoint(j);
+      if (childJoint->getJointIndexInSkeleton() == jointIdx
+          || parents(childJoint->getJointIndexInSkeleton(), jointIdx))
+      {
+        Eigen::Vector3s localT
+            = childJoint->getOriginalTransformFromParentBodyNode();
+        if (!group->uniformScaling)
+        {
+          localT = localT.cwiseProduct(Eigen::Vector3s::Unit(axis));
+        }
+        Eigen::Vector3s worldChildParentT
+            = source->getWorldTransform().linear() * localT;
+        motionSum += worldChildParentT;
+      }
+    }
+  }
+
+  return motionSum;
+}
+
+//==============================================================================
+/// This returns the vector relating changing a group scale parameter to the
+/// location of the center of a body.
+Eigen::Vector3s Skeleton::finiteDifferenceGroupScaleMovementOnJointInWorldSpace(
+    int groupIdx, int jointIdx)
+{
+  Eigen::VectorXs original = getGroupScales();
+  Eigen::Vector3s result;
+  math::finiteDifference<Eigen::Vector3s>(
+      [&](/* in*/ s_t eps,
+          /*out*/ Eigen::Vector3s& perturbed) {
+        Eigen::VectorXs tweaked = original;
+        tweaked(groupIdx) += eps;
+        setGroupScales(tweaked);
+        perturbed = getJointWorldPosition(jointIdx);
+        return true;
+      },
+      result,
+      1e-3,
+      true);
+  return result;
 }
 
 //==============================================================================
@@ -3925,6 +4810,618 @@ Eigen::VectorXs Skeleton::getGroupScalesLowerBound()
     }
   }
   assert(cursor == groups.size());
+  return groups;
+}
+
+//==============================================================================
+/// This gets the masses of each scale group, concatenated
+Eigen::VectorXs Skeleton::getGroupMasses()
+{
+  ensureBodyScaleGroups();
+  Eigen::VectorXs groups = Eigen::VectorXs::Zero(getNumScaleGroups());
+  for (int i = 0; i < mBodyScaleGroups.size(); i++)
+  {
+    assert(mBodyScaleGroups[i].nodes.size() > 0);
+    groups(i) = mBodyScaleGroups[i].nodes[0]->getMass();
+  }
+  return groups;
+}
+
+//==============================================================================
+/// This sets the masses of each scale group, concatenated
+void Skeleton::setGroupMasses(Eigen::VectorXs masses)
+{
+  ensureBodyScaleGroups();
+  for (int i = 0; i < mBodyScaleGroups.size(); i++)
+  {
+    assert(mBodyScaleGroups[i].nodes.size() > 0);
+    for (auto* node : mBodyScaleGroups[i].nodes)
+    {
+      node->setMass(masses(i));
+    }
+  }
+}
+
+//==============================================================================
+/// This gets the upper bound for each group's mass, concatenated
+Eigen::VectorXs Skeleton::getGroupMassesUpperBound()
+{
+  ensureBodyScaleGroups();
+  Eigen::VectorXs groups = Eigen::VectorXs::Zero(getNumScaleGroups());
+  for (int i = 0; i < mBodyScaleGroups.size(); i++)
+  {
+    assert(mBodyScaleGroups[i].nodes.size() > 0);
+    groups(i) = mBodyScaleGroups[i].nodes[0]->getInertia().getMassUpperBound();
+  }
+  return groups;
+}
+
+//==============================================================================
+/// This gets the lower bound for each group's mass, concatenated
+Eigen::VectorXs Skeleton::getGroupMassesLowerBound()
+{
+  ensureBodyScaleGroups();
+  Eigen::VectorXs groups = Eigen::VectorXs::Zero(getNumScaleGroups());
+  for (int i = 0; i < mBodyScaleGroups.size(); i++)
+  {
+    assert(mBodyScaleGroups[i].nodes.size() > 0);
+    groups(i) = mBodyScaleGroups[i].nodes[0]->getInertia().getMassLowerBound();
+  }
+  return groups;
+}
+
+//==============================================================================
+/// This gets a vector of [(1/m), p_0, ..., p_n], where the first entry is the
+/// inverse of the total mass of the skeleton, and all subsequent entries are
+/// the percentages of the total for each link mass.
+Eigen::VectorXs Skeleton::getLinearizedMasses()
+{
+  ensureBodyScaleGroups();
+  s_t totalMass = getMass();
+  Eigen::VectorXs linearized
+      = Eigen::VectorXs::Zero(mBodyScaleGroups.size() + 1);
+  linearized(0) = 1.0 / totalMass;
+  for (int i = 0; i < mBodyScaleGroups.size(); i++)
+  {
+    s_t totalGroupMass = mBodyScaleGroups[i].nodes[0]->getMass()
+                         * mBodyScaleGroups[i].nodes.size();
+    linearized(i + 1) = totalGroupMass / totalMass;
+  }
+  return linearized;
+}
+
+//==============================================================================
+/// This sets a vector of [(1/m), p_0, ..., p_n], where the first entry is the
+/// inverse of the total mass of the skeleton, and all subsequent entries are
+/// the percentages of the total for each link mass, and maps back into the
+/// mass list.
+void Skeleton::setLinearizedMasses(Eigen::VectorXs masses)
+{
+  ensureBodyScaleGroups();
+  s_t totalMass = 1.0 / masses(0);
+  for (int i = 0; i < mBodyScaleGroups.size(); i++)
+  {
+    s_t totalGroupMass = masses(i + 1) * totalMass;
+    for (auto* body : mBodyScaleGroups[i].nodes)
+    {
+      body->setMass(totalGroupMass / mBodyScaleGroups[i].nodes.size());
+    }
+  }
+}
+
+//==============================================================================
+/// This gets the upper bound for the linearized mass, concatenated
+Eigen::VectorXs Skeleton::getLinearizedMassesUpperBound()
+{
+  ensureBodyScaleGroups();
+  Eigen::VectorXs linearized
+      = Eigen::VectorXs::Ones(mBodyScaleGroups.size() + 1);
+  s_t minimumMass = 0.0;
+  for (int i = 0; i < getNumBodyNodes(); i++)
+  {
+    minimumMass += getBodyNode(i)->getInertia().getMassLowerBound();
+  }
+  linearized(0) = 1.0 / minimumMass;
+  return linearized;
+}
+
+//==============================================================================
+/// This gets the lower bound for the linearized mass, concatenated
+Eigen::VectorXs Skeleton::getLinearizedMassesLowerBound()
+{
+  ensureBodyScaleGroups();
+  Eigen::VectorXs linearized
+      = Eigen::VectorXs::Zero(mBodyScaleGroups.size() + 1);
+  s_t maxMass = 0.0;
+  for (int i = 0; i < getNumBodyNodes(); i++)
+  {
+    maxMass += getBodyNode(i)->getInertia().getMassUpperBound();
+  }
+  linearized(0) = 1.0 / maxMass;
+  return linearized;
+}
+
+//==============================================================================
+/// This maps a linearized masses vector to an "unnormalized COM." This means
+/// that the percentages in the linearized mass vector need not add to 1.
+/// Relaxing this constraint, and then applying it later in the optimizer, can
+/// make certain dynamics problems into linear.
+Eigen::Vector3s Skeleton::getUnnormalizedCOM(Eigen::VectorXs linearizedMasses)
+{
+  Eigen::Vector3s unnormalizedCOM = Eigen::Vector3s::Zero();
+  for (int i = 0; i < mBodyScaleGroups.size(); i++)
+  {
+    s_t percentage = linearizedMasses(i + 1);
+    s_t bodyPercentage = percentage / mBodyScaleGroups[i].nodes.size();
+    for (auto* body : mBodyScaleGroups[i].nodes)
+    {
+      unnormalizedCOM += bodyPercentage * body->getCOM();
+    }
+  }
+  return unnormalizedCOM;
+}
+
+//==============================================================================
+/// This maps a linearized masses vector to an "unnormalized COM
+/// acceleration." This means that the percentages in the linearized mass
+/// vector need not add to 1. Relaxing this constraint, and then applying it
+/// later in the optimizer, can make certain dynamics problems into linear.
+Eigen::Vector3s Skeleton::getUnnormalizedCOMAcceleration(
+    Eigen::VectorXs linearizedMasses)
+{
+  Eigen::Vector3s unnormalizedCOMAcc = Eigen::Vector3s::Zero();
+  for (int i = 0; i < mBodyScaleGroups.size(); i++)
+  {
+    s_t percentage = linearizedMasses(i + 1);
+    s_t bodyPercentage = percentage / mBodyScaleGroups[i].nodes.size();
+    for (auto* body : mBodyScaleGroups[i].nodes)
+    {
+      unnormalizedCOMAcc += bodyPercentage * body->getCOMLinearAcceleration();
+    }
+  }
+  return unnormalizedCOMAcc;
+}
+
+//==============================================================================
+/// This maps a linearized masses vector to an "unnormalized COM
+/// acceleration." This means that the percentages in the linearized mass
+/// vector need not add to 1. Relaxing this constraint, and then applying it
+/// later in the optimizer, can make certain dynamics problems into linear.
+Eigen::Vector3s Skeleton::getUnnormalizedCOMFDAcceleration(
+    Eigen::VectorXs linearizedMasses)
+{
+  Eigen::VectorXs p = getPositions();
+  Eigen::VectorXs v = getVelocities();
+  Eigen::VectorXs a = getAccelerations();
+  s_t dt = getTimeStep();
+  Eigen::VectorXs p_last = p - (dt * v);
+  Eigen::VectorXs p_next = (dt * dt * a) - p_last + (2 * p);
+
+  setPositions(p);
+  Eigen::Vector3s com = getUnnormalizedCOM(linearizedMasses);
+  setPositions(p_next);
+  Eigen::Vector3s com_next = getUnnormalizedCOM(linearizedMasses);
+  setPositions(p_last);
+  Eigen::Vector3s com_last = getUnnormalizedCOM(linearizedMasses);
+  setPositions(p);
+
+  return (com_last - 2 * com + com_next) / (dt * dt);
+}
+
+//==============================================================================
+/// This maps to the difference for unnormalized (analytical COM acc - fd COM
+/// acc)
+Eigen::Vector3s Skeleton::getUnnormalizedCOMAccelerationOffset(
+    Eigen::VectorXs linearizedMasses)
+{
+  return getUnnormalizedCOMAcceleration(linearizedMasses)
+         - getUnnormalizedCOMFDAcceleration(linearizedMasses);
+}
+
+//==============================================================================
+/// This gets the analytical jacobian relating the linearized masses to link
+/// masses
+Eigen::MatrixXs Skeleton::getGroupMassesJacobianWrtLinearizedMasses()
+{
+  ensureBodyScaleGroups();
+  int numGroups = mBodyScaleGroups.size();
+  s_t totalMass = getMass();
+  s_t inverseMass = 1.0 / totalMass;
+  (void)inverseMass;
+  Eigen::VectorXs linearized = getLinearizedMasses();
+
+  Eigen::MatrixXs result = Eigen::MatrixXs::Zero(numGroups, 1 + numGroups);
+  for (int i = 0; i < mBodyScaleGroups.size(); i++)
+  {
+    result(i, 0) = -(linearized(i + 1) / mBodyScaleGroups[i].nodes.size())
+                   / (inverseMass * inverseMass);
+    result(i, i + 1) = totalMass / mBodyScaleGroups[i].nodes.size();
+  }
+  return result;
+}
+
+//==============================================================================
+/// This gets the finite difference'd jacobian relating the linearized masses
+/// to link masses
+Eigen::MatrixXs
+Skeleton::finiteDifferenceGroupMassesJacobianWrtLinearizedMasses()
+{
+  ensureBodyScaleGroups();
+  int numGroups = mBodyScaleGroups.size();
+  Eigen::MatrixXs result(numGroups, 1 + numGroups);
+  Eigen::VectorXs original = getLinearizedMasses();
+
+  s_t eps = 1e-7;
+  math::finiteDifference(
+      [&](/* in*/ s_t eps,
+          /* in*/ int dof,
+          /*out*/ Eigen::VectorXs& perturbed) {
+        Eigen::VectorXs tweaked = original;
+        tweaked(dof) += eps;
+        setLinearizedMasses(tweaked);
+        perturbed = getGroupMasses();
+        return true;
+      },
+      result,
+      eps,
+      false);
+
+  // Reset everything how we left it
+  setLinearizedMasses(original);
+
+  return result;
+}
+
+//==============================================================================
+/// This gets the analytical jacobian relating changes in the linearized
+/// masses to changes in the COM position
+Eigen::MatrixXs Skeleton::getUnnormalizedCOMJacobianWrtLinearizedMasses()
+{
+  ensureBodyScaleGroups();
+  int numGroups = mBodyScaleGroups.size();
+  Eigen::VectorXs linearized = getLinearizedMasses();
+
+  Eigen::MatrixXs result = Eigen::MatrixXs::Zero(3, 1 + numGroups);
+  for (int i = 0; i < mBodyScaleGroups.size(); i++)
+  {
+    // s_t percentage = linearized(i + 1);
+    // s_t bodyPercentage = percentage / mBodyScaleGroups[i].nodes.size();
+    for (auto* body : mBodyScaleGroups[i].nodes)
+    {
+      result.col(i + 1) += body->getCOM() / mBodyScaleGroups[i].nodes.size();
+    }
+  }
+  return result;
+}
+
+//==============================================================================
+/// This gets the analytical jacobian relating changes in the linearized
+/// masses to changes in the COM position
+Eigen::MatrixXs
+Skeleton::finiteDifferenceUnnormalizedCOMJacobianWrtLinearizedMasses()
+{
+  ensureBodyScaleGroups();
+  int numGroups = mBodyScaleGroups.size();
+  Eigen::MatrixXs result(3, 1 + numGroups);
+  Eigen::VectorXs original = getLinearizedMasses();
+
+  s_t eps = 1e-3;
+  math::finiteDifference(
+      [&](/* in*/ s_t eps,
+          /* in*/ int dof,
+          /*out*/ Eigen::VectorXs& perturbed) {
+        Eigen::VectorXs tweaked = original;
+        tweaked(dof) += eps;
+        perturbed = getUnnormalizedCOM(tweaked);
+        return true;
+      },
+      result,
+      eps,
+      true);
+
+  // Reset everything how we left it
+  setLinearizedMasses(original);
+
+  return result;
+}
+
+//==============================================================================
+/// This relates changes to the linearized masses to changes to the finite
+/// difference'd formula for COM acceleration, (c[t-1] - 2*c[t] +
+/// c[t+1])/(dt*dt)
+Eigen::MatrixXs Skeleton::getUnnormalizedCOMFDAccJacobianWrtLinearizedMasses()
+{
+  Eigen::VectorXs p = getPositions();
+  Eigen::VectorXs v = getVelocities();
+  Eigen::VectorXs a = getAccelerations();
+  s_t dt = getTimeStep();
+  // v[t] = (p[t] - p[t-1])/dt
+  // p[t-1] = p[t] - dt*v[t]
+  // a[t] = (p[t-1] - 2*p[t] + p[t+1])/(dt*dt)
+  // dt*dt*a[t] = (p[t-1] - 2*p[t] + p[t+1])
+  // dt*dt*a[t] - p[t-1] + 2*p[t] = p[t+1]
+  Eigen::VectorXs p_last = p - (dt * v);
+  Eigen::VectorXs p_next = (dt * dt * a) - p_last + (2 * p);
+
+  Eigen::MatrixXs comJ = getUnnormalizedCOMJacobianWrtLinearizedMasses();
+  setPositions(p_last);
+  Eigen::MatrixXs comJ_last = getUnnormalizedCOMJacobianWrtLinearizedMasses();
+  setPositions(p_next);
+  Eigen::MatrixXs comJ_next = getUnnormalizedCOMJacobianWrtLinearizedMasses();
+  setPositions(p);
+
+  return (comJ_last - 2 * comJ + comJ_next) / (dt * dt);
+}
+
+//==============================================================================
+/// This relates changes to the linearized masses to changes to the finite
+/// difference'd formula for COM acceleration, (c[t-1] - 2*c[t] +
+/// c[t+1])/(dt*dt)
+Eigen::MatrixXs
+Skeleton::finiteDifferenceUnnormalizedCOMFDAccJacobianWrtLinearizedMasses()
+{
+  int numGroups = mBodyScaleGroups.size();
+  Eigen::MatrixXs result(3, 1 + numGroups);
+  Eigen::VectorXs original = getLinearizedMasses();
+
+  s_t eps = 1e-3;
+  math::finiteDifference(
+      [&](/* in*/ s_t eps,
+          /* in*/ int dof,
+          /*out*/ Eigen::VectorXs& perturbed) {
+        Eigen::VectorXs tweaked = original;
+        tweaked(dof) += eps;
+
+        perturbed = getUnnormalizedCOMFDAcceleration(tweaked);
+
+        return true;
+      },
+      result,
+      eps,
+      true);
+
+  // Reset everything how we left it
+  setLinearizedMasses(original);
+
+  return result;
+}
+
+//==============================================================================
+/// This relates changes to the linearized masses to changes to the analytical
+/// formula for COM acceleration
+Eigen::MatrixXs
+Skeleton::getUnnormalizedCOMAnalyticalAccJacobianWrtLinearizedMasses()
+{
+  int numGroups = mBodyScaleGroups.size();
+  Eigen::VectorXs linearized = getLinearizedMasses();
+
+  Eigen::MatrixXs result = Eigen::MatrixXs::Zero(3, 1 + numGroups);
+  for (int i = 0; i < mBodyScaleGroups.size(); i++)
+  {
+    // s_t percentage = linearized(i + 1);
+    // s_t bodyPercentage = percentage / mBodyScaleGroups[i].nodes.size();
+    for (auto* body : mBodyScaleGroups[i].nodes)
+    {
+      result.col(i + 1) += body->getCOMLinearAcceleration()
+                           / mBodyScaleGroups[i].nodes.size();
+    }
+  }
+  return result;
+}
+
+//==============================================================================
+/// This relates changes to the linearized masses to changes to the analytical
+/// formula for COM acceleration
+Eigen::MatrixXs Skeleton::
+    finiteDifferenceUnnormalizedCOMAnalyticalAccJacobianWrtLinearizedMasses()
+{
+  int numGroups = mBodyScaleGroups.size();
+  Eigen::MatrixXs result(3, 1 + numGroups);
+  Eigen::VectorXs original = getLinearizedMasses();
+
+  s_t eps = 1e-3;
+  math::finiteDifference(
+      [&](/* in*/ s_t eps,
+          /* in*/ int dof,
+          /*out*/ Eigen::VectorXs& perturbed) {
+        Eigen::VectorXs tweaked = original;
+        tweaked(dof) += eps;
+
+        perturbed = getUnnormalizedCOMAcceleration(tweaked);
+
+        return true;
+      },
+      result,
+      eps,
+      true);
+
+  return result;
+}
+
+//==============================================================================
+/// This relates changes to the linearized masses to changes in the
+/// unnormalized (analytical COM acc - fd COM acc) quantity.
+Eigen::MatrixXs
+Skeleton::getUnnormalizedCOMAccelerationOffsetJacobianWrtLinearizedMasses()
+{
+  return getUnnormalizedCOMAnalyticalAccJacobianWrtLinearizedMasses()
+         - getUnnormalizedCOMFDAccJacobianWrtLinearizedMasses();
+}
+
+//==============================================================================
+/// This relates changes to the linearized masses to changes in the
+/// unnormalized (analytical COM acc - fd COM acc) quantity.
+Eigen::MatrixXs Skeleton::
+    finiteDifferenceUnnormalizedCOMAccelerationOffsetJacobianWrtLinearizedMasses()
+{
+  int numGroups = mBodyScaleGroups.size();
+  Eigen::MatrixXs result(3, 1 + numGroups);
+  Eigen::VectorXs original = getLinearizedMasses();
+
+  s_t eps = 1e-3;
+  math::finiteDifference(
+      [&](/* in*/ s_t eps,
+          /* in*/ int dof,
+          /*out*/ Eigen::VectorXs& perturbed) {
+        Eigen::VectorXs tweaked = original;
+        tweaked(dof) += eps;
+
+        perturbed = getUnnormalizedCOMAccelerationOffset(tweaked);
+
+        return true;
+      },
+      result,
+      eps,
+      true);
+
+  return result;
+}
+
+//==============================================================================
+/// This gets the COMs of each scale group, concatenated
+Eigen::VectorXs Skeleton::getGroupCOMs()
+{
+  ensureBodyScaleGroups();
+  Eigen::VectorXs groups = Eigen::VectorXs::Zero(getNumScaleGroups() * 3);
+  for (int i = 0; i < mBodyScaleGroups.size(); i++)
+  {
+    assert(mBodyScaleGroups[i].nodes.size() > 0);
+    groups.segment<3>(i * 3)
+        = mBodyScaleGroups[i].nodes[0]->getInertia().getLocalCOM().cwiseProduct(
+            mBodyScaleGroups[i].flipAxis[0]);
+  }
+  return groups;
+}
+
+//==============================================================================
+/// This gets the upper bound for each axis of each group's COM, concatenated
+Eigen::VectorXs Skeleton::getGroupCOMUpperBound()
+{
+  ensureBodyScaleGroups();
+  Eigen::VectorXs groups = Eigen::VectorXs::Zero(getNumScaleGroups() * 3);
+  for (int i = 0; i < mBodyScaleGroups.size(); i++)
+  {
+    assert(mBodyScaleGroups[i].nodes.size() > 0);
+    groups.segment<3>(i * 3)
+        = mBodyScaleGroups[i].nodes[0]->getInertia().getLocalCOMUpperBound();
+  }
+  return groups;
+}
+
+//==============================================================================
+/// This gets the lower bound for each axis of each group's COM, concatenated
+Eigen::VectorXs Skeleton::getGroupCOMLowerBound()
+{
+  ensureBodyScaleGroups();
+  Eigen::VectorXs groups = Eigen::VectorXs::Zero(getNumScaleGroups() * 3);
+  for (int i = 0; i < mBodyScaleGroups.size(); i++)
+  {
+    assert(mBodyScaleGroups[i].nodes.size() > 0);
+    groups.segment<3>(i * 3)
+        = mBodyScaleGroups[i].nodes[0]->getInertia().getLocalCOMLowerBound();
+  }
+  return groups;
+}
+
+//==============================================================================
+/// This sets the COMs of each scale group, concatenated
+void Skeleton::setGroupCOMs(Eigen::VectorXs coms)
+{
+  ensureBodyScaleGroups();
+  for (int i = 0; i < mBodyScaleGroups.size(); i++)
+  {
+    assert(mBodyScaleGroups[i].nodes.size() > 0);
+    for (int j = 0; j < mBodyScaleGroups[i].nodes.size(); j++)
+    {
+      auto* node = mBodyScaleGroups[i].nodes[j];
+      node->setLocalCOM(
+          coms.segment<3>(i * 3).cwiseProduct(mBodyScaleGroups[i].flipAxis[j]));
+    }
+  }
+}
+
+//==============================================================================
+/// This gets the Inertias of each scale group (the 6 vector), concatenated
+Eigen::VectorXs Skeleton::getGroupInertias()
+{
+  ensureBodyScaleGroups();
+  Eigen::VectorXs groups = Eigen::VectorXs::Zero(getNumScaleGroups() * 6);
+  for (int i = 0; i < mBodyScaleGroups.size(); i++)
+  {
+    assert(mBodyScaleGroups[i].nodes.size() > 0);
+    Eigen::Vector3s flips = mBodyScaleGroups[i].flipAxis[0];
+    Eigen::Vector6s dimsAndEulers
+        = mBodyScaleGroups[i].nodes[0]->getInertia().getDimsAndEulerVector();
+    // If we are flipping the Z axis, we want to negate the X and Y rotations,
+    // but leave Z the same
+    if (flips(2) < 0)
+    {
+      dimsAndEulers(3 + 0) *= -1;
+      dimsAndEulers(3 + 1) *= -1;
+    }
+    groups.segment<6>(i * 6) = dimsAndEulers;
+  }
+  return groups;
+}
+
+//==============================================================================
+/// This sets the Inertias of each scale group (the 6 vector), concatenated
+void Skeleton::setGroupInertias(Eigen::VectorXs inertias)
+{
+  ensureBodyScaleGroups();
+  for (int i = 0; i < mBodyScaleGroups.size(); i++)
+  {
+    assert(mBodyScaleGroups[i].nodes.size() > 0);
+    for (int j = 0; j < mBodyScaleGroups[i].nodes.size(); j++)
+    {
+      auto* node = mBodyScaleGroups[i].nodes[j];
+      Eigen::Vector3s flips = mBodyScaleGroups[i].flipAxis[j];
+      Eigen::Vector6s dimsAndEulers = inertias.segment<6>(i * 6);
+      // If we are flipping the Z axis, we want to negate the X and Y rotations,
+      // but leave Z the same
+      if (flips(2) < 0)
+      {
+        dimsAndEulers(3 + 0) *= -1;
+        dimsAndEulers(3 + 1) *= -1;
+      }
+      node->setDimsAndEulersVector(dimsAndEulers);
+    }
+  }
+}
+
+//==============================================================================
+/// This gets the upper bound for each axis of each group's inertias,
+/// concatenated
+Eigen::VectorXs Skeleton::getGroupInertiasUpperBound()
+{
+  ensureBodyScaleGroups();
+  Eigen::VectorXs groups = Eigen::VectorXs::Zero(getNumScaleGroups() * 6);
+  for (int i = 0; i < mBodyScaleGroups.size(); i++)
+  {
+    assert(mBodyScaleGroups[i].nodes.size() > 0);
+    groups.segment<6>(i * 6) = mBodyScaleGroups[i]
+                                   .nodes[0]
+                                   ->getInertia()
+                                   .getDimsAndEulerUpperBound();
+  }
+  return groups;
+}
+
+//==============================================================================
+/// This gets the lower bound for each axis of each group's inertias,
+/// concatenated
+Eigen::VectorXs Skeleton::getGroupInertiasLowerBound()
+{
+  ensureBodyScaleGroups();
+  Eigen::VectorXs groups = Eigen::VectorXs::Zero(getNumScaleGroups() * 6);
+  for (int i = 0; i < mBodyScaleGroups.size(); i++)
+  {
+    assert(mBodyScaleGroups[i].nodes.size() > 0);
+    groups.segment<6>(i * 6) = mBodyScaleGroups[i]
+                                   .nodes[0]
+                                   ->getInertia()
+                                   .getDimsAndEulerLowerBound();
+  }
   return groups;
 }
 
@@ -4262,6 +5759,11 @@ std::shared_ptr<dynamics::Skeleton> Skeleton::convertSkeletonToBallJoints()
       auto pair = cloneBodyNodeTree<dynamics::FreeJoint>(
           body, copy, parent, props, false);
       pair.first->copyTransformsFrom(joint);
+      for (int i = 3; i < 6; i++)
+      {
+        pair.first->setPositionUpperLimit(i, joint->getPositionUpperLimit(i));
+        pair.first->setPositionLowerLimit(i, joint->getPositionLowerLimit(i));
+      }
     }
     else if (joint->getType() == EulerJoint::getStaticType())
     {
@@ -4286,6 +5788,12 @@ std::shared_ptr<dynamics::Skeleton> Skeleton::convertSkeletonToBallJoints()
           body->getParentJoint()->getPositionUpperLimits());
       pair.first->setPositionLowerLimits(
           body->getParentJoint()->getPositionLowerLimits());
+      assert(
+          pair.first->getPositionUpperLimits()
+          == body->getParentJoint()->getPositionUpperLimits());
+      assert(
+          pair.first->getPositionLowerLimits()
+          == body->getParentJoint()->getPositionLowerLimits());
     }
   }
 
@@ -4298,6 +5806,10 @@ std::shared_ptr<dynamics::Skeleton> Skeleton::convertSkeletonToBallJoints()
     for (auto body : mBodyScaleGroups[i].nodes)
     {
       group.nodes.push_back(copy->getBodyNode(body->getName()));
+    }
+    for (auto flips : mBodyScaleGroups[i].flipAxis)
+    {
+      group.flipAxis.push_back(flips);
     }
   }
 
@@ -4328,6 +5840,45 @@ std::shared_ptr<dynamics::Skeleton> Skeleton::convertSkeletonToBallJoints()
     assert(
         joint->getTransformFromParentBodyNode().matrix()
         == getJoint(i)->getTransformFromParentBodyNode().matrix());
+    if (getJoint(i)->getType() == RevoluteJoint::getStaticType())
+    {
+      dynamics::RevoluteJoint* ourJoint
+          = static_cast<dynamics::RevoluteJoint*>(getJoint(i));
+      dynamics::RevoluteJoint* copyJoint
+          = static_cast<dynamics::RevoluteJoint*>(joint);
+#ifndef NDEBUG
+      Eigen::Vector3s ourAxis = ourJoint->getAxis();
+      Eigen::Vector3s copyAxis = copyJoint->getAxis();
+      assert((ourAxis - copyAxis).norm() < 1e-15);
+#endif
+    }
+    if (getJoint(i)->getType() == CustomJoint<2>::getStaticType())
+    {
+      dynamics::CustomJoint<2>* ourJoint
+          = static_cast<dynamics::CustomJoint<2>*>(getJoint(i));
+      dynamics::CustomJoint<2>* copyJoint
+          = static_cast<dynamics::CustomJoint<2>*>(joint);
+      assert(ourJoint->getFlipAxisMap() == copyJoint->getFlipAxisMap());
+      for (int j = 0; j < 6; j++)
+      {
+        assert(
+            ourJoint->getCustomFunctionDrivenByDof(j)
+            == copyJoint->getCustomFunctionDrivenByDof(j));
+      }
+    }
+    // All the joint limits must match except the eulerian joints
+    if (getJoint(i)->getType() != EulerFreeJoint::getStaticType()
+        && getJoint(i)->getType() != EulerJoint::getStaticType())
+    {
+      std::string jointName = joint->getName();
+      (void)jointName;
+      Eigen::VectorXs copyUpperLimits = joint->getPositionUpperLimits();
+      Eigen::VectorXs ourUpperLimits = getJoint(i)->getPositionUpperLimits();
+      assert(copyUpperLimits == ourUpperLimits);
+      assert(
+          joint->getPositionLowerLimits()
+          == getJoint(i)->getPositionLowerLimits());
+    }
   }
 #endif
 
@@ -4470,12 +6021,44 @@ Eigen::VectorXs Skeleton::getJointWorldPositions(
   Eigen::VectorXs sourcePositions = Eigen::VectorXs::Zero(joints.size() * 3);
   for (int i = 0; i < joints.size(); i++)
   {
+#ifndef NDEBUG
+    if (joints[i]->getChildBodyNode() == nullptr)
+    {
+      std::cout << "ERROR in getJointWorldPositions(): Joint "
+                << joints[i]->getName() << " has no child body node"
+                << std::endl;
+      continue;
+    }
+#endif
     sourcePositions.segment<3>(i * 3)
         = (joints[i]->getChildBodyNode()->getWorldTransform()
            * joints[i]->getTransformFromChildBodyNode())
               .translation();
   }
   return sourcePositions;
+}
+
+//==============================================================================
+/// This returns the world position of a joint
+Eigen::Vector3s Skeleton::getJointWorldPosition(int idx) const
+{
+  return (getJoint(idx)->getChildBodyNode()->getWorldTransform()
+          * getJoint(idx)->getTransformFromChildBodyNode())
+      .translation();
+}
+
+//==============================================================================
+/// This returns a map with the world positions of each joint, keyed by joint
+/// name
+std::map<std::string, Eigen::Vector3s> Skeleton::getJointWorldPositionsMap()
+    const
+{
+  std::map<std::string, Eigen::Vector3s> result;
+  for (int i = 0; i < getNumJoints(); i++)
+  {
+    result[getJoint(i)->getName()] = getJointWorldPosition(i);
+  }
+  return result;
 }
 
 //==============================================================================
@@ -4506,8 +6089,8 @@ Eigen::MatrixXs Skeleton::getJointWorldPositionsJacobianWrtJointPositions(
     math::Jacobian bodyJac = getWorldPositionJacobian(
         joints[i]->getChildBodyNode(),
         joints[i]->getTransformFromChildBodyNode().translation());
-    jac.block(3 * i, 0, 3, bodyJac.cols() - 1)
-        = bodyJac.block(3, 0, 3, bodyJac.cols() - 1);
+    jac.block(3 * i, 0, 3, bodyJac.cols())
+        = bodyJac.block(3, 0, 3, bodyJac.cols());
   }
 
   return jac;
@@ -4556,6 +6139,7 @@ Eigen::MatrixXs Skeleton::getJointWorldPositionsJacobianWrtJointChildAngles(
   {
     math::Jacobian bodyJac
         = getWorldPositionJacobian(joints[i]->getChildBodyNode());
+    assert(bodyJac.cols() == getNumDofs());
     jac.block(3 * i, 0, 3, bodyJac.cols())
         = bodyJac.block(0, 0, 3, bodyJac.cols());
   }
@@ -4609,37 +6193,46 @@ Eigen::MatrixXs Skeleton::getJointWorldPositionsJacobianWrtBodyScales(
   for (int i = 0; i < getNumBodyNodes(); i++)
   {
     dynamics::BodyNode* bodyNode = getBodyNode(i);
-    Eigen::Matrix3s R = bodyNode->getWorldTransform().linear();
 
-    Eigen::Vector3s parentOffset = bodyNode->getParentJoint()
-                                       ->getTransformFromChildBodyNode()
-                                       .translation();
-
+    // Each body can scale along 3 distinct axis
     for (int axis = 0; axis < 3; axis++)
     {
-      Eigen::Vector3s worldParentOffset = -R.col(axis) * parentOffset(axis);
+      Eigen::Vector3s worldOffsetDueToParentJoint
+          = bodyNode->getParentJoint()
+                ->getWorldTranslationOfChildBodyWrtChildScale(axis);
 
+      // Now begin iterating rows, for each joint
       for (int j = 0; j < joints.size(); j++)
       {
         int sourceJointIndex = getJointIndex(joints[j]);
-        for (int k = 0; k < bodyNode->getNumChildJoints(); k++)
+        if (joints[j]->getName() == bodyNode->getParentJoint()->getName())
         {
-          dynamics::Joint* childJoint = bodyNode->getChildJoint(k);
-          if (childJoint == joints[j]
-              || parentMap(getJointIndex(childJoint), sourceJointIndex))
+          jac.block(j * 3, i * 3 + axis, 3, 1)
+              = worldOffsetDueToParentJoint
+                // Ignore any translation of the child body due to simply
+                // scaling the child offset, since the joint isn't attached to
+                // the child offset
+                - bodyNode->getParentJoint()
+                      ->Joint::getWorldTranslationOfChildBodyWrtChildScale(
+                          axis);
+        }
+        else
+        {
+          for (int k = 0; k < bodyNode->getNumChildJoints(); k++)
           {
-            // This is the child joint
-
-            Eigen::Vector3s childOffset
-                = Eigen::Vector3s::Unit(axis)
-                  * childJoint->getTransformFromParentBodyNode().translation()(
+            dynamics::Joint* childJoint = bodyNode->getChildJoint(k);
+            if (childJoint->getName() == joints[j]->getName()
+                || parentMap(getJointIndex(childJoint), sourceJointIndex))
+            {
+              Eigen::Vector3s worldOffsetDueToChildJoint
+                  = childJoint->getWorldTranslationOfChildBodyWrtParentScale(
                       axis);
-            Eigen::Vector3s worldChildOffset = R * childOffset;
-            jac.block(j * 3, i * 3 + axis, 3, 1)
-                = (worldParentOffset + worldChildOffset)
-                  / bodyNode->getScale()(axis);
 
-            break;
+              jac.block(j * 3, i * 3 + axis, 3, 1)
+                  = worldOffsetDueToParentJoint + worldOffsetDueToChildJoint;
+
+              break;
+            }
           }
         }
       }
@@ -4678,6 +6271,362 @@ Skeleton::finiteDifferenceJointWorldPositionsJacobianWrtBodyScales(
       false);
 
   return result;
+}
+
+//==============================================================================
+/// This returns a score for a force field, which runs a simple non-linear
+/// function over the joint distance
+s_t Skeleton::getJointForceFieldToOtherJoints(
+    const std::vector<dynamics::Joint*>& joints,
+    int jointIndex,
+    s_t barrierDistance,
+    s_t softness)
+{
+  Eigen::VectorXs distances = getJointDistanceToOtherJoints(joints, jointIndex);
+  s_t cost = 0.0;
+  for (int i = 0; i < joints.size(); i++)
+  {
+    if (i == jointIndex)
+      continue;
+    s_t dist = distances(i);
+    // Only apply cost if we're inside the "barrier distance"
+    if (dist >= barrierDistance)
+    {
+      cost += 0.0;
+    }
+    else
+    {
+      double diff = dist - barrierDistance;
+      cost += (diff * diff) / (2.0 * softness);
+    }
+  }
+  return cost;
+}
+
+//==============================================================================
+/// This returns a score for a force field, which runs a simple non-linear
+/// function over the joint distance
+Eigen::VectorXs Skeleton::getJointForceFieldToOtherJointsGradient(
+    const std::vector<dynamics::Joint*>& joints,
+    int jointIndex,
+    s_t barrierDistance,
+    s_t softness,
+    neural::WithRespectTo* wrt)
+{
+  Eigen::VectorXs distances = getJointDistanceToOtherJoints(joints, jointIndex);
+  Eigen::VectorXs grad = Eigen::VectorXs::Zero(distances.size());
+  for (int i = 0; i < joints.size(); i++)
+  {
+    if (i == jointIndex)
+      continue;
+    s_t dist = distances(i);
+    if (dist >= barrierDistance)
+    {
+      grad(i) = 0.0;
+    }
+    else
+    {
+      grad(i) = (dist - barrierDistance) / softness;
+    }
+  }
+
+  Eigen::MatrixXs jac
+      = getJointDistanceToOtherJointsJacobianWrt(joints, jointIndex, wrt);
+  return jac.transpose() * grad;
+}
+
+//==============================================================================
+/// This returns a score for a force field, which runs a simple non-linear
+/// function over the joint distance
+Eigen::VectorXs Skeleton::finiteDifferenceJointForceFieldToOtherJointsGradient(
+    const std::vector<dynamics::Joint*>& joints,
+    int jointIndex,
+    s_t barrierDistance,
+    s_t softness,
+    neural::WithRespectTo* wrt)
+{
+  int dim = wrt->dim(this);
+  Eigen::VectorXs grad = Eigen::VectorXs::Zero(dim);
+
+  Eigen::VectorXs originalWrt = wrt->get(this);
+
+  s_t eps = 1e-2;
+  math::finiteDifference(
+      [&](/* in*/ s_t eps,
+          /* in*/ int dof,
+          /*out*/ s_t& perturbed) {
+        Eigen::VectorXs perturbedWrt = originalWrt;
+        perturbedWrt(dof) += eps;
+        wrt->set(this, perturbedWrt);
+        perturbed = getJointForceFieldToOtherJoints(
+            joints, jointIndex, barrierDistance, softness);
+        return true;
+      },
+      grad,
+      eps,
+      true);
+
+  wrt->set(this, originalWrt);
+
+  return grad;
+}
+
+//==============================================================================
+/// This returns a score for a force field, which runs a simple non-linear
+/// function over the joint distance with respect to body scales, which for
+/// historical reasons is not supported in the neural::WithRespectTo API. TODO:
+/// correct that
+Eigen::VectorXs Skeleton::getJointForceFieldToOtherJointsGradientWrtBodyScales(
+    const std::vector<dynamics::Joint*>& joints,
+    int jointIndex,
+    s_t barrierDistance,
+    s_t softness)
+{
+  Eigen::VectorXs distances = getJointDistanceToOtherJoints(joints, jointIndex);
+  Eigen::VectorXs grad = Eigen::VectorXs::Zero(distances.size());
+  for (int i = 0; i < joints.size(); i++)
+  {
+    if (i == jointIndex)
+      continue;
+    s_t dist = distances(i);
+    if (dist >= barrierDistance)
+    {
+      grad(i) = 0.0;
+    }
+    else
+    {
+      grad(i) = (dist - barrierDistance) / softness;
+    }
+  }
+
+  Eigen::MatrixXs jac
+      = getJointDistanceToOtherJointsJacobianWrtBodyScales(joints, jointIndex);
+  return jac.transpose() * grad;
+}
+
+//==============================================================================
+/// This returns a score for a force field, which runs a simple non-linear
+/// function over the joint distance with respect to body scales, which for
+/// historical reasons is not supported in the neural::WithRespectTo API. TODO:
+/// correct that
+Eigen::VectorXs
+Skeleton::finiteDifferenceJointForceFieldToOtherJointsGradientWrtBodyScales(
+    const std::vector<dynamics::Joint*>& joints,
+    int jointIndex,
+    s_t barrierDistance,
+    s_t softness)
+{
+  int dim = getNumBodyNodes() * 3;
+  Eigen::VectorXs grad = Eigen::VectorXs::Zero(dim);
+
+  Eigen::VectorXs originalWrt = getBodyScales();
+
+  s_t eps = 1e-3;
+  math::finiteDifference(
+      [&](/* in*/ s_t eps,
+          /* in*/ int dof,
+          /*out*/ s_t& perturbed) {
+        Eigen::VectorXs perturbedWrt = originalWrt;
+        perturbedWrt(dof) += eps;
+        setBodyScales(perturbedWrt);
+        perturbed = getJointForceFieldToOtherJoints(
+            joints, jointIndex, barrierDistance, softness);
+        return true;
+      },
+      grad,
+      eps,
+      true);
+
+  setBodyScales(originalWrt);
+
+  return grad;
+}
+
+//==============================================================================
+/// This returns a vector of the distance to all joints after the joint
+Eigen::VectorXs Skeleton::getJointDistanceToOtherJoints(
+    const std::vector<dynamics::Joint*>& joints, int jointIndex)
+{
+  Eigen::VectorXs jointLocations = getJointWorldPositions(joints);
+  Eigen::VectorXs distances = Eigen::VectorXs::Zero(joints.size());
+  for (int i = 0; i < joints.size(); i++)
+  {
+    distances(i) = (jointLocations.segment<3>(i * 3)
+                    - jointLocations.segment<3>(jointIndex * 3))
+                       .squaredNorm();
+  }
+  return distances;
+}
+
+//==============================================================================
+/// This gets the Jacobian relating changes in the joint world positions
+/// (IMPORTANT: NOT JOINT ANGLE - physical position of joint centers in the
+/// world) to the changes in the joint distance measurement vector for joint
+/// `jointIndex`.
+Eigen::MatrixXs
+Skeleton::getJointDistanceToOtherJointsJacobianWrtJointWorldPositions(
+    const std::vector<dynamics::Joint*>& joints, int jointIndex)
+{
+  Eigen::MatrixXs dDistance_dJointLocations
+      = Eigen::MatrixXs::Zero(joints.size(), joints.size() * 3);
+  Eigen::VectorXs jointLocations = getJointWorldPositions(joints);
+  for (int i = 0; i < joints.size(); i++)
+  {
+    Eigen::Vector3s diff
+        = (jointLocations.segment<3>(i * 3)
+           - jointLocations.segment<3>(jointIndex * 3));
+    dDistance_dJointLocations.block<1, 3>(i, i * 3) = 2 * diff;
+    dDistance_dJointLocations.block<1, 3>(i, jointIndex * 3) = -2 * diff;
+  }
+  return dDistance_dJointLocations;
+}
+
+//==============================================================================
+/// This gets the Jacobian relating changes in the joint world positions
+/// (IMPORTANT: NOT JOINT ANGLE - physical position of joint centers in the
+/// world) to the changes in the joint distance measurement vector for joint
+/// `jointIndex`.
+Eigen::MatrixXs Skeleton::
+    finiteDifferenceJointDistanceToOtherJointsJacobianWrtJointWorldPositions(
+        const std::vector<dynamics::Joint*>& joints, int jointIndex)
+{
+  Eigen::VectorXs jointLocations = getJointWorldPositions(joints);
+  Eigen::MatrixXs dDistance_dJointLocations
+      = Eigen::MatrixXs::Zero(joints.size(), joints.size() * 3);
+  s_t eps = 1e-7;
+  math::finiteDifference(
+      [&](/* in*/ s_t eps,
+          /* in*/ int dof,
+          /*out*/ Eigen::VectorXs& perturbed) {
+        Eigen::VectorXs perturbedJointLocations = jointLocations;
+        perturbedJointLocations(dof) += eps;
+        perturbed = Eigen::VectorXs::Zero(joints.size());
+        for (int i = 0; i < joints.size(); i++)
+        {
+          perturbed(i) = (perturbedJointLocations.segment<3>(i * 3)
+                          - perturbedJointLocations.segment<3>(jointIndex * 3))
+                             .squaredNorm();
+        }
+        return true;
+      },
+      dDistance_dJointLocations,
+      eps,
+      false);
+  return dDistance_dJointLocations;
+}
+
+//==============================================================================
+/// This returns a Jacobian of the distance to every joint in the body with
+/// respect to WRT
+Eigen::MatrixXs Skeleton::getJointDistanceToOtherJointsJacobianWrt(
+    const std::vector<dynamics::Joint*>& joints,
+    int jointIndex,
+    neural::WithRespectTo* wrt)
+{
+  if (wrt == neural::WithRespectTo::POSITION
+      || wrt == neural::WithRespectTo::GROUP_SCALES)
+  {
+    Eigen::MatrixXs dDistance_dJointLocations
+        = getJointDistanceToOtherJointsJacobianWrtJointWorldPositions(
+            joints, jointIndex);
+
+    if (wrt == neural::WithRespectTo::POSITION)
+    {
+      Eigen::MatrixXs dJointLocations
+          = getJointWorldPositionsJacobianWrtJointPositions(joints);
+      return dDistance_dJointLocations * dJointLocations;
+    }
+    else if (wrt == neural::WithRespectTo::GROUP_SCALES)
+    {
+      Eigen::MatrixXs dJointLocations
+          = getJointWorldPositionsJacobianWrtGroupScales(joints);
+      return dDistance_dJointLocations * dJointLocations;
+    }
+  }
+
+  int dim = wrt->dim(this);
+  return Eigen::MatrixXs::Zero(joints.size(), dim);
+}
+
+//==============================================================================
+/// This returns a Jacobian of the distance to every joint in the body with
+/// respect to WRT
+Eigen::MatrixXs Skeleton::finiteDifferenceJointDistanceToOtherJointsJacobianWrt(
+    const std::vector<dynamics::Joint*>& joints,
+    int jointIndex,
+    neural::WithRespectTo* wrt)
+{
+  int dim = wrt->dim(this);
+  Eigen::MatrixXs jac = Eigen::MatrixXs::Zero(joints.size(), dim);
+
+  Eigen::VectorXs originalWrt = wrt->get(this);
+
+  s_t eps = 1e-7;
+  math::finiteDifference(
+      [&](/* in*/ s_t eps,
+          /* in*/ int dof,
+          /*out*/ Eigen::VectorXs& perturbed) {
+        Eigen::VectorXs perturbedWrt = originalWrt;
+        perturbedWrt(dof) += eps;
+        wrt->set(this, perturbedWrt);
+        perturbed = getJointDistanceToOtherJoints(joints, jointIndex);
+        return true;
+      },
+      jac,
+      eps,
+      false);
+
+  wrt->set(this, originalWrt);
+
+  return jac;
+}
+
+//==============================================================================
+/// This returns a Jacobian of the distance to every joint in the body with
+/// respect to body scales, which for historical reasons is not supported in the
+/// neural::WithRespectTo API. TODO: correct that
+Eigen::MatrixXs Skeleton::getJointDistanceToOtherJointsJacobianWrtBodyScales(
+    const std::vector<dynamics::Joint*>& joints, int jointIndex)
+{
+  Eigen::MatrixXs dDistance_dJointLocations
+      = getJointDistanceToOtherJointsJacobianWrtJointWorldPositions(
+          joints, jointIndex);
+  Eigen::MatrixXs dJointLocations
+      = getJointWorldPositionsJacobianWrtBodyScales(joints);
+  return dDistance_dJointLocations * dJointLocations;
+}
+
+//==============================================================================
+/// This returns a Jacobian of the distance to every joint in the body with
+/// respect to body scales, which for historical reasons is not supported in the
+/// neural::WithRespectTo API. TODO: correct that
+Eigen::MatrixXs
+Skeleton::finiteDifferenceJointDistanceToOtherJointsJacobianWrtBodyScales(
+    const std::vector<dynamics::Joint*>& joints, int jointIndex)
+{
+  int dim = getNumBodyNodes() * 3;
+  Eigen::MatrixXs jac = Eigen::MatrixXs::Zero(joints.size(), dim);
+
+  Eigen::VectorXs originalWrt = getBodyScales();
+
+  s_t eps = 1e-7;
+  math::finiteDifference(
+      [&](/* in*/ s_t eps,
+          /* in*/ int dof,
+          /*out*/ Eigen::VectorXs& perturbed) {
+        Eigen::VectorXs perturbedWrt = originalWrt;
+        perturbedWrt(dof) += eps;
+        setBodyScales(perturbedWrt);
+        perturbed = getJointDistanceToOtherJoints(joints, jointIndex);
+        return true;
+      },
+      jac,
+      eps,
+      false);
+
+  setBodyScales(originalWrt);
+
+  return jac;
 }
 
 //==============================================================================
@@ -4817,14 +6766,12 @@ Eigen::MatrixXs Skeleton::getMarkerWorldPositionsJacobianWrtBodyScales(
     dynamics::BodyNode* bodyNode = getBodyNode(i);
     Eigen::Matrix3s R = bodyNode->getWorldTransform().linear();
 
-    Eigen::Vector3s parentOffset = bodyNode->getParentJoint()
-                                       ->getTransformFromChildBodyNode()
-                                       .translation();
-
     // Each body can scale along 3 distinct axis
     for (int axis = 0; axis < 3; axis++)
     {
-      Eigen::Vector3s worldParentOffset = -R.col(axis) * parentOffset(axis);
+      Eigen::Vector3s worldOffsetDueToParentJoint
+          = bodyNode->getParentJoint()
+                ->getWorldTranslationOfChildBodyWrtChildScale(axis);
 
       // Now begin iterating rows, for each marker
       for (int j = 0; j < markers.size(); j++)
@@ -4837,8 +6784,8 @@ Eigen::MatrixXs Skeleton::getMarkerWorldPositionsJacobianWrtBodyScales(
         if (markers[j].first == bodyNode)
         {
           jac.block(j * 3, i * 3 + axis, 3, 1)
-              = R.col(axis) * markers[j].second(axis)
-                + (worldParentOffset / bodyNode->getScale()(axis));
+              = (R.col(axis) * markers[j].second(axis))
+                + worldOffsetDueToParentJoint;
         }
         else
         {
@@ -4849,16 +6796,12 @@ Eigen::MatrixXs Skeleton::getMarkerWorldPositionsJacobianWrtBodyScales(
             if (childJoint == markers[j].first->getParentJoint()
                 || parentMap(getJointIndex(childJoint), sourceJointIndex))
             {
-              // This is the child joint
-              Eigen::Vector3s childOffset
-                  = Eigen::Vector3s::Unit(axis)
-                    * childJoint->getTransformFromParentBodyNode()
-                          .translation()(axis);
+              Eigen::Vector3s worldOffsetDueToChildJoint
+                  = childJoint->getWorldTranslationOfChildBodyWrtParentScale(
+                      axis);
 
-              Eigen::Vector3s worldChildOffset = R * childOffset;
               jac.block(j * 3, i * 3 + axis, 3, 1)
-                  = (worldParentOffset + worldChildOffset)
-                    / bodyNode->getScale()(axis);
+                  = worldOffsetDueToParentJoint + worldOffsetDueToChildJoint;
 
               break;
             }
@@ -5019,6 +6962,16 @@ Eigen::MatrixXs
 Skeleton::getScrewsMarkerWorldPositionsJacobianWrtJointPositions(
     const std::vector<std::pair<dynamics::BodyNode*, Eigen::Vector3s>>& markers)
 {
+  // HERE
+  //
+  //
+  //
+  //
+  //
+  //
+  //
+  //
+  //
   Eigen::MatrixXs jac = Eigen::MatrixXs::Zero(markers.size() * 3, getNumDofs());
 
   Eigen::VectorXs worldMarkers = getMarkerWorldPositions(markers);
@@ -5192,6 +7145,32 @@ Skeleton::getMarkerWorldPositionsSecondJacobianWrtJointWrtJointPositions(
 {
   Eigen::MatrixXs result = Eigen::MatrixXs::Zero(getNumDofs(), getNumDofs());
 
+  // We're creating these caches outside of the inner loops, to avoid calling
+  // these getter's a bazillion times in the hot inner loops
+  std::vector<dynamics::Joint*> dofJoints;
+  std::vector<Eigen::Vector6s> dofScrews;
+  std::vector<int> dofJointIndices;
+  std::vector<int> dofIndexInJoint;
+  for (int j = 0; j < getNumDofs(); j++)
+  {
+    dofJoints.push_back(getDof(j)->getJoint());
+    dofIndexInJoint.push_back(getDof(j)->getIndexInJoint());
+    dofScrews.push_back(
+        dofJoints[j]->getWorldAxisScrewForPosition(dofIndexInJoint[j]));
+    dofJointIndices.push_back(getJointIndex(dofJoints[j]));
+  }
+
+  std::vector<dynamics::Joint*> markerSourceJoints;
+  std::vector<int> markerSourceJointIndices;
+  for (int i = 0; i < markers.size(); i++)
+  {
+    markerSourceJoints.push_back(markers[i].first->getParentJoint());
+    markerSourceJointIndices.push_back(getJointIndex(markerSourceJoints[i]));
+  }
+
+  const Eigen::VectorXs worldMarkers = getMarkerWorldPositions(markers);
+  const Eigen::MatrixXi& parentMap = getJointParentMap();
+
   // The left multiply means we're taking a weighted combination of rows, to get
   // a single row. That's our new vector. Then we're treating that vector as a
   // column vector, and building a Jacobian of how that vector changes as we
@@ -5199,11 +7178,120 @@ Skeleton::getMarkerWorldPositionsSecondJacobianWrtJointWrtJointPositions(
 
   for (int col = 0; col < getNumDofs(); col++)
   {
-    result.col(col)
-        = getMarkerWorldPositionsDerivativeOfJacobianWrtJointsWrtJoints(
-              markers, col)
-              .transpose()
-          * leftMultiply;
+    const int index = col;
+
+    // Here's the original version, not optimized
+
+    // result.col(col)
+    //     = getMarkerWorldPositionsDerivativeOfJacobianWrtJointsWrtJoints(
+    //           markers, col)
+    //           .transpose()
+    //       * leftMultiply;
+
+    // It turns out that calling
+    // getMarkerWorldPositionsDerivativeOfJacobianWrtJointsWrtJoints()
+    // in a tight inner loop actually wastes a lot of inefficient index
+    // lookups in Skeleton, so instead we can cache so data outside of the
+    // loop
+
+    Eigen::MatrixXs jac
+        = Eigen::MatrixXs::Zero(markers.size() * 3, getNumDofs());
+
+    // Differentiating the whole mess wrt this joint
+    const dynamics::Joint* rootJoint = dofJoints[index];
+    const Eigen::Vector6s rootScrew = dofScrews[index];
+    const int rootJointIndex = dofJointIndices[index];
+
+    for (int j = 0; j < getNumDofs(); j++)
+    {
+      dynamics::Joint* parentJoint = dofJoints[j];
+      const Eigen::Vector6s screw = dofScrews[j];
+      const int parentJointIndex = dofJointIndices[j];
+      for (int i = 0; i < markers.size(); i++)
+      {
+        dynamics::Joint* sourceJoint = markerSourceJoints[i];
+        int sourceJointIndex = markerSourceJointIndices[i];
+
+        /// getDofParentMap(i,j) == 1: Dof[i] is a parent of Dof[j]
+        /// getDofParentMap(i,j) == 0: Dof[i] is NOT a parent of Dof[j]
+        if (parentMap(parentJointIndex, sourceJointIndex) == 1
+            || sourceJoint == parentJoint)
+        {
+          // The original value in this cell is the following
+
+          /*
+          jac.block<3, 1>(i * 3, j) = math::gradientWrtTheta(
+              screw, worldMarkers.segment<3>(i * 3), 0.0);
+          */
+
+          // There's a special case if the root is the parent of both the DOF
+          // for this column of the Jac, _and_ of the marker. That means that
+          // all we're doing is rotating (and translating, but that's
+          // irrelevant) the joint-marker system. So all we need is the gradient
+          // of the rotation.
+          if (parentMap(rootJointIndex, parentJointIndex) == 1)
+          {
+            Eigen::Vector3s originalJac = math::gradientWrtTheta(
+                screw, worldMarkers.segment<3>(i * 3), 0.0);
+            jac.block<3, 1>(i * 3, j) = math::gradientWrtThetaPureRotation(
+                rootScrew.head<3>(), originalJac, 0);
+          }
+          else
+          {
+            // We'll use the sum-product rule, so we need to individually
+            // differentiate both terms (`screw` and `markerPos`) wrt the root
+            // joint's theta term.
+
+            // Make `screwGrad` hold the gradient of the screw with respect to
+            // root
+
+            Eigen::Vector6s screwGrad = Eigen::Vector6s::Zero();
+
+            if (rootJoint == parentJoint)
+            {
+              int axisIndex
+                  = dofIndexInJoint[j]; // getDof(j)->getIndexInJoint();
+              int rotateIndex
+                  = dofIndexInJoint[index]; // getDof(index)->getIndexInJoint();
+              screwGrad = parentJoint->getScrewAxisGradientForPosition(
+                  axisIndex, rotateIndex);
+            }
+            else
+            {
+              // Otherwise rotating the root joint doesn't effect parentJoint's
+              // screw
+              screwGrad.setZero();
+            }
+
+            // `screwGrad` now holds the gradient of the screw with respect to
+            // root.
+
+            // Now we need the marker position's gradient wrt the root axis
+
+            Eigen::Vector3s markerGradWrtRoot = Eigen::Vector3s::Zero();
+
+            if (parentMap(rootJointIndex, sourceJointIndex) == 1
+                || (rootJoint == sourceJoint))
+            {
+              markerGradWrtRoot = math::gradientWrtTheta(
+                  rootScrew, worldMarkers.segment<3>(i * 3), 0.0);
+            }
+
+            // Now we just need to apply the product rule to get the final
+            // result
+
+            Eigen::Vector3s partA = math::gradientWrtTheta(
+                screwGrad, worldMarkers.segment<3>(i * 3), 0.0);
+            Eigen::Vector3s partB = math::gradientWrtThetaPureRotation(
+                screw.head<3>(), markerGradWrtRoot, 0.0);
+
+            jac.block<3, 1>(i * 3, j) = partA + partB;
+          }
+        }
+      }
+    }
+
+    result.col(col) = jac.transpose() * leftMultiply;
   }
 
   return result;
@@ -5260,20 +7348,47 @@ Skeleton::getMarkerWorldPositionsDerivativeOfJacobianWrtJointsWrtBodyScale(
     const Eigen::MatrixXs& markerWrtScaleJac)
 {
   dynamics::BodyNode* scaleBody = getBodyNode(index);
-  dynamics::Joint* scaleJoint = scaleBody->getParentJoint();
-  int scaleJointIndex = getJointIndex(scaleJoint);
-  int markerGradCol = index * 3 + axis;
+  dynamics::Joint* scaleBodyParentJoint = scaleBody->getParentJoint();
+  int scaleBodyParentJointIndex = getJointIndex(scaleBodyParentJoint);
+  (void)scaleBodyParentJointIndex;
+  int gradCol = index * 3 + axis;
 
   Eigen::MatrixXs jac = Eigen::MatrixXs::Zero(markers.size() * 3, getNumDofs());
 
   Eigen::VectorXs worldMarkers = getMarkerWorldPositions(markers);
   const Eigen::MatrixXi& parentMap = getJointParentMap();
 
+  Eigen::MatrixXs jointChangeInPos
+      = getJointWorldPositionsJacobianWrtBodyScales(getJoints());
+
   for (int j = 0; j < getNumDofs(); j++)
   {
     dynamics::Joint* parentJoint = getDof(j)->getJoint();
     Eigen::Vector6s screw = parentJoint->getWorldAxisScrewForPosition(
         getDof(j)->getIndexInJoint());
+
+    // Find the change in the velocity due to the joint
+    Eigen::Vector6s dScrew = Eigen::Vector6s::Zero();
+    if (parentJoint->getParentBodyNode() != nullptr
+        && parentJoint->getParentBodyNode()->getName() == scaleBody->getName())
+    {
+      dScrew = parentJoint->getRelativeJacobianDerivWrtParentScale(axis).col(
+          getDof(j)->getIndexInJoint());
+    }
+    if (parentJoint->getChildBodyNode()->getName() == scaleBody->getName())
+    {
+      // Get only the portion of the derivative that is not due to scaling the
+      // child transform
+      dScrew = parentJoint->getRelativeJacobianDerivWrtChildScale(axis).col(
+                   getDof(j)->getIndexInJoint())
+               - parentJoint->Joint::getRelativeJacobianDerivWrtChildScale(axis)
+                     .col(getDof(j)->getIndexInJoint());
+    }
+    assert(dScrew.head<3>().norm() == 0 && "This optimized formula does not support joints where scaling an attached body can change rotational speed! Either update this function, or consider re-parameterizing your custom joint definition.");
+    Eigen::Isometry3s childT
+        = parentJoint->getChildBodyNode()->getWorldTransform();
+    dScrew = math::AdT(childT, dScrew);
+
     int parentJointIndex = getJointIndex(parentJoint);
     for (int i = 0; i < markers.size(); i++)
     {
@@ -5285,23 +7400,84 @@ Skeleton::getMarkerWorldPositionsDerivativeOfJacobianWrtJointsWrtBodyScale(
       if (parentMap(parentJointIndex, sourceJointIndex) == 1
           || sourceJoint == parentJoint)
       {
-        bool isScalingBodyParentOfMarker
-            = (parentMap(scaleJointIndex, sourceJointIndex) == 1
-               || scaleBody == markers[i].first);
-        bool isScalingBodyParentOfAxisJoint
-            = parentMap(scaleJointIndex, parentJointIndex) == 1;
-        if (isScalingBodyParentOfMarker && !isScalingBodyParentOfAxisJoint)
-        {
-          Eigen::Vector3s markerGrad
-              = markerWrtScaleJac.block<3, 1>(i * 3, markerGradCol);
-          jac.block<3, 1>(i * 3, j) = math::gradientWrtThetaPureRotation(
-              screw.head<3>(), markerGrad, 0.0);
-        }
+        Eigen::Vector3s markerGrad
+            = markerWrtScaleJac.block<3, 1>(i * 3, gradCol);
+        Eigen::Vector3s jointGrad
+            = jointChangeInPos.block<3, 1>(parentJointIndex * 3, gradCol);
+        // We're interested in relative motion of the marker wrt the joint
+        jac.block<3, 1>(i * 3, j)
+            = screw.head<3>().cross(markerGrad - jointGrad) + dScrew.tail<3>();
       }
     }
   }
 
   return jac;
+}
+
+//==============================================================================
+Eigen::MatrixXs Skeleton::scratch(
+    const std::vector<std::pair<dynamics::BodyNode*, Eigen::Vector3s>>& markers)
+{
+  (void)markers;
+  Eigen::VectorXs worldJoints = getJointWorldPositions(getJoints());
+
+  return worldJoints;
+}
+
+//==============================================================================
+Eigen::MatrixXs Skeleton::scratchAnalytical(
+    const std::vector<std::pair<dynamics::BodyNode*, Eigen::Vector3s>>& markers,
+    int index,
+    int axis)
+{
+  dynamics::BodyNode* scaleBody = getBodyNode(index);
+  (void)scaleBody;
+
+  const Eigen::MatrixXs markerWrtScaleJac
+      = getMarkerWorldPositionsJacobianWrtBodyScales(markers);
+  const Eigen::MatrixXs jointsWrtScaleJac
+      = getJointWorldPositionsJacobianWrtBodyScales(getJoints());
+  int gradCol = index * 3 + axis;
+  (void)gradCol;
+
+  return jointsWrtScaleJac.col(gradCol);
+}
+
+//==============================================================================
+Eigen::MatrixXs Skeleton::scratchFd(
+    const std::vector<std::pair<dynamics::BodyNode*, Eigen::Vector3s>>& markers,
+    int index,
+    int axis)
+{
+  Eigen::Vector3s originalScale = getBodyNode(index)->getScale();
+  const s_t EPS = 1e-3;
+
+  Eigen::MatrixXs result(getJoints().size() * 3, getNumDofs());
+
+  math::finiteDifference<Eigen::MatrixXs>(
+      [&](/* in*/ s_t eps,
+          /*out*/ Eigen::MatrixXs& perturbed) {
+        Eigen::VectorXs tweakedScale = originalScale;
+        if (axis == -1)
+        {
+          tweakedScale += Eigen::Vector3s::Ones() * eps;
+        }
+        else
+        {
+          tweakedScale(axis) += eps;
+        }
+        getBodyNode(index)->setScale(tweakedScale);
+        perturbed = scratch(markers);
+        return true;
+      },
+      result,
+      EPS,
+      false);
+
+  // Reset everything how we left it
+  getBodyNode(index)->setScale(originalScale);
+
+  return result;
 }
 
 //==============================================================================
@@ -5315,23 +7491,34 @@ Eigen::MatrixXs Skeleton::
         int axis)
 {
   Eigen::Vector3s originalScale = getBodyNode(index)->getScale();
-  const s_t EPS = 1e-7;
+  const s_t EPS = 1e-3;
 
-  Eigen::Vector3s perturbed = originalScale;
-  perturbed(axis) += EPS;
-  getBodyNode(index)->setScale(perturbed);
-  Eigen::MatrixXs plus
-      = getMarkerWorldPositionsJacobianWrtJointPositions(markers);
+  Eigen::MatrixXs result(markers.size() * 3, getNumDofs());
 
-  perturbed = originalScale;
-  perturbed(axis) -= EPS;
-  getBodyNode(index)->setScale(perturbed);
-  Eigen::MatrixXs minus
-      = getMarkerWorldPositionsJacobianWrtJointPositions(markers);
+  math::finiteDifference<Eigen::MatrixXs>(
+      [&](/* in*/ s_t eps,
+          /*out*/ Eigen::MatrixXs& perturbed) {
+        Eigen::VectorXs tweakedScale = originalScale;
+        if (axis == -1)
+        {
+          tweakedScale += Eigen::Vector3s::Ones() * eps;
+        }
+        else
+        {
+          tweakedScale(axis) += eps;
+        }
+        getBodyNode(index)->setScale(tweakedScale);
+        perturbed = getMarkerWorldPositionsJacobianWrtJointPositions(markers);
+        return true;
+      },
+      result,
+      EPS,
+      false);
 
+  // Reset everything how we left it
   getBodyNode(index)->setScale(originalScale);
 
-  return (plus - minus) / (2 * EPS);
+  return result;
 }
 
 //==============================================================================
@@ -5350,18 +7537,117 @@ Skeleton::getMarkerWorldPositionsSecondJacobianWrtJointWrtBodyScale(
   // column vector, and building a Jacobian of how that vector changes as we
   // change body scales.
 
-  Eigen::MatrixXs scaleJac
+  Eigen::MatrixXs markerJacWrtScales
       = getMarkerWorldPositionsJacobianWrtBodyScales(markers);
+  Eigen::MatrixXs jointJacWrtScales
+      = getJointWorldPositionsJacobianWrtBodyScales(getJoints());
+
+  // We're creating these caches outside of the inner loops, to avoid calling
+  // these getter's a bazillion times in the hot inner loops
+  std::vector<dynamics::Joint*> parentJoints;
+  std::vector<Eigen::Vector6s> screws;
+  std::vector<int> parentJointIndices;
+  for (int j = 0; j < getNumDofs(); j++)
+  {
+    parentJoints.push_back(getDof(j)->getJoint());
+    screws.push_back(parentJoints[j]->getWorldAxisScrewForPosition(
+        getDof(j)->getIndexInJoint()));
+    parentJointIndices.push_back(getJointIndex(parentJoints[j]));
+  }
+
+  std::vector<dynamics::Joint*> markerSourceJoints;
+  std::vector<int> markerSourceJointIndices;
+  for (int i = 0; i < markers.size(); i++)
+  {
+    markerSourceJoints.push_back(markers[i].first->getParentJoint());
+    markerSourceJointIndices.push_back(getJointIndex(markerSourceJoints[i]));
+  }
 
   for (int body = 0; body < getNumBodyNodes(); body++)
   {
+    // We also cache these results in this outer loop to avoid re-creating them
+    // in the inner axis loop
+    const int index = body;
+    dynamics::BodyNode* scaleBody = getBodyNode(index);
+
     for (int axis = 0; axis < 3; axis++)
     {
-      result.col(body * 3 + axis)
-          = getMarkerWorldPositionsDerivativeOfJacobianWrtJointsWrtBodyScale(
-                markers, body, axis, scaleJac)
-                .transpose()
-            * leftMultiply;
+      // Here's the original version, not optimized
+
+      // result.col(body * 3 + axis)
+      //     = getMarkerWorldPositionsDerivativeOfJacobianWrtJointsWrtBodyScale(
+      //           markers, body, axis, scaleJac)
+      //           .transpose()
+      //       * leftMultiply;
+
+      // It turns out that calling
+      // getMarkerWorldPositionsDerivativeOfJacobianWrtJointsWrtMarkerOffsets()
+      // in a tight inner loop actually wastes a lot of inefficient index
+      // lookups in Skeleton, so instead we can cache so data outside of the
+      // loop
+
+      int gradCol = index * 3 + axis;
+
+      Eigen::MatrixXs jac
+          = Eigen::MatrixXs::Zero(markers.size() * 3, getNumDofs());
+
+      Eigen::VectorXs worldMarkers = getMarkerWorldPositions(markers);
+      const Eigen::MatrixXi& parentMap = getJointParentMap();
+
+      for (int j = 0; j < getNumDofs(); j++)
+      {
+        dynamics::Joint* parentJoint = parentJoints[j];
+        Eigen::Vector6s screw = screws[j];
+        int parentJointIndex = parentJointIndices[j];
+
+        // Find the change in the velocity due to the joint
+        Eigen::Vector6s dScrew = Eigen::Vector6s::Zero();
+        if (parentJoint->getParentBodyNode() != nullptr
+            && parentJoint->getParentBodyNode()->getName()
+                   == scaleBody->getName())
+        {
+          dScrew
+              = parentJoint->getRelativeJacobianDerivWrtParentScale(axis).col(
+                  getDof(j)->getIndexInJoint());
+        }
+        if (parentJoint->getChildBodyNode()->getName() == scaleBody->getName())
+        {
+          // Get only the portion of the derivative that is not due to scaling
+          // the child transform
+          dScrew = parentJoint->getRelativeJacobianDerivWrtChildScale(axis).col(
+                       getDof(j)->getIndexInJoint())
+                   - parentJoint
+                         ->Joint::getRelativeJacobianDerivWrtChildScale(axis)
+                         .col(getDof(j)->getIndexInJoint());
+        }
+        assert(dScrew.head<3>().norm() == 0 && "This optimized formula does not support joints where scaling an attached body can change rotational speed! Either update this function, or consider re-parameterizing your custom joint definition.");
+        Eigen::Isometry3s childT
+            = parentJoint->getChildBodyNode()->getWorldTransform();
+        dScrew = math::AdT(childT, dScrew);
+
+        for (int i = 0; i < markers.size(); i++)
+        {
+          dynamics::Joint* sourceJoint = markerSourceJoints[i];
+          int sourceJointIndex = markerSourceJointIndices[i];
+
+          /// getDofParentMap(i,j) == 1: Dof[i] is a parent of Dof[j]
+          /// getDofParentMap(i,j) == 0: Dof[i] is NOT a parent of Dof[j]
+          if (parentMap(parentJointIndex, sourceJointIndex) == 1
+              || sourceJoint == parentJoint)
+          {
+            Eigen::Vector3s markerGrad
+                = markerJacWrtScales.block<3, 1>(i * 3, gradCol);
+            Eigen::Vector3s jointGrad
+                = jointJacWrtScales.block<3, 1>(parentJointIndex * 3, gradCol);
+            // We're interested in relative motion of the marker wrt the joint
+            jac.block<3, 1>(i * 3, j)
+                = screw.head<3>().cross(markerGrad - jointGrad)
+                  + dScrew.tail<3>();
+          }
+        }
+      }
+
+      result.col(body * 3 + axis) = jac.transpose() * leftMultiply;
     }
   }
 
@@ -5426,7 +7712,7 @@ Skeleton::getMarkerWorldPositionsDerivativeOfJacobianWrtJointsWrtMarkerOffsets(
   int markerGradCol = marker * 3 + axis;
   Eigen::MatrixXs jac = Eigen::MatrixXs::Zero(markers.size() * 3, getNumDofs());
 
-  Eigen::VectorXs worldMarkers = getMarkerWorldPositions(markers);
+  // Eigen::VectorXs worldMarkers = getMarkerWorldPositions(markers);
   const Eigen::MatrixXi& parentMap = getJointParentMap();
 
   for (int j = 0; j < getNumDofs(); j++)
@@ -5505,15 +7791,77 @@ Skeleton::getMarkerWorldPositionsSecondJacobianWrtJointWrtMarkerOffsets(
   Eigen::MatrixXs markerJac
       = getMarkerWorldPositionsJacobianWrtMarkerOffsets(markers);
 
+  // We're creating these caches outside of the inner loops, to avoid calling
+  // these getter's a bazillion times in the hot inner loops
+  std::vector<dynamics::Joint*> parentJoints;
+  std::vector<Eigen::Vector6s> screws;
+  std::vector<int> parentJointIndices;
+  for (int j = 0; j < getNumDofs(); j++)
+  {
+    parentJoints.push_back(getDof(j)->getJoint());
+    screws.push_back(parentJoints[j]->getWorldAxisScrewForPosition(
+        getDof(j)->getIndexInJoint()));
+    parentJointIndices.push_back(getJointIndex(parentJoints[j]));
+  }
+
+  std::vector<dynamics::Joint*> markerSourceJoints;
+  std::vector<int> markerSourceJointIndices;
+  for (int i = 0; i < markers.size(); i++)
+  {
+    markerSourceJoints.push_back(markers[i].first->getParentJoint());
+    markerSourceJointIndices.push_back(getJointIndex(markerSourceJoints[i]));
+  }
+
+  const Eigen::MatrixXi& parentMap = getJointParentMap();
+
   for (int marker = 0; marker < markers.size(); marker++)
   {
     for (int axis = 0; axis < 3; axis++)
     {
-      result.col(marker * 3 + axis)
-          = getMarkerWorldPositionsDerivativeOfJacobianWrtJointsWrtMarkerOffsets(
-                markers, marker, axis, markerJac)
-                .transpose()
-            * leftMultiply;
+      // Here's the original version, not optimized
+
+      // result.col(marker * 3 + axis)
+      //     =
+      //     getMarkerWorldPositionsDerivativeOfJacobianWrtJointsWrtMarkerOffsets(
+      //           markers, marker, axis, markerJac)
+      //           .transpose()
+      //       * leftMultiply;
+
+      // It turns out that calling
+      // getMarkerWorldPositionsDerivativeOfJacobianWrtJointsWrtMarkerOffsets()
+      // in a tight inner loop actually wastes a lot of inefficient index
+      // lookups in Skeleton, so instead we can cache so data outside of the
+      // loop
+
+      int markerGradCol = marker * 3 + axis;
+      Eigen::MatrixXs jac
+          = Eigen::MatrixXs::Zero(markers.size() * 3, getNumDofs());
+
+      for (int j = 0; j < getNumDofs(); j++)
+      {
+        dynamics::Joint* parentJoint = parentJoints[j];
+        Eigen::Vector6s screw = screws[j];
+        int parentJointIndex = parentJointIndices[j];
+
+        for (int i = 0; i < markers.size(); i++)
+        {
+          dynamics::Joint* sourceJoint = markerSourceJoints[i];
+          int sourceJointIndex = markerSourceJointIndices[i];
+
+          /// getDofParentMap(i,j) == 1: Dof[i] is a parent of Dof[j]
+          /// getDofParentMap(i,j) == 0: Dof[i] is NOT a parent of Dof[j]
+          if (parentMap(parentJointIndex, sourceJointIndex) == 1
+              || sourceJoint == parentJoint)
+          {
+            Eigen::Vector3s markerGrad
+                = markerJac.block<3, 1>(i * 3, markerGradCol);
+            jac.block<3, 1>(i * 3, j) = math::gradientWrtThetaPureRotation(
+                screw.head<3>(), markerGrad, 0.0);
+          }
+        }
+      }
+
+      result.col(marker * 3 + axis) = jac.transpose() * leftMultiply;
     }
   }
 
@@ -5579,11 +7927,23 @@ s_t Skeleton::fitJointsToWorldPositions(
   {
     Eigen::VectorXs initialPos
         = Eigen::VectorXs::Zero(getNumDofs() + getGroupScaleDim());
+    Eigen::VectorXs lowerBound
+        = Eigen::VectorXs::Zero(getNumDofs() + getGroupScaleDim());
+    Eigen::VectorXs upperBound
+        = Eigen::VectorXs::Zero(getNumDofs() + getGroupScaleDim());
     initialPos.segment(0, getNumDofs()) = getPositions();
+    lowerBound.segment(0, getNumDofs()) = getPositionLowerLimits();
+    upperBound.segment(0, getNumDofs()) = getPositionUpperLimits();
     initialPos.segment(getNumDofs(), getGroupScaleDim()) = getGroupScales();
+    lowerBound.segment(getNumDofs(), getGroupScaleDim())
+        = getGroupScalesLowerBound();
+    upperBound.segment(getNumDofs(), getGroupScaleDim())
+        = getGroupScalesUpperBound();
 
     return math::solveIK(
         initialPos,
+        upperBound,
+        lowerBound,
         positionJoints.size() * 3,
         [this](/* in*/ const Eigen::VectorXs pos, bool clamp) {
           // Set positions
@@ -5609,9 +7969,9 @@ s_t Skeleton::fitJointsToWorldPositions(
           return clampedPos;
         },
         [this, targetPositions, positionJoints](
-            /*out*/ Eigen::VectorXs& diff,
-            /*out*/ Eigen::MatrixXs& jac) {
-          diff = targetPositions - getJointWorldPositions(positionJoints);
+            /*out*/ Eigen::Ref<Eigen::VectorXs> diff,
+            /*out*/ Eigen::Ref<Eigen::MatrixXs> jac) {
+          diff = getJointWorldPositions(positionJoints) - targetPositions;
           assert(jac.cols() == getNumDofs() + getGroupScaleDim());
           assert(jac.rows() == positionJoints.size() * 3);
           jac.setZero();
@@ -5621,7 +7981,7 @@ s_t Skeleton::fitJointsToWorldPositions(
               0, getNumDofs(), positionJoints.size() * 3, getGroupScaleDim())
               = getJointWorldPositionsJacobianWrtGroupScales(positionJoints);
         },
-        [this](Eigen::VectorXs& val) {
+        [this](Eigen::Ref<Eigen::VectorXs> val) {
           val.segment(0, getNumDofs()) = getRandomPose();
           val.segment(getNumDofs(), getGroupScaleDim()).setConstant(1.0);
         },
@@ -5631,6 +7991,8 @@ s_t Skeleton::fitJointsToWorldPositions(
   {
     return math::solveIK(
         getPositions(),
+        getPositionUpperLimits(),
+        getPositionLowerLimits(),
         positionJoints.size() * 3,
         [this](/* in*/ Eigen::VectorXs pos, bool clamp) {
           setPositions(pos);
@@ -5642,12 +8004,12 @@ s_t Skeleton::fitJointsToWorldPositions(
           return pos;
         },
         [this, targetPositions, positionJoints](
-            /*out*/ Eigen::VectorXs& diff,
-            /*out*/ Eigen::MatrixXs& jac) {
-          diff = targetPositions - getJointWorldPositions(positionJoints);
+            /*out*/ Eigen::Ref<Eigen::VectorXs> diff,
+            /*out*/ Eigen::Ref<Eigen::MatrixXs> jac) {
+          diff = getJointWorldPositions(positionJoints) - targetPositions;
           jac = getJointWorldPositionsJacobianWrtJointPositions(positionJoints);
         },
-        [this](Eigen::VectorXs& val) { val = getRandomPose(); },
+        [this](Eigen::Ref<Eigen::VectorXs> val) { val = getRandomPose(); },
         config);
   }
 }
@@ -5666,11 +8028,23 @@ s_t Skeleton::fitMarkersToWorldPositions(
   {
     Eigen::VectorXs initialPos
         = Eigen::VectorXs::Zero(getNumDofs() + getGroupScaleDim());
+    Eigen::VectorXs lowerBound
+        = Eigen::VectorXs::Zero(getNumDofs() + getGroupScaleDim());
+    Eigen::VectorXs upperBound
+        = Eigen::VectorXs::Zero(getNumDofs() + getGroupScaleDim());
     initialPos.segment(0, getNumDofs()) = getPositions();
+    lowerBound.segment(0, getNumDofs()) = getPositionLowerLimits();
+    upperBound.segment(0, getNumDofs()) = getPositionUpperLimits();
     initialPos.segment(getNumDofs(), getGroupScaleDim()) = getGroupScales();
+    lowerBound.segment(getNumDofs(), getGroupScaleDim())
+        = getGroupScalesLowerBound();
+    upperBound.segment(getNumDofs(), getGroupScaleDim())
+        = getGroupScalesUpperBound();
 
     return math::solveIK(
         initialPos,
+        upperBound,
+        lowerBound,
         markers.size() * 3,
         [this](/* in*/ const Eigen::VectorXs pos, bool clamp) {
           // Set positions
@@ -5696,9 +8070,9 @@ s_t Skeleton::fitMarkersToWorldPositions(
           return clampedPos;
         },
         [this, targetPositions, markers](
-            /*out*/ Eigen::VectorXs& diff,
-            /*out*/ Eigen::MatrixXs& jac) {
-          diff = targetPositions - getMarkerWorldPositions(markers);
+            /*out*/ Eigen::Ref<Eigen::VectorXs> diff,
+            /*out*/ Eigen::Ref<Eigen::MatrixXs> jac) {
+          diff = getMarkerWorldPositions(markers) - targetPositions;
           assert(jac.cols() == getNumDofs() + getGroupScaleDim());
           assert(jac.rows() == markers.size() * 3);
           jac.setZero();
@@ -5707,7 +8081,7 @@ s_t Skeleton::fitMarkersToWorldPositions(
           jac.block(0, getNumDofs(), markers.size() * 3, getGroupScaleDim())
               = getMarkerWorldPositionsJacobianWrtGroupScales(markers);
         },
-        [this](Eigen::VectorXs& val) {
+        [this](Eigen::Ref<Eigen::VectorXs> val) {
           val.segment(0, getNumDofs()) = getRandomPose();
           val.segment(getNumDofs(), getGroupScaleDim()).setConstant(1.0);
         },
@@ -5717,6 +8091,8 @@ s_t Skeleton::fitMarkersToWorldPositions(
   {
     return math::solveIK(
         getPositions(),
+        getPositionUpperLimits(),
+        getPositionLowerLimits(),
         markers.size() * 3,
         [this](/* in*/ Eigen::VectorXs pos, bool clamp) {
           setPositions(pos);
@@ -5728,18 +8104,514 @@ s_t Skeleton::fitMarkersToWorldPositions(
           return pos;
         },
         [this, targetPositions, markers, markerWeights](
-            /*out*/ Eigen::VectorXs& diff,
-            /*out*/ Eigen::MatrixXs& jac) {
-          diff = targetPositions - getMarkerWorldPositions(markers);
+            /*out*/ Eigen::Ref<Eigen::VectorXs> diff,
+            /*out*/ Eigen::Ref<Eigen::MatrixXs> jac) {
+          diff = getMarkerWorldPositions(markers) - targetPositions;
           for (int j = 0; j < markerWeights.size(); j++)
           {
             diff.segment<3>(j * 3) *= markerWeights(j);
           }
           jac = getMarkerWorldPositionsJacobianWrtJointPositions(markers);
         },
-        [this](Eigen::VectorXs& val) { val = getRandomPose(); },
+        [this](Eigen::Ref<Eigen::VectorXs> val) { val = getRandomPose(); },
         config);
   }
+}
+
+//==============================================================================
+/// These are a set of bodies, and offsets in local body space where gyros
+/// are mounted on the body
+std::map<std::string, Eigen::Vector3s> Skeleton::getGyroMapReadings(
+    const SensorMap& gyros)
+{
+  std::map<std::string, Eigen::Vector3s> results;
+  for (auto& pair : gyros)
+  {
+    Eigen::Vector3s gyroInBodyFrame = pair.second.first->getAngularVelocity(
+        Frame::World(), pair.second.first);
+    Eigen::Isometry3s T_gb = pair.second.second.inverse();
+    T_gb.translation()
+        = T_gb.translation().cwiseProduct(pair.second.first->getScale());
+    results[pair.first] = T_gb * gyroInBodyFrame;
+  }
+  return results;
+}
+
+//==============================================================================
+/// These are a set of bodies, and offsets in local body space where
+/// accelerometers are mounted on the body
+std::map<std::string, Eigen::Vector3s> Skeleton::getAccMapReadings(
+    const SensorMap& accs)
+{
+  std::map<std::string, Eigen::Vector3s> results;
+  for (auto& pair : accs)
+  {
+    Eigen::Vector3s accInBodyFrame = pair.second.first->getLinearAcceleration(
+        Frame::World(), pair.second.first);
+    Eigen::Vector3s worldGravity = getGravity();
+    Eigen::Vector3s localGravity
+        = pair.second.first->getWorldTransform().linear().transpose()
+          * worldGravity;
+    Eigen::Isometry3s T_ab = pair.second.second.inverse();
+    T_ab.translation()
+        = T_ab.translation().cwiseProduct(pair.second.first->getScale());
+    results[pair.first] = T_ab * (accInBodyFrame - localGravity);
+  }
+  return results;
+}
+
+//==============================================================================
+/// This returns the world positions and orientations of the sensors
+std::map<std::string, Eigen::Isometry3s> Skeleton::getSensorWorldPositions(
+    const SensorMap& sensors)
+{
+  std::map<std::string, Eigen::Isometry3s> sensorWorldPositions;
+  for (auto& pair : sensors)
+  {
+    sensorWorldPositions[pair.first]
+        = pair.second.first->getWorldTransform() * pair.second.second;
+  }
+  return sensorWorldPositions;
+}
+
+//==============================================================================
+/// This converts markers from a source skeleton to the current, doing a
+/// simple mapping based on body node names. Any markers that don't find a
+/// body node in the current skeleton with the same name are dropped.
+SensorMap Skeleton::convertSensorMap(
+    const SensorMap& sensorMap, bool warnOnDrop)
+{
+  std::map<std::string, std::pair<dynamics::BodyNode*, Eigen::Isometry3s>>
+      result;
+  for (auto pair : sensorMap)
+  {
+    dynamics::BodyNode* node = getBodyNode(pair.second.first->getName());
+    if (node != nullptr)
+    {
+      Eigen::Isometry3s T = pair.second.second;
+      T.translation()
+          = T.translation().cwiseQuotient(pair.second.first->getScale());
+      result[pair.first] = std::make_pair(node, T);
+    }
+    else if (warnOnDrop)
+    {
+      std::cout
+          << "WARNING: sensor \"" << pair.first
+          << "\" attaches to a node named \"" << pair.second.first->getName()
+          << "\", for which there is no equivalent in the current skeleton. "
+             "This sensor will be dropped in the converted sensors map."
+          << std::endl;
+    }
+  }
+  return result;
+}
+
+//==============================================================================
+/// These are a set of bodies, and offsets in local body space where gyros
+/// are mounted on the body
+Eigen::VectorXs Skeleton::getGyroReadings(
+    const std::vector<std::pair<dynamics::BodyNode*, Eigen::Isometry3s>>& gyros)
+{
+  Eigen::VectorXs results = Eigen::VectorXs::Zero(gyros.size() * 3);
+  Eigen::VectorXs bodyVels = getBodyLocalVelocities();
+  for (int i = 0; i < gyros.size(); i++)
+  {
+    Eigen::Vector3s gyroInBodyFrame
+        = bodyVels.segment<3>(gyros[i].first->getIndexInSkeleton() * 6);
+#ifndef NDEBUG
+    Eigen::Vector3s gyroInBodyFrameDirect
+        = gyros[i].first->getAngularVelocity(Frame::World(), gyros[i].first);
+    assert(gyroInBodyFrame == gyroInBodyFrameDirect);
+#endif
+    Eigen::Isometry3s T_gb = gyros[i].second.inverse();
+    results.segment<3>(i * 3) = T_gb.linear() * gyroInBodyFrame;
+  }
+  return results;
+}
+
+//==============================================================================
+/// This returns the Jacobian relating changes in joint
+/// positions to changes in gyro readings
+Eigen::MatrixXs Skeleton::getGyroReadingsJacobianWrt(
+    const std::vector<std::pair<dynamics::BodyNode*, Eigen::Isometry3s>>& gyros,
+    neural::WithRespectTo* wrt)
+{
+  Eigen::MatrixXs bodyVelWrt = getBodyLocalVelocitiesJacobian(wrt);
+  Eigen::MatrixXs J = Eigen::MatrixXs::Zero(gyros.size() * 3, wrt->dim(this));
+  for (int i = 0; i < gyros.size(); i++)
+  {
+    Eigen::Isometry3s T_gb = gyros[i].second.inverse();
+    T_gb.translation()
+        = T_gb.translation().cwiseProduct(gyros[i].first->getScale());
+    // TODO: if we're taking the jacobian wrt body scales and that could change
+    // T_gb, we need to take that into account here.
+    J.block(i * 3, 0, 3, J.cols())
+        = math::AdTJac(
+              T_gb,
+              bodyVelWrt.block<6, Eigen::Dynamic>(
+                  gyros[i].first->getIndexInSkeleton() * 6,
+                  0,
+                  6,
+                  bodyVelWrt.cols()))
+              .block(0, 0, 3, bodyVelWrt.cols());
+  }
+  return J;
+}
+
+//==============================================================================
+/// This returns the Jacobian relating changes in joint
+/// positions to changes in gyro readings
+Eigen::MatrixXs Skeleton::finiteDifferenceGyroReadingsJacobianWrt(
+    const std::vector<std::pair<dynamics::BodyNode*, Eigen::Isometry3s>>& gyros,
+    neural::WithRespectTo* wrt)
+{
+  int dim = wrt->dim(this);
+  Eigen::MatrixXs result(gyros.size() * 3, dim);
+  Eigen::VectorXs original = wrt->get(this);
+
+  s_t eps = 1e-4;
+  bool useRidders = true;
+  math::finiteDifference(
+      [&](/* in*/ s_t eps,
+          /* in*/ int dof,
+          /*out*/ Eigen::VectorXs& perturbed) {
+        Eigen::VectorXs tweaked = original;
+        tweaked(dof) += eps;
+        wrt->set(this, tweaked);
+        perturbed = getGyroReadings(gyros);
+        return true;
+      },
+      result,
+      eps,
+      useRidders);
+
+  // Reset everything how we left it
+  wrt->set(this, original);
+
+  return result;
+}
+
+//==============================================================================
+/// These are a set of bodies, and offsets in local body space where accs
+/// are mounted on the body
+Eigen::VectorXs Skeleton::getAccelerometerReadings(
+    const std::vector<std::pair<dynamics::BodyNode*, Eigen::Isometry3s>>& accs)
+{
+  Eigen::VectorXs results = Eigen::VectorXs::Zero(accs.size() * 3);
+  Eigen::VectorXs bodyVels = getBodyLocalVelocities();
+  Eigen::VectorXs bodyAccs = getBodyLocalAccelerations();
+  for (int i = 0; i < accs.size(); i++)
+  {
+    Eigen::Isometry3s T_ba = accs[i].second;
+    Eigen::Vector3s offset = T_ba.translation();
+    offset = offset.cwiseProduct(accs[i].first->getScale());
+
+    // Explicit formulation
+    int bodyIndex = accs[i].first->getIndexInSkeleton();
+    assert(bodyIndex >= 0 && bodyIndex < getNumBodyNodes());
+    Eigen::Vector6s velInBodyFrame = bodyVels.segment<6>(bodyIndex * 6);
+    Eigen::Vector6s accInBodyFrame = bodyAccs.segment<6>(bodyIndex * 6);
+    Eigen::Vector6s velInAccFrame = velInBodyFrame;
+    velInAccFrame.tail<3>().noalias() += velInBodyFrame.head<3>().cross(offset);
+    Eigen::Vector6s accInAccFrame = accInBodyFrame;
+    accInAccFrame.tail<3>().noalias() += accInBodyFrame.head<3>().cross(offset);
+    Eigen::Vector3s accTail = accInAccFrame.tail<3>();
+    Eigen::Vector3s contributionFromVel
+        = velInAccFrame.head<3>().cross(velInAccFrame.tail<3>());
+    Eigen::Vector3s worldGravity = getGravity();
+    Eigen::Isometry3s T_wb = accs[i].first->getWorldTransform();
+    Eigen::Matrix3s R_wb = T_wb.linear();
+    Eigen::Matrix3s R_bw = R_wb.transpose();
+    Eigen::Vector3s localGravity = R_bw * worldGravity;
+    Eigen::Vector3s acc = accTail + contributionFromVel - localGravity;
+    acc = T_ba.linear().transpose() * acc;
+
+    results.segment<3>(i * 3) = acc;
+
+#ifndef NDEBUG
+    Eigen::Vector3s accInBodyFrameDirect
+        = T_ba.linear().transpose()
+          * (accs[i].first->getLinearAcceleration(
+                 offset, Frame::World(), accs[i].first)
+             - localGravity);
+    assert(acc == accInBodyFrameDirect);
+#endif
+  }
+  return results;
+}
+
+//==============================================================================
+/// This returns the Jacobian relating changes in joint
+/// positions to changes in acc readings
+Eigen::MatrixXs Skeleton::getAccelerometerReadingsJacobianWrt(
+    const std::vector<std::pair<dynamics::BodyNode*, Eigen::Isometry3s>>& accs,
+    neural::WithRespectTo* wrt)
+{
+  Eigen::MatrixXs J = Eigen::MatrixXs::Zero(accs.size() * 3, wrt->dim(this));
+
+  Eigen::VectorXs bodyVels = getBodyLocalVelocities();
+  Eigen::MatrixXs bodyVelWrt = getBodyLocalVelocitiesJacobian(wrt);
+  Eigen::VectorXs bodyAccs = getBodyLocalAccelerations();
+  Eigen::MatrixXs bodyAccWrt = getBodyLocalAccelerationsJacobian(wrt);
+  Eigen::MatrixXs bodyGravityWrt = getBodyLocalGravityVectorsJacobian(wrt);
+
+  for (int i = 0; i < accs.size(); i++)
+  {
+    Eigen::Isometry3s T_ba = accs[i].second;
+    Eigen::Vector3s offset = T_ba.translation();
+    offset = offset.cwiseProduct(accs[i].first->getScale());
+    Eigen::MatrixXs offsetWrt = Eigen::MatrixXs::Zero(3, wrt->dim(this));
+    if (wrt == neural::WithRespectTo::GROUP_SCALES)
+    {
+      int index = getScaleGroupIndex(accs[i].first);
+      offsetWrt.block(0, index * 3, 3, 3) = T_ba.translation().asDiagonal();
+    }
+
+    // Explicit formulation
+    Eigen::Vector6s velInBodyFrame
+        = bodyVels.segment<6>(accs[i].first->getIndexInSkeleton() * 6);
+    Eigen::MatrixXs velInBodyFrameWrt = bodyVelWrt.block(
+        accs[i].first->getIndexInSkeleton() * 6, 0, 6, bodyVelWrt.cols());
+    Eigen::Vector6s accInBodyFrame
+        = bodyAccs.segment<6>(accs[i].first->getIndexInSkeleton() * 6);
+    Eigen::MatrixXs accInBodyFrameWrt = bodyAccWrt.block(
+        accs[i].first->getIndexInSkeleton() * 6, 0, 6, bodyAccWrt.cols());
+
+    Eigen::MatrixXs gravityInBodyFrameWrt = bodyGravityWrt.block(
+        accs[i].first->getIndexInSkeleton() * 3, 0, 3, bodyGravityWrt.cols());
+
+    Eigen::Vector6s velInAccFrame = velInBodyFrame;
+    velInAccFrame.tail<3>().noalias() += velInBodyFrame.head<3>().cross(offset);
+    Eigen::MatrixXs velInAccFrameWrt = velInBodyFrameWrt;
+    for (int col = 0; col < velInAccFrameWrt.cols(); col++)
+    {
+      velInAccFrameWrt.col(col).tail<3>().noalias()
+          += velInBodyFrameWrt.col(col).head<3>().cross(offset)
+             + velInBodyFrame.head<3>().cross(offsetWrt.col(col).head<3>());
+    }
+
+    Eigen::Vector6s accInAccFrame = accInBodyFrame;
+    accInAccFrame.tail<3>().noalias() += accInBodyFrame.head<3>().cross(offset);
+    Eigen::MatrixXs accInAccFrameWrt = accInBodyFrameWrt;
+    for (int col = 0; col < accInAccFrameWrt.cols(); col++)
+    {
+      accInAccFrameWrt.col(col).tail<3>().noalias()
+          += accInAccFrameWrt.col(col).head<3>().cross(offset)
+             + accInBodyFrame.head<3>().cross(offsetWrt.col(col).head<3>());
+    }
+
+    Eigen::Vector3s accTail = accInAccFrame.tail<3>();
+    Eigen::MatrixXs accTailWrt
+        = accInAccFrameWrt.block(3, 0, 3, accInAccFrameWrt.cols());
+
+    Eigen::Vector3s contributionFromVel
+        = velInAccFrame.head<3>().cross(velInAccFrame.tail<3>());
+    Eigen::MatrixXs contributionFromVelWrt
+        = Eigen::MatrixXs::Zero(3, velInAccFrameWrt.cols());
+    for (int col = 0; col < velInAccFrameWrt.cols(); col++)
+    {
+      contributionFromVelWrt.col(col)
+          = velInAccFrame.head<3>().cross(velInAccFrameWrt.col(col).tail<3>())
+            + velInAccFrameWrt.col(col).head<3>().cross(
+                velInAccFrame.tail<3>());
+    }
+
+    Eigen::Vector3s acc = accTail + contributionFromVel;
+    acc = T_ba.linear().transpose() * acc;
+
+    Eigen::MatrixXs accWrt
+        = Eigen::MatrixXs::Zero(3, contributionFromVelWrt.cols());
+    for (int col = 0; col < accWrt.cols(); col++)
+    {
+      accWrt.col(col) = T_ba.linear().transpose()
+                        * (accTailWrt.col(col) + contributionFromVelWrt.col(col)
+                           - gravityInBodyFrameWrt.col(col));
+    }
+
+    J.block(i * 3, 0, 3, J.cols()) = accWrt;
+  }
+
+  return J;
+}
+
+//==============================================================================
+/// This returns the Jacobian relating changes in joint
+/// positions to changes in acc readings
+Eigen::MatrixXs Skeleton::finiteDifferenceAccelerometerReadingsJacobianWrt(
+    const std::vector<std::pair<dynamics::BodyNode*, Eigen::Isometry3s>>& accs,
+    neural::WithRespectTo* wrt)
+{
+  int dim = wrt->dim(this);
+  Eigen::MatrixXs result(accs.size() * 3, dim);
+  Eigen::VectorXs original = wrt->get(this);
+
+  s_t eps = 1e-3;
+  bool useRidders = true;
+  math::finiteDifference(
+      [&](/* in*/ s_t eps,
+          /* in*/ int dof,
+          /*out*/ Eigen::VectorXs& perturbed) {
+        Eigen::VectorXs tweaked = original;
+        tweaked(dof) += eps;
+        wrt->set(this, tweaked);
+        perturbed = getAccelerometerReadings(accs);
+        return true;
+      },
+      result,
+      eps,
+      useRidders);
+
+  // Reset everything how we left it
+  wrt->set(this, original);
+
+  return result;
+}
+
+//==============================================================================
+/// These are a set of bodies, and offsets in local body space where
+/// magnetometers are mounted on the body
+Eigen::VectorXs Skeleton::getMagnetometerReadings(
+    const std::vector<std::pair<dynamics::BodyNode*, Eigen::Isometry3s>>& mags,
+    Eigen::Vector3s magneticField)
+{
+  Eigen::VectorXs output = Eigen::VectorXs::Zero(mags.size() * 3);
+  for (int i = 0; i < mags.size(); i++)
+  {
+    Eigen::Isometry3s T_wb = mags[i].first->getWorldTransform();
+    Eigen::Isometry3s T_bm = mags[i].second;
+    Eigen::Isometry3s T_wm = T_wb * T_bm;
+    output.segment<3>(i * 3) = T_wm.linear().transpose() * magneticField;
+  }
+  return output;
+}
+
+//==============================================================================
+/// This returns the Jacobian relating changes in joint
+/// positions to changes in gyro readings
+Eigen::MatrixXs Skeleton::getMagnetometerReadingsJacobianWrt(
+    const std::vector<std::pair<dynamics::BodyNode*, Eigen::Isometry3s>>& mags,
+    Eigen::Vector3s magneticField,
+    neural::WithRespectTo* wrt)
+{
+  Eigen::MatrixXs J = Eigen::MatrixXs::Zero(mags.size() * 3, wrt->dim(this));
+
+  if (wrt == neural::WithRespectTo::POSITION)
+  {
+    const Eigen::MatrixXi& parents = getJointParentMap();
+    for (int m = 0; m < mags.size(); m++)
+    {
+      auto* bodyNode = mags[m].first;
+      int parentJointIndex
+          = bodyNode->getParentJoint()->getJointIndexInSkeleton();
+
+      // const math::Jacobian& H = getJacobianInPositionSpace(bodyNodes[b]);
+      Eigen::Isometry3s Tworld = bodyNode->getWorldTransform() * mags[m].second;
+      for (auto i = 0u; i < getNumDofs(); ++i)
+      {
+        const dynamics::DegreeOfFreedom* dof = getDof(i);
+        const dynamics::Joint* joint = dof->getJoint();
+        if (joint->getJointIndexInSkeleton() == parentJointIndex
+            || parents(joint->getJointIndexInSkeleton(), parentJointIndex) == 1)
+        {
+          Eigen::Vector3s worldRotationScrew
+              = joint->getWorldAxisScrewForPosition(dof->getIndexInJoint())
+                    .head<3>();
+          Eigen::Vector3s localRotationScrew
+              = Tworld.linear().transpose() * worldRotationScrew;
+          // Derivative of magnetic field
+          Eigen::Vector3s localMagneticField
+              = Tworld.linear().transpose() * magneticField;
+          J.block<3, 1>(m * 3, i)
+              = -1 * localRotationScrew.cross(localMagneticField);
+        }
+      }
+    }
+  }
+
+  return J;
+}
+
+//==============================================================================
+/// This returns the Jacobian relating changes in joint
+/// positions to changes in gyro readings
+Eigen::MatrixXs Skeleton::finiteDifferenceMagnetometerReadingsJacobianWrt(
+    const std::vector<std::pair<dynamics::BodyNode*, Eigen::Isometry3s>>& mags,
+    Eigen::Vector3s magneticField,
+    neural::WithRespectTo* wrt)
+{
+  int dim = wrt->dim(this);
+  Eigen::MatrixXs result(mags.size() * 3, dim);
+  Eigen::VectorXs original = wrt->get(this);
+
+  s_t eps = 1e-3;
+  bool useRidders = true;
+  math::finiteDifference(
+      [&](/* in*/ s_t eps,
+          /* in*/ int dof,
+          /*out*/ Eigen::VectorXs& perturbed) {
+        Eigen::VectorXs tweaked = original;
+        tweaked(dof) += eps;
+        wrt->set(this, tweaked);
+        perturbed = getMagnetometerReadings(mags, magneticField);
+        return true;
+      },
+      result,
+      eps,
+      useRidders);
+
+  // Reset everything how we left it
+  wrt->set(this, original);
+
+  return result;
+}
+
+//==============================================================================
+/// This returns the Jacobian relating changes in magnetic field to
+/// changes in magnetometer readings
+Eigen::MatrixXs Skeleton::getMagnetometerReadingsJacobianWrtMagneticField(
+    const std::vector<std::pair<dynamics::BodyNode*, Eigen::Isometry3s>>& mags,
+    Eigen::Vector3s magneticField)
+{
+  (void)magneticField;
+
+  Eigen::MatrixXs output = Eigen::MatrixXs::Zero(mags.size() * 3, 3);
+  for (int i = 0; i < mags.size(); i++)
+  {
+    Eigen::Isometry3s T_wb = mags[i].first->getWorldTransform();
+    Eigen::Isometry3s T_bm = mags[i].second;
+    Eigen::Isometry3s T_wm = T_wb * T_bm;
+    output.block<3, 3>(i * 3, 0) = T_wm.linear().transpose();
+  }
+  return output;
+}
+
+//==============================================================================
+/// This returns the Jacobian relating changes in magnetic field to
+/// changes in magnetometer readings
+Eigen::MatrixXs
+Skeleton::finiteDifferenceMagnetometerReadingsJacobianWrtMagneticField(
+    const std::vector<std::pair<dynamics::BodyNode*, Eigen::Isometry3s>>& mags,
+    Eigen::Vector3s magneticField)
+{
+  Eigen::MatrixXs result(mags.size() * 3, 3);
+  Eigen::VectorXs original = magneticField;
+
+  s_t eps = 1e-3;
+  bool useRidders = true;
+  math::finiteDifference(
+      [&](/* in*/ s_t eps,
+          /* in*/ int dof,
+          /*out*/ Eigen::VectorXs& perturbed) {
+        Eigen::VectorXs tweaked = original;
+        tweaked(dof) += eps;
+        perturbed = getMagnetometerReadings(mags, tweaked);
+        return true;
+      },
+      result,
+      eps,
+      useRidders);
+
+  return result;
 }
 
 //==============================================================================
@@ -5904,6 +8776,802 @@ Skeleton::finiteDifferenceGradientOfDistanceAlongAxisWrtBodyScales(
 }
 
 //==============================================================================
+/// This returns the spatial velocities (6 vecs) of the bodies each in local
+/// body space, concatenated
+Eigen::VectorXs Skeleton::getBodyLocalVelocities()
+{
+  Eigen::VectorXs vels = Eigen::VectorXs(getNumBodyNodes() * 6);
+  for (int i = 0; i < getNumBodyNodes(); i++)
+  {
+    auto* body = getBodyNode(i);
+    vels.segment<6>(i * 6) = body->getSpatialVelocity(Frame::World(), body);
+  }
+  return vels;
+}
+
+//==============================================================================
+/// This returns the spatial accelerations (6 vecs) of the bodies in each in
+/// local body space, concatenated
+Eigen::VectorXs Skeleton::getBodyLocalAccelerations()
+{
+  Eigen::VectorXs accs = Eigen::VectorXs(getNumBodyNodes() * 6);
+  for (int i = 0; i < getNumBodyNodes(); i++)
+  {
+    auto* body = getBodyNode(i);
+    accs.segment<6>(i * 6) = body->getSpatialAcceleration(Frame::World(), body);
+  }
+  return accs;
+}
+
+//==============================================================================
+/// This returns the linear accelerations due to gravity (3 vecs) of the
+/// bodies in each in local body space, concatenated
+Eigen::VectorXs Skeleton::getBodyLocalGravityVectors()
+{
+  Eigen::VectorXs accs = Eigen::VectorXs(getNumBodyNodes() * 3);
+  for (int i = 0; i < getNumBodyNodes(); i++)
+  {
+    auto* body = getBodyNode(i);
+    accs.segment<3>(i * 3)
+        = body->getWorldTransform().linear().transpose() * getGravity();
+  }
+  return accs;
+}
+
+//==============================================================================
+/// This computes the jacobian of the local velocities for each body with
+/// respect to `wrt`
+Eigen::MatrixXs Skeleton::getBodyLocalVelocitiesJacobian(
+    neural::WithRespectTo* wrt)
+{
+  int dim = wrt->dim(this);
+  Eigen::MatrixXs jac = Eigen::MatrixXs::Zero(getNumBodyNodes() * 6, dim);
+
+  if (wrt == neural::WithRespectTo::POSITION
+      || wrt == neural::WithRespectTo::VELOCITY
+      || wrt == neural::WithRespectTo::GROUP_SCALES)
+  {
+    std::vector<BodyNode*>& bodyNodes = mSkelCache.mBodyNodes;
+
+    for (int i = 0; i < bodyNodes.size(); i++)
+    {
+      bodyNodes[i]->computeJacobianOfCForward(wrt, true);
+      jac.block(i * 6, 0, 6, dim) = bodyNodes[i]->mCg_V_p;
+    }
+  }
+
+  return jac;
+}
+
+//==============================================================================
+/// This brute forces our local velocities jacobian
+Eigen::MatrixXs Skeleton::finiteDifferenceBodyLocalVelocitiesJacobian(
+    neural::WithRespectTo* wrt)
+{
+  int dim = wrt->dim(this);
+  Eigen::MatrixXs result(getNumBodyNodes() * 6, dim);
+  Eigen::VectorXs original = wrt->get(this);
+
+  s_t eps = 1e-4;
+  bool useRidders = true;
+  math::finiteDifference(
+      [&](/* in*/ s_t eps,
+          /* in*/ int dof,
+          /*out*/ Eigen::VectorXs& perturbed) {
+        Eigen::VectorXs tweaked = original;
+        tweaked(dof) += eps;
+        wrt->set(this, tweaked);
+        perturbed = getBodyLocalVelocities();
+        return true;
+      },
+      result,
+      eps,
+      useRidders);
+
+  // Reset everything how we left it
+  wrt->set(this, original);
+
+  return result;
+}
+
+//==============================================================================
+/// This computes the jacobian of the local accelerations for each body with
+/// respect to `wrt`
+Eigen::MatrixXs Skeleton::getBodyLocalAccelerationsJacobian(
+    neural::WithRespectTo* wrt)
+{
+  int dim = wrt->dim(this);
+  Eigen::MatrixXs jac = Eigen::MatrixXs::Zero(getNumBodyNodes() * 6, dim);
+
+  if (wrt == neural::WithRespectTo::ACCELERATION)
+  {
+    std::vector<BodyNode*>& bodyNodes = mSkelCache.mBodyNodes;
+
+    for (int i = 0; i < bodyNodes.size(); i++)
+    {
+      jac.block(i * 6, 0, 6, dim) = getJacobian(bodyNodes[i], bodyNodes[i]);
+    }
+  }
+  else if (
+      wrt == neural::WithRespectTo::POSITION
+      || wrt == neural::WithRespectTo::VELOCITY
+      || wrt == neural::WithRespectTo::GROUP_SCALES)
+  {
+    std::vector<BodyNode*>& bodyNodes = mSkelCache.mBodyNodes;
+
+    for (int i = 0; i < bodyNodes.size(); i++)
+    {
+      bodyNodes[i]->computeJacobianOfCForward(wrt, true);
+      jac.block(i * 6, 0, 6, dim) = bodyNodes[i]->mCg_dV_p;
+    }
+  }
+  return jac;
+}
+
+//==============================================================================
+/// This brute forces our local accelerations jacobian
+Eigen::MatrixXs Skeleton::finiteDifferenceBodyLocalAccelerationsJacobian(
+    neural::WithRespectTo* wrt)
+{
+  int dim = wrt->dim(this);
+  Eigen::MatrixXs result(getNumBodyNodes() * 6, dim);
+  Eigen::VectorXs original = wrt->get(this);
+
+  s_t eps = 1e-3;
+  bool useRidders = true;
+  math::finiteDifference(
+      [&](/* in*/ s_t eps,
+          /* in*/ int dof,
+          /*out*/ Eigen::VectorXs& perturbed) {
+        Eigen::VectorXs tweaked = original;
+        tweaked(dof) += eps;
+        wrt->set(this, tweaked);
+        perturbed = getBodyLocalAccelerations();
+        return true;
+      },
+      result,
+      eps,
+      useRidders);
+
+  // Reset everything how we left it
+  wrt->set(this, original);
+
+  return result;
+}
+
+//==============================================================================
+/// This computes the jacobian of the local gravity vectors for each body with
+/// respect to `wrt`
+Eigen::MatrixXs Skeleton::getBodyLocalGravityVectorsJacobian(
+    neural::WithRespectTo* wrt)
+{
+  int dim = wrt->dim(this);
+  Eigen::MatrixXs jac = Eigen::MatrixXs::Zero(getNumBodyNodes() * 3, dim);
+
+  if (wrt == neural::WithRespectTo::POSITION)
+  {
+    std::vector<BodyNode*>& bodyNodes = mSkelCache.mBodyNodes;
+
+    const Eigen::MatrixXi& parents = getJointParentMap();
+    for (int b = 0; b < bodyNodes.size(); b++)
+    {
+      int parentJointIndex
+          = bodyNodes[b]->getParentJoint()->getJointIndexInSkeleton();
+
+      // const math::Jacobian& H = getJacobianInPositionSpace(bodyNodes[b]);
+      Eigen::Isometry3s Tworld = bodyNodes[b]->getWorldTransform();
+      for (auto i = 0u; i < getNumDofs(); ++i)
+      {
+        const dynamics::DegreeOfFreedom* dof = getDof(i);
+        const dynamics::Joint* joint = dof->getJoint();
+        if (joint->getJointIndexInSkeleton() == parentJointIndex
+            || parents(joint->getJointIndexInSkeleton(), parentJointIndex) == 1)
+        {
+          Eigen::Vector3s worldRotationScrew
+              = joint->getWorldAxisScrewForPosition(dof->getIndexInJoint())
+                    .head<3>();
+          Eigen::Vector3s localRotationScrew
+              = Tworld.linear().transpose() * worldRotationScrew;
+          // Derivative of gravity acceleration
+          Eigen::Vector3s localGravity
+              = Tworld.linear().transpose() * getGravity();
+          jac.block<3, 1>(b * 3, i)
+              = -1 * localRotationScrew.cross(localGravity);
+        }
+      }
+    }
+  }
+  return jac;
+}
+
+//==============================================================================
+/// This brute forces our local gravity vectors jacobian
+Eigen::MatrixXs Skeleton::finiteDifferenceBodyLocalGravityVectorsJacobian(
+    neural::WithRespectTo* wrt)
+{
+  int dim = wrt->dim(this);
+  Eigen::MatrixXs result(getNumBodyNodes() * 3, dim);
+  Eigen::VectorXs original = wrt->get(this);
+
+  s_t eps = 1e-3;
+  bool useRidders = true;
+  math::finiteDifference(
+      [&](/* in*/ s_t eps,
+          /* in*/ int dof,
+          /*out*/ Eigen::VectorXs& perturbed) {
+        Eigen::VectorXs tweaked = original;
+        tweaked(dof) += eps;
+        wrt->set(this, tweaked);
+        perturbed = getBodyLocalGravityVectors();
+        return true;
+      },
+      result,
+      eps,
+      useRidders);
+
+  // Reset everything how we left it
+  wrt->set(this, original);
+
+  return result;
+}
+
+//==============================================================================
+/// This returns the spatial velocities (6 vecs) of the bodies in world space,
+/// concatenated
+Eigen::VectorXs Skeleton::getBodyWorldVelocities()
+{
+  Eigen::VectorXs vels = Eigen::VectorXs(getNumBodyNodes() * 6);
+  for (int i = 0; i < getNumBodyNodes(); i++)
+  {
+    vels.segment<6>(i * 6)
+        = getBodyNode(i)->getSpatialVelocity(Frame::World(), Frame::World());
+  }
+  return vels;
+}
+
+//==============================================================================
+/// This returns the spatial accelerations (6 vecs) of the bodies in world
+/// space, concatenated
+Eigen::VectorXs Skeleton::getBodyWorldAccelerations()
+{
+  Eigen::VectorXs accs = Eigen::VectorXs(getNumBodyNodes() * 6);
+  for (int i = 0; i < getNumBodyNodes(); i++)
+  {
+    accs.segment<6>(i * 6) = getBodyNode(i)->getSpatialAcceleration(
+        Frame::World(), Frame::World());
+  }
+  return accs;
+}
+
+//==============================================================================
+/// This computes the jacobian of the world velocities for each body with
+/// respect to `wrt`
+Eigen::MatrixXs Skeleton::getBodyWorldVelocitiesJacobian(
+    neural::WithRespectTo* wrt)
+{
+  int dim = wrt->dim(this);
+  Eigen::MatrixXs jac = Eigen::MatrixXs::Zero(getNumBodyNodes() * 6, dim);
+
+  if (wrt == neural::WithRespectTo::POSITION
+      || wrt == neural::WithRespectTo::VELOCITY
+      || wrt == neural::WithRespectTo::GROUP_SCALES)
+  {
+    std::vector<BodyNode*>& bodyNodes = mSkelCache.mBodyNodes;
+
+    for (int i = 0; i < bodyNodes.size(); i++)
+    {
+      bodyNodes[i]->computeJacobianOfCForward(wrt, true);
+      jac.block(i * 6, 0, 6, dim) = math::AdRJac(
+          bodyNodes[i]->getWorldTransform(), bodyNodes[i]->mCg_V_p);
+    }
+    // We need to account for the relative rotation, wrt the world frame,
+    // because that's an extra step that isn't accounted for in the featherstone
+    // algo. We can use the product rule, and add the cross product of the
+    // current vel and the rotation axis for each joint.
+    if (wrt == neural::WithRespectTo::POSITION)
+    {
+      const Eigen::MatrixXi& jointParent = getJointParentMap();
+      for (int i = 0; i < getNumDofs(); i++)
+      {
+        int jointIndex = getDof(i)->getJoint()->getJointIndexInSkeleton();
+        Eigen::Vector6s worldScrew
+            = getDof(i)->getJoint()->getWorldAxisScrewForPosition(
+                getDof(i)->getIndexInJoint());
+        Eigen::Vector3s worldRot = worldScrew.head<3>();
+        for (int b = 0; b < getNumBodyNodes(); b++)
+        {
+          int bodyJointIndex
+              = getBodyNode(b)->getParentJoint()->getJointIndexInSkeleton();
+          if (bodyJointIndex == jointIndex
+              || jointParent(jointIndex, bodyJointIndex) == 1)
+          {
+            Eigen::Vector6s spatialVel = getBodyNode(b)->getSpatialVelocity(
+                Frame::World(), Frame::World());
+            jac.block<3, 1>(b * 6, i) -= spatialVel.head<3>().cross(worldRot);
+            jac.block<3, 1>(b * 6 + 3, i)
+                -= spatialVel.tail<3>().cross(worldRot);
+          }
+        }
+      }
+    }
+  }
+
+  return jac;
+}
+
+//==============================================================================
+/// This brute forces our world velocities jacobian
+Eigen::MatrixXs Skeleton::finiteDifferenceBodyWorldVelocitiesJacobian(
+    neural::WithRespectTo* wrt)
+{
+  int dim = wrt->dim(this);
+  Eigen::MatrixXs result(getNumBodyNodes() * 6, dim);
+  Eigen::VectorXs original = wrt->get(this);
+
+  s_t eps = 1e-3;
+  bool useRidders = true;
+  math::finiteDifference(
+      [&](/* in*/ s_t eps,
+          /* in*/ int dof,
+          /*out*/ Eigen::VectorXs& perturbed) {
+        Eigen::VectorXs tweaked = original;
+        tweaked(dof) += eps;
+        wrt->set(this, tweaked);
+        perturbed = getBodyWorldVelocities();
+        return true;
+      },
+      result,
+      eps,
+      useRidders);
+
+  // Reset everything how we left it
+  wrt->set(this, original);
+
+  return result;
+}
+
+//==============================================================================
+/// This computes the jacobian of the world accelerations for each body with
+/// respect to `wrt`
+Eigen::MatrixXs Skeleton::getBodyWorldAccelerationsJacobian(
+    neural::WithRespectTo* wrt)
+{
+  int dim = wrt->dim(this);
+  Eigen::MatrixXs jac = Eigen::MatrixXs::Zero(getNumBodyNodes() * 6, dim);
+
+  if (wrt == neural::WithRespectTo::ACCELERATION)
+  {
+    std::vector<BodyNode*>& bodyNodes = mSkelCache.mBodyNodes;
+
+    for (int i = 0; i < bodyNodes.size(); i++)
+    {
+      jac.block(i * 6, 0, 6, dim) = getJacobian(bodyNodes[i], Frame::World());
+    }
+  }
+  else if (
+      wrt == neural::WithRespectTo::POSITION
+      || wrt == neural::WithRespectTo::VELOCITY
+      || wrt == neural::WithRespectTo::GROUP_SCALES)
+  {
+    std::vector<BodyNode*>& bodyNodes = mSkelCache.mBodyNodes;
+
+    for (int i = 0; i < bodyNodes.size(); i++)
+    {
+      bodyNodes[i]->computeJacobianOfCForward(wrt, true);
+      jac.block(i * 6, 0, 6, dim) = math::AdRJac(
+          bodyNodes[i]->getWorldTransform(), bodyNodes[i]->mCg_dV_p);
+    }
+  }
+  // We need to account for the relative rotation, wrt the world frame,
+  // because that's an extra step that isn't accounted for in the featherstone
+  // algo. We can use the product rule, and add the cross product of the
+  // current acc and the rotation axis for each joint.
+  if (wrt == neural::WithRespectTo::POSITION)
+  {
+    const Eigen::MatrixXi& jointParent = getJointParentMap();
+    for (int i = 0; i < getNumDofs(); i++)
+    {
+      int jointIndex = getDof(i)->getJoint()->getJointIndexInSkeleton();
+      Eigen::Vector6s worldScrew
+          = getDof(i)->getJoint()->getWorldAxisScrewForPosition(
+              getDof(i)->getIndexInJoint());
+      Eigen::Vector3s worldRot = worldScrew.head<3>();
+      for (int b = 0; b < getNumBodyNodes(); b++)
+      {
+        int bodyJointIndex
+            = getBodyNode(b)->getParentJoint()->getJointIndexInSkeleton();
+        if (bodyJointIndex == jointIndex
+            || jointParent(jointIndex, bodyJointIndex) == 1)
+        {
+          Eigen::Vector6s spatialAcc = getBodyNode(b)->getSpatialAcceleration(
+              Frame::World(), Frame::World());
+          jac.block<3, 1>(b * 6, i) -= spatialAcc.head<3>().cross(worldRot);
+          jac.block<3, 1>(b * 6 + 3, i) -= spatialAcc.tail<3>().cross(worldRot);
+        }
+      }
+    }
+  }
+
+  return jac;
+}
+
+//==============================================================================
+/// This brute forces our world accelerations jacobian
+Eigen::MatrixXs Skeleton::finiteDifferenceBodyWorldAccelerationsJacobian(
+    neural::WithRespectTo* wrt)
+{
+  int dim = wrt->dim(this);
+  Eigen::MatrixXs result(getNumBodyNodes() * 6, dim);
+  Eigen::VectorXs original = wrt->get(this);
+
+  s_t eps = 1e-3;
+  bool useRidders = true;
+  math::finiteDifference(
+      [&](/* in*/ s_t eps,
+          /* in*/ int dof,
+          /*out*/ Eigen::VectorXs& perturbed) {
+        Eigen::VectorXs tweaked = original;
+        tweaked(dof) += eps;
+        wrt->set(this, tweaked);
+        perturbed = getBodyWorldAccelerations();
+        return true;
+      },
+      result,
+      eps,
+      useRidders);
+
+  // Reset everything how we left it
+  wrt->set(this, original);
+
+  return result;
+}
+
+//==============================================================================
+/// This returns the spatial velocities (6 vecs) of the COMs of each body in
+/// world space, concatenated
+Eigen::VectorXs Skeleton::getCOMWorldVelocities()
+{
+  Eigen::VectorXs vels = Eigen::VectorXs(getNumBodyNodes() * 6);
+  for (int i = 0; i < getNumBodyNodes(); i++)
+  {
+    vels.segment<6>(i * 6)
+        = getBodyNode(i)->getCOMSpatialVelocity(Frame::World(), Frame::World());
+  }
+  return vels;
+}
+
+//==============================================================================
+/// This returns the spatial accelerations (6 vecs) of the COMs of each body
+/// in world space, concatenated
+Eigen::VectorXs Skeleton::getCOMWorldAccelerations()
+{
+  Eigen::VectorXs accs = Eigen::VectorXs(getNumBodyNodes() * 6);
+  for (int i = 0; i < getNumBodyNodes(); i++)
+  {
+    accs.segment<6>(i * 6) = getBodyNode(i)->getCOMSpatialAcceleration(
+        Frame::World(), Frame::World());
+  }
+  return accs;
+}
+
+//==============================================================================
+/// This returns the linear accelerations (3 vecs) of the COMs of each body in
+/// world space.
+Eigen::VectorXs Skeleton::getCOMWorldLinearAccelerations()
+{
+  Eigen::VectorXs accs = Eigen::VectorXs(getNumBodyNodes() * 3);
+  for (int i = 0; i < getNumBodyNodes(); i++)
+  {
+    accs.segment<3>(i * 3) = getBodyNode(i)->getCOMLinearAcceleration(
+        Frame::World(), Frame::World());
+  }
+  return accs;
+}
+
+//==============================================================================
+/// This computes the jacobian of the world velocities for each body with
+/// respect to `wrt`
+Eigen::MatrixXs Skeleton::getCOMWorldVelocitiesJacobian(
+    neural::WithRespectTo* wrt)
+{
+  int dim = wrt->dim(this);
+  Eigen::MatrixXs jac = Eigen::MatrixXs::Zero(getNumBodyNodes() * 6, dim);
+
+  if (wrt == neural::WithRespectTo::GROUP_COMS)
+  {
+    for (int i = 0; i < getNumScaleGroups(); i++)
+    {
+      BodyScaleGroup scaleGroup = getBodyScaleGroup(i);
+      for (int b = 0; b < scaleGroup.nodes.size(); b++)
+      {
+        Eigen::Vector6s localV = scaleGroup.nodes[b]->getSpatialVelocity();
+        for (int axis = 0; axis < 3; axis++)
+        {
+          jac.block<3, 1>(
+              scaleGroup.nodes[b]->getIndexInSkeleton() * 6 + 3, i * 3 + axis)
+              = scaleGroup.nodes[b]->getWorldTransform().linear()
+                * (localV.head<3>().cross(
+                    Eigen::Vector3s::Unit(axis)
+                    * scaleGroup.flipAxis[b](axis)));
+        }
+      }
+    }
+  }
+  else if (
+      wrt == neural::WithRespectTo::POSITION
+      || wrt == neural::WithRespectTo::VELOCITY
+      || wrt == neural::WithRespectTo::GROUP_SCALES)
+  {
+    std::vector<BodyNode*>& bodyNodes = mSkelCache.mBodyNodes;
+
+    for (int i = 0; i < bodyNodes.size(); i++)
+    {
+      bodyNodes[i]->computeJacobianOfCForward(wrt, true);
+      jac.block(i * 6, 0, 6, dim) = bodyNodes[i]->mCg_V_p;
+      for (int j = 0; j < dim; j++)
+      {
+        jac.block<3, 1>(i * 6 + 3, j)
+            += jac.block<3, 1>(i * 6, j).cross(bodyNodes[i]->getLocalCOM());
+      }
+      jac.block(i * 6, 0, 6, dim) = math::AdRJac(
+          bodyNodes[i]->getWorldTransform(),
+          jac.block<6, Eigen::Dynamic>(i * 6, 0, 6, dim));
+    }
+    // We need to account for the relative rotation, wrt the world frame,
+    // because that's an extra step that isn't accounted for in the featherstone
+    // algo. We can use the product rule, and add the cross product of the
+    // current vel and the rotation axis for each joint.
+    if (wrt == neural::WithRespectTo::POSITION)
+    {
+      const Eigen::MatrixXi& jointParent = getJointParentMap();
+      for (int i = 0; i < getNumDofs(); i++)
+      {
+        int jointIndex = getDof(i)->getJoint()->getJointIndexInSkeleton();
+        Eigen::Vector6s worldScrew
+            = getDof(i)->getJoint()->getWorldAxisScrewForPosition(
+                getDof(i)->getIndexInJoint());
+        Eigen::Vector3s worldRot = worldScrew.head<3>();
+        for (int b = 0; b < getNumBodyNodes(); b++)
+        {
+          int bodyJointIndex
+              = getBodyNode(b)->getParentJoint()->getJointIndexInSkeleton();
+          if (bodyJointIndex == jointIndex
+              || jointParent(jointIndex, bodyJointIndex) == 1)
+          {
+            Eigen::Vector6s spatialVel = getBodyNode(b)->getCOMSpatialVelocity(
+                Frame::World(), Frame::World());
+            jac.block<3, 1>(b * 6, i) -= spatialVel.head<3>().cross(worldRot);
+            jac.block<3, 1>(b * 6 + 3, i)
+                -= spatialVel.tail<3>().cross(worldRot);
+          }
+        }
+      }
+    }
+  }
+
+  return jac;
+}
+
+//==============================================================================
+/// This brute forces our world velocities jacobian
+Eigen::MatrixXs Skeleton::finiteDifferenceCOMWorldVelocitiesJacobian(
+    neural::WithRespectTo* wrt)
+{
+  int dim = wrt->dim(this);
+  Eigen::MatrixXs result(getNumBodyNodes() * 6, dim);
+  Eigen::VectorXs original = wrt->get(this);
+
+  s_t eps = 1e-3;
+  bool useRidders = true;
+  math::finiteDifference(
+      [&](/* in*/ s_t eps,
+          /* in*/ int dof,
+          /*out*/ Eigen::VectorXs& perturbed) {
+        Eigen::VectorXs tweaked = original;
+        tweaked(dof) += eps;
+        wrt->set(this, tweaked);
+        perturbed = getCOMWorldVelocities();
+        return true;
+      },
+      result,
+      eps,
+      useRidders);
+
+  // Reset everything how we left it
+  wrt->set(this, original);
+
+  return result;
+}
+
+//==============================================================================
+/// This computes the jacobian of the world accelerations for each body with
+/// respect to `wrt`
+Eigen::MatrixXs Skeleton::getCOMWorldAccelerationsJacobian(
+    neural::WithRespectTo* wrt)
+{
+  int dim = wrt->dim(this);
+  Eigen::MatrixXs jac = Eigen::MatrixXs::Zero(getNumBodyNodes() * 6, dim);
+
+  if (wrt == neural::WithRespectTo::GROUP_COMS)
+  {
+    for (int i = 0; i < getNumScaleGroups(); i++)
+    {
+      BodyScaleGroup scaleGroup = getBodyScaleGroup(i);
+      for (int b = 0; b < scaleGroup.nodes.size(); b++)
+      {
+        Eigen::Vector6s localV = scaleGroup.nodes[b]->getSpatialAcceleration();
+        for (int axis = 0; axis < 3; axis++)
+        {
+          jac.block<3, 1>(
+              scaleGroup.nodes[b]->getIndexInSkeleton() * 6 + 3, i * 3 + axis)
+              = scaleGroup.nodes[b]->getWorldTransform().linear()
+                * (localV.head<3>().cross(
+                    Eigen::Vector3s::Unit(axis)
+                    * scaleGroup.flipAxis[b](axis)));
+        }
+      }
+    }
+  }
+  else if (wrt == neural::WithRespectTo::ACCELERATION)
+  {
+    std::vector<BodyNode*>& bodyNodes = mSkelCache.mBodyNodes;
+
+    for (int i = 0; i < bodyNodes.size(); i++)
+    {
+      jac.block(i * 6, 0, 6, dim) = getJacobian(bodyNodes[i], Frame::World());
+      for (int j = 0; j < getNumDofs(); j++)
+      {
+        jac.block<3, 1>(i * 6 + 3, j) += jac.block<3, 1>(i * 6, j).cross(
+            bodyNodes[i]->getWorldTransform().linear()
+            * bodyNodes[i]->getLocalCOM());
+      }
+    }
+  }
+  else if (
+      wrt == neural::WithRespectTo::POSITION
+      || wrt == neural::WithRespectTo::VELOCITY
+      || wrt == neural::WithRespectTo::GROUP_SCALES)
+  {
+    std::vector<BodyNode*>& bodyNodes = mSkelCache.mBodyNodes;
+
+    for (int i = 0; i < bodyNodes.size(); i++)
+    {
+      bodyNodes[i]->computeJacobianOfCForward(wrt, true);
+      jac.block(i * 6, 0, 6, dim) = bodyNodes[i]->mCg_dV_p;
+      for (int j = 0; j < dim; j++)
+      {
+        jac.block<3, 1>(i * 6 + 3, j)
+            += jac.block<3, 1>(i * 6, j).cross(bodyNodes[i]->getLocalCOM());
+      }
+      jac.block(i * 6, 0, 6, dim) = math::AdRJac(
+          bodyNodes[i]->getWorldTransform(),
+          jac.block<6, Eigen::Dynamic>(i * 6, 0, 6, dim));
+    }
+    // We need to account for the relative rotation, wrt the world frame,
+    // because that's an extra step that isn't accounted for in the featherstone
+    // algo. We can use the product rule, and add the cross product of the
+    // current acc and the rotation axis for each joint.
+    if (wrt == neural::WithRespectTo::POSITION)
+    {
+      const Eigen::MatrixXi& jointParent = getJointParentMap();
+      for (int i = 0; i < getNumDofs(); i++)
+      {
+        int jointIndex = getDof(i)->getJoint()->getJointIndexInSkeleton();
+        Eigen::Vector6s worldScrew
+            = getDof(i)->getJoint()->getWorldAxisScrewForPosition(
+                getDof(i)->getIndexInJoint());
+        Eigen::Vector3s worldRot = worldScrew.head<3>();
+        for (int b = 0; b < getNumBodyNodes(); b++)
+        {
+          int bodyJointIndex
+              = getBodyNode(b)->getParentJoint()->getJointIndexInSkeleton();
+          if (bodyJointIndex == jointIndex
+              || jointParent(jointIndex, bodyJointIndex) == 1)
+          {
+            Eigen::Vector6s spatialAcc
+                = getBodyNode(b)->getCOMSpatialAcceleration(
+                    Frame::World(), Frame::World());
+            jac.block<3, 1>(b * 6, i) -= spatialAcc.head<3>().cross(worldRot);
+            jac.block<3, 1>(b * 6 + 3, i)
+                -= spatialAcc.tail<3>().cross(worldRot);
+          }
+        }
+      }
+    }
+  }
+
+  return jac;
+}
+
+//==============================================================================
+/// This brute forces our world accelerations jacobian
+Eigen::MatrixXs Skeleton::finiteDifferenceCOMWorldAccelerationsJacobian(
+    neural::WithRespectTo* wrt)
+{
+  int dim = wrt->dim(this);
+  Eigen::MatrixXs result(getNumBodyNodes() * 6, dim);
+  Eigen::VectorXs original = wrt->get(this);
+
+  s_t eps = 1e-3;
+  bool useRidders = true;
+  math::finiteDifference(
+      [&](/* in*/ s_t eps,
+          /* in*/ int dof,
+          /*out*/ Eigen::VectorXs& perturbed) {
+        Eigen::VectorXs tweaked = original;
+        tweaked(dof) += eps;
+        wrt->set(this, tweaked);
+        perturbed = getCOMWorldAccelerations();
+        return true;
+      },
+      result,
+      eps,
+      useRidders);
+
+  // Reset everything how we left it
+  wrt->set(this, original);
+
+  return result;
+}
+
+//==============================================================================
+Eigen::MatrixXs Skeleton::getCOMWorldLinearAccelerationsJacobian(
+    neural::WithRespectTo* wrt)
+{
+  int dim = wrt->dim(this);
+
+  Eigen::MatrixXs spatialAccJac = getCOMWorldAccelerationsJacobian(wrt);
+  Eigen::MatrixXs spatialVelJac = getCOMWorldVelocitiesJacobian(wrt);
+  Eigen::VectorXs spatialVel = getCOMWorldVelocities();
+
+  Eigen::MatrixXs jac = Eigen::MatrixXs::Zero(getNumBodyNodes() * 3, dim);
+  for (int i = 0; i < dim; i++)
+  {
+    for (int b = 0; b < getNumBodyNodes(); b++)
+    {
+      Eigen::Vector6s vel = spatialVel.segment<6>(b * 6);
+      jac.block<3, 1>(b * 3, i)
+          = spatialAccJac.block<3, 1>(b * 6 + 3, i)
+            + (vel.head<3>().cross(spatialVelJac.block<3, 1>(b * 6 + 3, i))
+               - vel.tail<3>().cross(spatialVelJac.block<3, 1>(b * 6, i)));
+    }
+  }
+
+  return jac;
+}
+
+//==============================================================================
+/// This brute forces our world linear accelerations jacobian
+Eigen::MatrixXs Skeleton::finiteDifferenceCOMWorldLinearAccelerationsJacobian(
+    neural::WithRespectTo* wrt)
+{
+  int dim = wrt->dim(this);
+  Eigen::MatrixXs result(getNumBodyNodes() * 3, dim);
+  Eigen::VectorXs original = wrt->get(this);
+
+  s_t eps = 1e-3;
+  bool useRidders = true;
+  math::finiteDifference(
+      [&](/* in*/ s_t eps,
+          /* in*/ int dof,
+          /*out*/ Eigen::VectorXs& perturbed) {
+        Eigen::VectorXs tweaked = original;
+        tweaked(dof) += eps;
+        wrt->set(this, tweaked);
+        perturbed = getCOMWorldLinearAccelerations();
+        return true;
+      },
+      result,
+      eps,
+      useRidders);
+
+  // Reset everything how we left it
+  wrt->set(this, original);
+
+  return result;
+}
+
+//==============================================================================
 void Skeleton::integratePositions(s_t _dt)
 {
   for (std::size_t i = 0; i < mSkelCache.mBodyNodes.size(); ++i)
@@ -6036,6 +9704,45 @@ Eigen::VectorXs Skeleton::getVelocityDifferences(
 }
 
 //==============================================================================
+/// For rotational joints (euler joints and ball joints), it is possible for
+/// your position to suddenly jump by 360 degrees to an equivalent positions
+/// at a different value for the joint angles. This wreaks havok with
+/// smoothing and lowpass filtering, and so we would like sometimes to be able
+/// to prevent the wrapping, and just pick the representation for our current
+/// joint rotatinos that is as close as possible to our previous joint
+/// positions, without large jumps.
+Eigen::VectorXs Skeleton::unwrapPositionToNearest(
+    Eigen::VectorXs thisPos, Eigen::VectorXs lastPos) const
+{
+  Eigen::VectorXs unwrapped = thisPos;
+  for (int j = 0; j < getNumJoints(); j++)
+  {
+    auto* joint = getJoint(j);
+    if (joint->getType() == dynamics::EulerJoint::getStaticType())
+    {
+      const dynamics::EulerJoint* eulerJoint
+          = static_cast<const dynamics::EulerJoint*>(joint);
+      int start = joint->getDof(0)->getIndexInSkeleton();
+      unwrapped.segment<3>(start) = math::roundEulerAnglesToNearest(
+          thisPos.segment<3>(start),
+          lastPos.segment<3>(start),
+          eulerJoint->getAxisOrder());
+    }
+    else if (joint->getType() == dynamics::EulerFreeJoint::getStaticType())
+    {
+      const dynamics::EulerFreeJoint* eulerJoint
+          = static_cast<const dynamics::EulerFreeJoint*>(joint);
+      int start = joint->getDof(0)->getIndexInSkeleton();
+      unwrapped.segment<3>(start) = math::roundEulerAnglesToNearest(
+          thisPos.segment<3>(start),
+          lastPos.segment<3>(start),
+          eulerJoint->getAxisOrder());
+    }
+  }
+  return unwrapped;
+}
+
+//==============================================================================
 /// This quantifies how much error the inverse dynamics result ended up with.
 s_t Skeleton::ContactInverseDynamicsResult::sumError()
 {
@@ -6052,8 +9759,7 @@ s_t Skeleton::ContactInverseDynamicsResult::sumError()
 
   // Compute one timestep
   skel->computeForwardDynamics();
-  skel->integrateVelocities(skel->getTimeStep());
-  Eigen::VectorXs realNextVel = skel->getVelocities();
+  Eigen::VectorXs realAcc = skel->getAccelerations();
 
   /*
   Eigen::MatrixXs velCompare = Eigen::MatrixXs::Zero(realNextVel.size(), 2);
@@ -6065,7 +9771,7 @@ s_t Skeleton::ContactInverseDynamicsResult::sumError()
   */
 
   // Compute the error
-  s_t error = (realNextVel - nextVel).norm();
+  s_t error = (realAcc - acc).norm();
 
   // Reset to old forces
   skel->setPositions(oldPos);
@@ -6079,15 +9785,45 @@ s_t Skeleton::ContactInverseDynamicsResult::sumError()
 //==============================================================================
 /// This solves a simple inverse dynamics problem to get force we need to
 /// apply to arrive at "nextVel" at the next timestep.
-Eigen::VectorXs Skeleton::getInverseDynamics(const Eigen::VectorXs& nextVel)
+Eigen::VectorXs Skeleton::getInverseDynamics(
+    const Eigen::VectorXs& accelerations)
 {
-  Eigen::VectorXs accel
-      = getVelocityDifferences(nextVel, getVelocities()) / getTimeStep();
-  Eigen::VectorXs massTorques = multiplyByImplicitMassMatrix(accel);
+  Eigen::VectorXs massTorques = multiplyByImplicitMassMatrix(accelerations);
   Eigen::VectorXs coriolisAndGravity = getCoriolisAndGravityForces()
                                        - getExternalForces() + getDampingForce()
                                        + getSpringForce();
   return massTorques + coriolisAndGravity;
+}
+
+//==============================================================================
+/// This computes the joint torques on the skeleton, given predicted wrenches on
+/// each contact body, and optionally a predicted root residual.
+Eigen::VectorXs Skeleton::getInverseDynamicsFromPredictions(
+    Eigen::VectorXs accelerations,
+    std::vector<dynamics::BodyNode*> contactBodies,
+    std::vector<Eigen::Vector6s> rootFrameNormalizedContactWrench,
+    Eigen::Vector6s rootResiduals)
+{
+  dynamics::BodyNode* rootBody = getRootBodyNode();
+  const Eigen::Isometry3s T_wr = rootBody->getWorldTransform();
+  const Eigen::VectorXs rootResidualTorques
+      = getJacobian(rootBody).transpose() * rootResiduals;
+  const Eigen::VectorXs massTorques
+      = multiplyByImplicitMassMatrix(accelerations);
+  const Eigen::VectorXs coriolisAndGravity
+      = getCoriolisAndGravityForces() + getDampingForce() + getSpringForce();
+  Eigen::VectorXs totalTorques
+      = massTorques + coriolisAndGravity - rootResidualTorques;
+  for (int i = 0; i < contactBodies.size(); i++)
+  {
+    const Eigen::Vector6s rootFrameWrench = rootFrameNormalizedContactWrench[i];
+    const Eigen::Isometry3s T_wb = contactBodies[i]->getWorldTransform();
+    const Eigen::Vector6s worldWrench = math::dAdInvT(T_wr, rootFrameWrench);
+    const Eigen::Vector6s bodyWrench
+        = math::dAdInvT(T_wb.inverse(), worldWrench);
+    totalTorques -= getJacobian(contactBodies[i]).transpose() * bodyWrench;
+  }
+  return totalTorques;
 }
 
 //==============================================================================
@@ -6097,14 +9833,14 @@ Eigen::VectorXs Skeleton::getInverseDynamics(const Eigen::VectorXs& nextVel)
 /// `contactBody`, which can be post-processed down to individual contact
 /// results.
 Skeleton::ContactInverseDynamicsResult Skeleton::getContactInverseDynamics(
-    const Eigen::VectorXs& nextVel, const dynamics::BodyNode* contactBody)
+    const Eigen::VectorXs& accelerations, const dynamics::BodyNode* contactBody)
 {
   ContactInverseDynamicsResult result;
   result.skel = this;
   result.contactBody = contactBody;
   result.pos = getPositions();
   result.vel = getVelocities();
-  result.nextVel = nextVel;
+  result.acc = accelerations;
 
   dynamics::Joint* joint = getRootJoint();
   const dynamics::FreeJoint* freeJoint
@@ -6128,8 +9864,7 @@ Skeleton::ContactInverseDynamicsResult Skeleton::getContactInverseDynamics(
   math::Jacobian jac = getJacobian(contactBody);
   Eigen::Matrix6s jacBlock = jac.block<6, 6>(0, 0).transpose();
 
-  Eigen::VectorXs accel
-      = getVelocityDifferences(nextVel, getVelocities()) / getTimeStep();
+  Eigen::VectorXs accel = accelerations;
   Eigen::VectorXs massTorques = multiplyByImplicitMassMatrix(accel);
 
   Eigen::VectorXs coriolisAndGravity = getCoriolisAndGravityForces()
@@ -6177,8 +9912,7 @@ s_t Skeleton::MultipleContactInverseDynamicsResult::sumError()
 
   // Compute one timestep
   skel->computeForwardDynamics();
-  skel->integrateVelocities(skel->getTimeStep());
-  Eigen::VectorXs realNextVel = skel->getVelocities();
+  Eigen::VectorXs realAcc = skel->getAccelerations();
 
   /*
   Eigen::MatrixXs velCompare = Eigen::MatrixXs::Zero(realNextVel.size(), 2);
@@ -6190,7 +9924,7 @@ s_t Skeleton::MultipleContactInverseDynamicsResult::sumError()
   */
 
   // Compute the error
-  s_t error = (realNextVel - nextVel).norm();
+  s_t error = (realAcc - acc).norm();
 
   // Reset to old forces
   skel->setPositions(oldPos);
@@ -6228,7 +9962,7 @@ s_t Skeleton::MultipleContactInverseDynamicsResult::computeGuessLoss()
 /// you'll need good initial guesses.
 Skeleton::MultipleContactInverseDynamicsResult
 Skeleton::getMultipleContactInverseDynamics(
-    const Eigen::VectorXs& nextVel,
+    const Eigen::VectorXs& accelerations,
     std::vector<const dynamics::BodyNode*> bodies,
     std::vector<Eigen::Vector6s> bodyWrenchGuesses)
 {
@@ -6237,7 +9971,7 @@ Skeleton::getMultipleContactInverseDynamics(
   result.contactBodies = bodies;
   result.pos = getPositions();
   result.vel = getVelocities();
-  result.nextVel = nextVel;
+  result.acc = accelerations;
 
   dynamics::Joint* joint = getRootJoint();
   const dynamics::FreeJoint* freeJoint
@@ -6269,8 +10003,7 @@ Skeleton::getMultipleContactInverseDynamics(
   }
   Eigen::MatrixXs jacBlock = jacs.block(0, 0, 6 * bodies.size(), 6).transpose();
 
-  Eigen::VectorXs massTorques = multiplyByImplicitMassMatrix(
-      (nextVel - getVelocities()) / getTimeStep());
+  Eigen::VectorXs massTorques = multiplyByImplicitMassMatrix(accelerations);
 
   Eigen::VectorXs coriolisAndGravity = getCoriolisAndGravityForces()
                                        - getExternalForces() + getDampingForce()
@@ -6345,6 +10078,425 @@ Skeleton::getMultipleContactInverseDynamics(
   return result;
 }
 
+Skeleton::MultipleContactCoPProblem
+Skeleton::createMultipleContactInverseDynamicsNearCoPProblem(
+    const Eigen::VectorXs& accelerations,
+    std::vector<const dynamics::BodyNode*> bodies,
+    std::vector<Eigen::Vector9s> copWrenchGuesses,
+    s_t groundHeight,
+    int verticalAxis)
+{
+  // This is the Jacobian in local body space. We're going to end up applying
+  // our contact force in local body space, so this works out.
+  Eigen::MatrixXs jacs = Eigen::MatrixXs::Zero(6 * bodies.size(), getNumDofs());
+  assert(bodies.size() > 0);
+
+  for (int i = 0; i < bodies.size(); i++)
+  {
+    // jacs.block(6 * i, 0, 6, getNumDofs())
+    //     = getJacobian(bodies[i], Frame::World());
+
+    jacs.block(6 * i, 0, 6, getNumDofs()) = getJacobian(bodies[i]);
+  }
+  Eigen::MatrixXs jacBlock = jacs.block(0, 0, 6 * bodies.size(), 6).transpose();
+  Eigen::VectorXs massTorques = multiplyByImplicitMassMatrix(accelerations);
+  Eigen::VectorXs coriolisAndGravity = getCoriolisAndGravityForces()
+                                       - getExternalForces() + getDampingForce()
+                                       + getSpringForce();
+  Eigen::Vector6s rootTorque
+      = massTorques.head<6>() + coriolisAndGravity.head<6>();
+
+  // Precompute matrix factorization
+  Eigen::FullPivLU<Eigen::MatrixXs> lu(jacBlock);
+  assert(lu.rank() <= 6);
+  Eigen::MatrixXs J_null_space = lu.kernel();
+  for (int i = 0; i < J_null_space.cols(); i++)
+  {
+    J_null_space.col(i).normalize();
+  }
+
+  Skeleton::MultipleContactCoPProblem problem;
+  problem.massTorques = massTorques;
+  problem.coriolisAndGravity = coriolisAndGravity;
+  problem.copWrenchGuesses = copWrenchGuesses;
+  problem.jacs = jacs;
+  problem.jacBlock = jacBlock;
+  problem.lu = lu;
+  problem.J_null_space = J_null_space;
+  problem.rootTorque = rootTorque;
+  problem.groundHeight = groundHeight;
+  problem.verticalAxis = verticalAxis;
+  problem.bodies = bodies;
+  problem.weightForceToMeters = 0.001;
+
+  return problem;
+}
+
+//==============================================================================
+Eigen::VectorXs Skeleton::MultipleContactCoPProblem::getInitialGuess()
+{
+  return jacBlock.completeOrthogonalDecomposition().solve(rootTorque);
+  /*
+  Eigen::VectorXs xLocal
+      = jacBlock.completeOrthogonalDecomposition().solve(rootTorque);
+  // std::cout << "Initial guess: " << std::endl << x << std::endl;
+  Eigen::VectorXs xGlobal = Eigen::VectorXs::Zero(xLocal.size());
+  for (int i = 0; i < xLocal.size(); i++)
+  {
+    xGlobal.segment<6>(i * 6) = math::dAdInvT(
+        bodies[i]->getWorldTransform(), xLocal.segment<6>(i * 6));
+  }
+  return xGlobal;
+  */
+}
+
+//==============================================================================
+s_t Skeleton::MultipleContactCoPProblem::getLoss(const Eigen::VectorXs& x)
+{
+  s_t loss = 0.0;
+  for (int i = 0; i < copWrenchGuesses.size(); i++)
+  {
+    assert(!copWrenchGuesses[i].hasNaN());
+    assert(!x.segment<6>(i * 6).hasNaN());
+
+    Eigen::Vector9s copWrench = math::projectWrenchToCoP(
+        math::dAdInvT(bodies[i]->getWorldTransform(), x.segment<6>(i * 6)),
+        groundHeight,
+        verticalAxis);
+    assert(!copWrench.hasNaN());
+    Eigen::Vector3s cop = copWrench.head<3>();
+    Eigen::Vector3s copError = copWrenchGuesses[i].head<3>() - cop;
+    loss += copError.norm();
+
+    Eigen::Vector3s f = copWrench.tail<3>();
+    Eigen::Vector3s fError = copWrenchGuesses[i].tail<3>() - f;
+    loss += fError.norm() * weightForceToMeters;
+  }
+  return loss;
+}
+
+//==============================================================================
+s_t Skeleton::MultipleContactCoPProblem::getAvgCoPDistance(
+    const Eigen::VectorXs& x)
+{
+  s_t loss = 0.0;
+  for (int i = 0; i < copWrenchGuesses.size(); i++)
+  {
+    assert(!copWrenchGuesses[i].hasNaN());
+    assert(!x.segment<6>(i * 6).hasNaN());
+    Eigen::Vector9s copWrench = math::projectWrenchToCoP(
+        math::dAdInvT(bodies[i]->getWorldTransform(), x.segment<6>(i * 6)),
+        groundHeight,
+        verticalAxis);
+    assert(!copWrench.hasNaN());
+    Eigen::Vector3s cop = copWrench.head<3>();
+    Eigen::Vector3s copError = copWrenchGuesses[i].head<3>() - cop;
+    loss += copError.norm();
+  }
+  return loss;
+}
+
+//==============================================================================
+Eigen::Vector6s Skeleton::MultipleContactCoPProblem::getConstraintErrors(
+    const Eigen::VectorXs& x)
+{
+  Eigen::VectorXs contactTorques = jacs.transpose() * x;
+  Eigen::VectorXs jointTorques
+      = massTorques + coriolisAndGravity - contactTorques;
+  return jointTorques.head<6>();
+}
+
+//==============================================================================
+Eigen::VectorXs Skeleton::MultipleContactCoPProblem::getUnconstrainedGradient(
+    const Eigen::VectorXs& x)
+{
+  Eigen::VectorXs unconstrained = Eigen::VectorXs::Zero(x.size());
+  for (int i = 0; i < copWrenchGuesses.size(); i++)
+  {
+    // Eigen::Matrix6s invT = math::dAdTMatrix(bodies[i]->getWorldTransform());
+    Eigen::Vector9s copWrench = math::projectWrenchToCoP(
+        math::dAdInvT(bodies[i]->getWorldTransform(), x.segment<6>(i * 6)),
+        groundHeight,
+        verticalAxis);
+    Eigen::Vector3s cop = copWrench.head<3>();
+    Eigen::Vector3s copError = cop - copWrenchGuesses[i].head<3>();
+    Eigen::Vector3s f = copWrench.tail<3>();
+    Eigen::Vector3s fError = f - copWrenchGuesses[i].tail<3>();
+
+    Eigen::Vector9s copWrenchGrad = Eigen::Vector9s::Zero();
+    copWrenchGrad.head<3>() = copError.normalized();
+    copWrenchGrad.tail<3>() = fError.normalized() * weightForceToMeters;
+
+    Eigen::Vector6s globalWrenchGrad
+        = math::getProjectWrenchToCoPJacobian(
+              math::dAdInvT(
+                  bodies[i]->getWorldTransform(), x.segment<6>(i * 6)),
+              groundHeight,
+              verticalAxis)
+              .transpose()
+          * copWrenchGrad;
+    Eigen::Vector6s wrenchGrad
+        = math::dAdInvTMatrix(bodies[i]->getWorldTransform()).transpose()
+          * globalWrenchGrad;
+    unconstrained.segment<6>(i * 6) = wrenchGrad;
+  }
+  return unconstrained;
+}
+
+//==============================================================================
+Eigen::VectorXs
+Skeleton::MultipleContactCoPProblem::finiteDifferenceUnconstrainedGradient(
+    const Eigen::VectorXs& x)
+{
+  Eigen::VectorXs result = Eigen::VectorXs::Zero(x.size());
+
+  bool useRidders = true;
+  s_t eps = useRidders ? 1e-3 : 1e-5;
+  math::finiteDifference(
+      [&](/* in*/ s_t eps,
+          /* in*/ int i,
+          /*out*/ s_t& out) {
+        Eigen::VectorXs perturbed = x;
+        perturbed(i) += eps;
+
+        out = getLoss(perturbed);
+
+        return true;
+      },
+      result,
+      eps,
+      useRidders);
+
+  return result;
+}
+
+//==============================================================================
+Eigen::VectorXs Skeleton::MultipleContactCoPProblem::projectToNullSpace(
+    const Eigen::VectorXs& x)
+{
+  Eigen::VectorXs dx = Eigen::VectorXs::Zero(x.size());
+  for (int i = 0; i < J_null_space.cols(); i++)
+  {
+    dx += J_null_space.col(i) * J_null_space.col(i).dot(x);
+  }
+  return dx;
+}
+
+//==============================================================================
+Eigen::VectorXs Skeleton::MultipleContactCoPProblem::clampToNearestLegalValues(
+    const Eigen::VectorXs& x)
+{
+  return lu.solve(rootTorque - jacBlock * x) + x;
+}
+
+//==============================================================================
+/// This performs a similar task to getMultipleContactInverseDynamics(), but
+/// it resolves ambiguity by attempting to find contact forces that are as
+/// closes as possible to the center-of-pressure (CoP) guesses.
+Skeleton::MultipleContactInverseDynamicsResult
+Skeleton::getMultipleContactInverseDynamicsNearCoP(
+    const Eigen::VectorXs& accelerations,
+    std::vector<const dynamics::BodyNode*> bodies,
+    std::vector<Eigen::Vector6s> bodyWrenchGuesses,
+    s_t groundHeight,
+    int verticalAxis,
+    s_t weightForceToMeters,
+    bool logOutput)
+{
+  MultipleContactInverseDynamicsResult result;
+  result.skel = this;
+  result.contactBodies = bodies;
+  result.pos = getPositions();
+  result.vel = getVelocities();
+  result.acc = accelerations;
+
+  dynamics::Joint* joint = getRootJoint();
+  const dynamics::FreeJoint* freeJoint
+      = dynamic_cast<const dynamics::FreeJoint*>(joint);
+  const dynamics::EulerFreeJoint* eulerFreeJoint
+      = dynamic_cast<const dynamics::EulerFreeJoint*>(joint);
+  if (freeJoint == nullptr && eulerFreeJoint == nullptr)
+  {
+    std::cout
+        << "Error: Skeleton::getContactInverseDynamics() assumes that the root "
+           "joint of the skeleton is a FreeJoint or an EulerFreeJoint. Since "
+           "it's neither, this function won't work and we're returning zeros."
+        << std::endl;
+    result.contactWrenches = std::vector<Eigen::Vector6s>();
+    for (int i = 0; i < bodies.size(); i++)
+      result.contactWrenches.push_back(Eigen::Vector6s::Zero());
+    result.jointTorques = Eigen::VectorXs::Zero(getNumDofs());
+    return result;
+  }
+  std::vector<Eigen::Vector9s> copWrenchGuesses;
+  for (int i = 0; i < bodyWrenchGuesses.size(); i++)
+  {
+    Eigen::Vector9s copWrench = math::projectWrenchToCoP(
+        math::dAdInvT(bodies[i]->getWorldTransform(), bodyWrenchGuesses[i]),
+        groundHeight,
+        verticalAxis);
+    /*
+#ifndef NDEBUG
+    if ((copWrench.head<3>() - copGuesses[i]).norm() > 1e-8)
+    {
+      std::cout << "Failed to recover CoP complete wrench!";
+      std::cout << "Original guess:" << std::endl << copGuesses[i] << std::endl;
+      std::cout << "Wrench guess:" << std::endl
+                << copWrench.head<3>() << std::endl;
+      std::cout << "Diff:" << std::endl
+                << copWrench.head<3>() - copGuesses[i] << std::endl;
+      assert((copWrench.head<3>() - copGuesses[i]).norm() < 1e-8);
+    }
+#endif
+    */
+    copWrenchGuesses.push_back(copWrench);
+  }
+
+  MultipleContactCoPProblem problem
+      = createMultipleContactInverseDynamicsNearCoPProblem(
+          accelerations, bodies, copWrenchGuesses, groundHeight, verticalAxis);
+  problem.weightForceToMeters = weightForceToMeters;
+
+  // Eigen::VectorXs x = problem.getInitialGuess();
+
+  auto initialResult = getMultipleContactInverseDynamics(
+      accelerations, bodies, bodyWrenchGuesses);
+
+  // Find an initial guess that's legal, and we'll only take legal steps from
+  // here
+  Eigen::VectorXs x = Eigen::VectorXs::Zero(bodies.size() * 6);
+  for (int i = 0; i < bodies.size(); i++)
+  {
+    x.segment<6>(i * 6) = initialResult.contactWrenches[i];
+  }
+
+#ifndef NDEBUG
+  Eigen::VectorXs constraintErrors = problem.getConstraintErrors(x);
+  if (constraintErrors.norm() > 1e-10)
+  {
+    std::cout << "Got an initial constraint error!" << std::endl
+              << constraintErrors << std::endl;
+    assert(constraintErrors.norm() <= 1e-10);
+  }
+#endif
+
+  // 1.5. Compute initial loss
+  s_t lastLoss = problem.getLoss(x);
+  assert(!isnan(lastLoss));
+
+#ifndef NDEBUG
+  std::cout << "Initial dist " << problem.getAvgCoPDistance(x) << std::endl;
+#endif
+
+#ifndef NDEBUG
+  s_t lastDist = problem.getAvgCoPDistance(x);
+#endif
+
+  s_t alpha = 0.01;
+  for (int t = 0; t < 400; t++)
+  {
+    if (logOutput)
+      std::cout << "Iteration " << t << ": " << lastLoss << std::endl;
+    // 1.2. Arive at an unconstrained grad x
+    Eigen::VectorXs unconstrained = problem.getUnconstrainedGradient(x);
+
+    // 1.3. Constrain grad x to only operate in the null space of J
+    Eigen::VectorXs dx = problem.projectToNullSpace(unconstrained);
+
+    // 1.4. Update x
+    Eigen::VectorXs proposedX = x - dx * alpha;
+
+#ifndef NDEBUG
+    Eigen::VectorXs constraintErrors = problem.getConstraintErrors(proposedX);
+    if (constraintErrors.norm() > 1e-10)
+    {
+      std::cout << "Got a constraint violation!" << std::endl
+                << constraintErrors << std::endl;
+      assert(constraintErrors.norm() <= 1e-10);
+    }
+#endif
+
+    /*
+    Eigen::VectorXs proposedX
+        = problem.clampToNearestLegalValues(x - unconstrained * alpha);
+        */
+
+    // 1.5. Compute loss
+    s_t loss = problem.getLoss(proposedX);
+    assert(!isnan(loss));
+
+    if (loss < lastLoss)
+    {
+      if (logOutput)
+        std::cout << "Decreased loss by " << (lastLoss - loss) << std::endl;
+      lastLoss = loss;
+      x = proposedX;
+      alpha *= 1.2;
+#ifndef NDEBUG
+      if (logOutput)
+      {
+        s_t newDist = problem.getAvgCoPDistance(x);
+        std::cout << "New dist " << newDist << ", decreased by "
+                  << (lastDist - newDist) << std::endl;
+        lastDist = newDist;
+      }
+#endif
+    }
+    else
+    {
+      if (logOutput)
+        std::cout << "   Cutting back step size to " << alpha << std::endl;
+      alpha *= 0.5;
+      if (alpha < 1e-15)
+      {
+        if (logOutput)
+        {
+          std::cout << "Step size got below 1e-15! This suggests we stalled! "
+                       "Exiting optimizer."
+                    << std::endl;
+          std::cout << "Latest x: " << std::endl << x << std::endl;
+          std::cout << "Latest grad: " << std::endl
+                    << unconstrained << std::endl;
+        }
+        break;
+      }
+    }
+  }
+
+  // Polish the final solution back into legal space (take a least-squares
+  // closest approx)
+  Eigen::VectorXs clampedX = problem.clampToNearestLegalValues(x);
+#ifndef NDEBUG
+  if ((clampedX - x).squaredNorm() > 1e-10)
+  {
+    std::cout << "Ended up with a very different final x!" << std::endl;
+    assert(false);
+  }
+#endif
+  x = clampedX;
+
+#ifndef NDEBUG
+  std::cout << "Final dist " << problem.getAvgCoPDistance(x) << std::endl;
+#endif
+
+  /////////////////////////////////////////////////////
+  // 2. Write out the results
+  result.contactWrenches = std::vector<Eigen::Vector6s>();
+  for (int i = 0; i < bodies.size(); i++)
+  {
+    // result.contactWrenches.push_back(
+    //     math::dAdT(bodies[i]->getWorldTransform(), x.segment<6>(i * 6)));
+    result.contactWrenches.push_back(x.segment<6>(i * 6));
+  }
+  Eigen::VectorXs contactTorques = problem.jacs.transpose() * x;
+  result.jointTorques
+      = problem.massTorques + problem.coriolisAndGravity - contactTorques;
+  assert(result.jointTorques.head<6>().norm() < 1e-10);
+  result.jointTorques.head<6>().setZero();
+
+  return result;
+}
+
 //==============================================================================
 /// This computes how much the actual dynamics we get when we apply this
 /// solution differ from the goal solution.
@@ -6374,11 +10526,10 @@ s_t Skeleton::MultipleContactInverseDynamicsOverTimeResult::sumError()
 
     // Compute one timestep
     skel->computeForwardDynamics();
-    skel->integrateVelocities(skel->getTimeStep());
-    Eigen::VectorXs realNextVel = skel->getVelocities();
+    Eigen::VectorXs realAcc = skel->getAccelerations();
 
     // Compute the error
-    error += (realNextVel - nextVelocities.col(i)).norm();
+    error += (realAcc - accelerations.col(i)).norm();
   }
 
   // Reset to old forces
@@ -6473,7 +10624,7 @@ Skeleton::getMultipleContactInverseDynamicsOverTime(
 
   result.positions = Eigen::MatrixXs::Zero(dofs, timesteps);
   result.velocities = Eigen::MatrixXs::Zero(dofs, timesteps);
-  result.nextVelocities = Eigen::MatrixXs::Zero(dofs, timesteps);
+  result.accelerations = Eigen::MatrixXs::Zero(dofs, timesteps);
   result.jointTorques = Eigen::MatrixXs::Zero(dofs, timesteps);
 
   std::vector<Eigen::MatrixXs> timestepJacs;
@@ -6533,7 +10684,7 @@ Skeleton::getMultipleContactInverseDynamicsOverTime(
 
     result.positions.col(i) = positions.col(i);
     result.velocities.col(i) = vel;
-    result.nextVelocities.col(i) = nextVel;
+    result.accelerations.col(i) = accel;
 
     setPositions(positions.col(i));
     setVelocities(vel);
@@ -6606,6 +10757,242 @@ Skeleton::getMultipleContactInverseDynamicsOverTime(
   setVelocities(oldVel);
   setControlForces(oldControl);
   return result;
+}
+
+//==============================================================================
+/// This will create an "accounting frame" of data at the current moment
+Skeleton::EnergyAccountingFrame Skeleton::getEnergyAccounting(
+    s_t heightZeroPoint,
+    Eigen::Vector3s referenceFrameVelocity,
+    std::vector<dynamics::BodyNode*> contactBodies,
+    std::vector<Eigen::Vector3s> cops,
+    std::vector<Eigen::Vector3s> forces,
+    std::vector<Eigen::Vector3s> moments)
+{
+  EnergyAccountingFrame frame;
+  if (contactBodies.size() != cops.size())
+  {
+    std::cout << "Invalid input to getEnergyAccounting! Need the same number "
+                 "of contactBodies as cops"
+              << std::endl;
+    throw std::runtime_error(
+        "Invalid input to getEnergyAccounting! Need the "
+        "same number of contactBodies as cops");
+  }
+  if (contactBodies.size() != forces.size())
+  {
+    std::cout << "Invalid input to getEnergyAccounting! Need the same number "
+                 "of contactBodies as forces"
+              << std::endl;
+    throw std::runtime_error(
+        "Invalid input to getEnergyAccounting! Need the "
+        "same number of contactBodies as forces");
+  }
+  if (contactBodies.size() != moments.size())
+  {
+    std::cout << "Invalid input to getEnergyAccounting! Need the same number "
+                 "of contactBodies as moments"
+              << std::endl;
+    throw std::runtime_error(
+        "Invalid input to getEnergyAccounting! Need the "
+        "same number of contactBodies as moments");
+  }
+
+  // Get the current stocks of energy in each body
+  Eigen::VectorXs jointWorldCenters = getJointWorldPositions(getJoints());
+  frame.bodyKineticEnergy = Eigen::VectorXs::Zero(getNumBodyNodes());
+  frame.bodyPotentialEnergy = Eigen::VectorXs::Zero(getNumBodyNodes());
+  for (int i = 0; i < getNumBodyNodes(); i++)
+  {
+    Eigen::Vector3s bodyCenter = getBodyNode(i)->getCOM();
+
+    Eigen::Vector6s V = getBodyNode(i)->getSpatialVelocity();
+    V.tail<3>() += getBodyNode(i)->getWorldTransform().linear().transpose()
+                   * referenceFrameVelocity;
+    const Eigen::Matrix6s& G = getBodyNode(i)->getSpatialInertia();
+    frame.bodyKineticEnergy(i) = 0.5 * V.dot(G * V);
+
+    frame.bodyCenters.push_back(bodyCenter);
+
+    s_t bodyHeight = heightZeroPoint
+                     - getBodyNode(i)->getWorldTransform().translation().dot(
+                         getGravity().normalized());
+    frame.bodyPotentialEnergy(i)
+        = bodyHeight * getBodyNode(i)->getMass() * getGravity().norm();
+  }
+
+  // Compute the flows of energy through each joint
+  computeInverseDynamics(true);
+  for (int i = 0; i < getNumJoints(); i++)
+  {
+    dynamics::Joint* joint = getJoint(i);
+
+    JointEnergyTransmitter jointTransmitter;
+    jointTransmitter.name = joint->getName();
+    jointTransmitter.childBody = joint->getChildBodyNode()->getName();
+    if (joint->getParentBodyNode() != nullptr)
+    {
+      jointTransmitter.parentBody = joint->getParentBodyNode()->getName();
+      jointTransmitter.parentCenter
+          = frame.bodyCenters[joint->getParentBodyNode()->getIndexInSkeleton()];
+    }
+    else
+    {
+      jointTransmitter.parentBody = "ground";
+      jointTransmitter.parentCenter = Eigen::Vector3s::Zero();
+    }
+    jointTransmitter.childCenter
+        = frame.bodyCenters[joint->getChildBodyNode()->getIndexInSkeleton()];
+    jointTransmitter.worldCenter = jointWorldCenters.segment<3>(i * 3);
+    // These are set later, when we're computing power at each body
+    jointTransmitter.powerToChild = 0.0;
+    jointTransmitter.powerToParent = 0.0;
+
+    frame.joints.push_back(jointTransmitter);
+  }
+
+  for (int i = 0; i < contactBodies.size(); i++)
+  {
+    ContactEnergyTransmitter contactTransmitter;
+    contactTransmitter.contactBody = contactBodies[i]->getName();
+    contactTransmitter.worldCenter = cops[i];
+    contactTransmitter.worldForce = forces[i];
+    contactTransmitter.worldMoment = moments[i];
+    contactTransmitter.contactBodyCenter
+        = frame.bodyCenters[contactBodies[i]->getIndexInSkeleton()];
+    Eigen::Vector6s worldF;
+    worldF.head<3>() = moments[i];
+    worldF.tail<3>() = forces[i];
+    Eigen::Vector6s worldV
+        = contactBodies[i]->getSpatialVelocity(Frame::World(), Frame::World());
+    worldV.tail<3>() += referenceFrameVelocity;
+    contactTransmitter.powerToBody = worldF.dot(worldV);
+
+    frame.contacts.push_back(contactTransmitter);
+  }
+
+  frame.bodyKineticEnergyDeriv = Eigen::VectorXs::Zero(getNumBodyNodes());
+  frame.bodyPotentialEnergyDeriv = Eigen::VectorXs::Zero(getNumBodyNodes());
+  frame.bodyParentJointPower = Eigen::VectorXs::Zero(getNumBodyNodes());
+  frame.bodyGravityPower = Eigen::VectorXs::Zero(getNumBodyNodes());
+  frame.bodyChildJointPowerSum = Eigen::VectorXs::Zero(getNumBodyNodes());
+  frame.bodyExternalForcePower = Eigen::VectorXs::Zero(getNumBodyNodes());
+  for (int i = 0; i < getNumBodyNodes(); i++)
+  {
+    dynamics::BodyNode* body = getBodyNode(i);
+
+    // For notes and ground truth on how all this is computed, see
+    // updateTransmittedForceID()
+
+    // body->getCOMSpatialVelocity()
+    Eigen::Vector6s V_offset = Eigen::Vector6s::Zero();
+    V_offset.tail<3>()
+        += getBodyNode(i)->getWorldTransform().linear().transpose()
+           * referenceFrameVelocity;
+    Eigen::Vector6s V = getBodyNode(i)->getSpatialVelocity();
+    V += V_offset;
+    const Eigen::Vector6s& V_dot = body->getSpatialAcceleration();
+    const Eigen::Matrix6s& I = body->getSpatialInertia();
+
+    s_t kineticEnergyRecovered = 0.5 * V.dot(I * V);
+    if (kineticEnergyRecovered != frame.bodyKineticEnergy(i))
+    {
+      std::cout << "Kinetic energy recovered on body " << i << " doesn't match!"
+                << std::endl;
+      std::cout << "Recovered: " << kineticEnergyRecovered << std::endl;
+      std::cout << "Actual: " << frame.bodyKineticEnergy(i) << std::endl;
+      std::cout << "Diff: "
+                << kineticEnergyRecovered - frame.bodyKineticEnergy(i)
+                << std::endl;
+      assert(false);
+    }
+
+    Eigen::Vector6s coriolisForce = math::dad(V, I * V);
+    Eigen::Vector6s coriolisForceFromOriginal
+        = math::dad(body->getSpatialVelocity(), I * body->getSpatialVelocity());
+    Eigen::Vector6s coriolisForceFromOffset
+        = coriolisForce
+          - coriolisForceFromOriginal; // math::dad(V_offset, I * V_offset);
+    Eigen::Vector6s totalForceIDFormula = I * V_dot - coriolisForceFromOriginal;
+    s_t powerFromCoriolis = V.dot(coriolisForce);
+    if (std::abs(powerFromCoriolis) > 1e-8)
+    {
+      std::cout << "Coriolis power on body " << i << " non-zero! "
+                << powerFromCoriolis << std::endl;
+    }
+    if ((coriolisForceFromOriginal + coriolisForceFromOffset - coriolisForce)
+            .norm()
+        > 1e-12)
+    {
+      std::cout << "Coriolis: " << std::endl << coriolisForce << std::endl;
+      std::cout << "Coriolis from original: " << std::endl
+                << coriolisForceFromOriginal << std::endl;
+      std::cout << "Coriolis from offset: " << std::endl
+                << coriolisForceFromOffset << std::endl;
+      assert(
+          (coriolisForceFromOriginal + coriolisForceFromOffset - coriolisForce)
+              .norm()
+          < 1e-12);
+    }
+
+    Eigen::Vector6s gravityForce
+        = I * math::AdInvRLinear(body->getWorldTransform(), getGravity());
+    Eigen::Vector6s totalForceFDFormula
+        = body->getBodyForce() + gravityForce + body->getExternalForceLocal();
+    s_t powerFromParent = V.dot(body->getBodyForce());
+    frame.joints[body->getParentJoint()->getJointIndexInSkeleton()].powerToChild
+        = powerFromParent;
+    frame.bodyParentJointPower(i) = powerFromParent;
+    frame.bodyGravityPower(i) = V.dot(gravityForce);
+    frame.bodyExternalForcePower(i) = V.dot(body->getExternalForceLocal());
+    std::vector<s_t> childPowers;
+    for (int c = 0; c < body->getNumChildBodyNodes(); c++)
+    {
+      Joint* childJoint = body->getChildJoint(c);
+      dynamics::BodyNode* childBodyNode = childJoint->getChildBodyNode();
+      totalForceFDFormula -= math::dAdInvT(
+          childJoint->getRelativeTransform(), childBodyNode->getBodyForce());
+      s_t powerFromChild = V.dot(-math::dAdInvT(
+          childJoint->getRelativeTransform(), childBodyNode->getBodyForce()));
+      frame.bodyChildJointPowerSum(i) += powerFromChild;
+      childPowers.push_back(powerFromChild);
+
+      frame.joints[childJoint->getJointIndexInSkeleton()].powerToParent
+          = powerFromChild;
+    }
+    frame.bodyChildJointPowers.push_back(childPowers);
+
+    if ((totalForceFDFormula - totalForceIDFormula).norm() > 1e-8)
+    {
+      std::cout << "Two sides of total force equality do not match!"
+                << std::endl;
+      Eigen::MatrixXs compare = Eigen::MatrixXs(6, 3);
+      compare.col(0) = totalForceFDFormula;
+      compare.col(1) = totalForceIDFormula;
+      compare.col(2) = totalForceFDFormula - totalForceIDFormula;
+      std::cout << "FD formula - ID formula - Diff" << std::endl
+                << compare << std::endl;
+      std::cout << "Coriolis Force from Vel Offset: " << std::endl
+                << coriolisForceFromOffset << std::endl;
+    }
+
+    frame.bodyKineticEnergyDeriv(i) = V.dot(totalForceIDFormula);
+    frame.bodyPotentialEnergyDeriv(i)
+        = body->getSpatialVelocity().dot(-gravityForce);
+
+    s_t powerSum = frame.bodyExternalForcePower(i) + frame.bodyGravityPower(i)
+                   + frame.bodyParentJointPower(i)
+                   + frame.bodyChildJointPowerSum(i);
+    if (abs(powerSum - frame.bodyKineticEnergyDeriv(i)) > 1e-7)
+    {
+      std::cout << "Power sum doesn't match kinetic energy deriv for body "
+                << getBodyNode(i)->getName() << "! Got sum: " << powerSum
+                << ", but have deriv " << frame.bodyKineticEnergyDeriv(i)
+                << std::endl;
+    }
+  }
+
+  return frame;
 }
 
 //==============================================================================

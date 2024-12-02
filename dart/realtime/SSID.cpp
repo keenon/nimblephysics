@@ -41,14 +41,14 @@ SSID::SSID(
     mMassDim(world->getMassDims()),
     mDampingDim(world->getDampingDims()),
     mSpringDim(world->getSpringDims()),
-    mParam_Solution(Eigen::VectorXs::Zero(mMassDim+mDampingDim+mSpringDim)),
-    mValue(Eigen::VectorXs::Zero(mMassDim+mDampingDim+mSpringDim)),
-    mCumValue(Eigen::VectorXs::Zero(mMassDim+mDampingDim+mSpringDim)),
-    mTemperature(Eigen::VectorXs::Ones(mMassDim+mDampingDim+mSpringDim))
+    mParam_Solution(Eigen::VectorXs::Zero(mMassDim + mDampingDim + mSpringDim)),
+    mValue(Eigen::VectorXs::Zero(mMassDim + mDampingDim + mSpringDim)),
+    mCumValue(Eigen::VectorXs::Zero(mMassDim + mDampingDim + mSpringDim)),
+    mTemperature(Eigen::VectorXs::Ones(mMassDim + mDampingDim + mSpringDim))
 {
-  for(int i=0;i<mSensorDims.size();i++)
+  for (int i = 0; i < mSensorDims.size(); i++)
   {
-    mSensorLogs.push_back(VectorLog(mSensorDims(i)));
+    mSensorLogs.push_back(VectorLog((double)mSensorDims(i)));
   }
   int dofs = world->getNumDofs();
   mInitialPosEstimator
@@ -73,7 +73,7 @@ SSID::SSID(
   mOptimizer = ipoptOptimizer;
 
   std::shared_ptr<IPOptOptimizer> ipoptOptimizerSlow
-    = std::make_shared<IPOptOptimizer>();
+      = std::make_shared<IPOptOptimizer>();
   ipoptOptimizerSlow->setCheckDerivatives(false);
   ipoptOptimizerSlow->setSuppressOutput(true);
   ipoptOptimizerSlow->setTolerance(1e-15);
@@ -150,7 +150,7 @@ std::shared_ptr<trajectory::Problem> SSID::getProblem()
 }
 
 /// This logs that the sensor output is a specific vector now
-void SSID::registerSensorsNow(Eigen::VectorXs sensors,int sensor_id)
+void SSID::registerSensorsNow(Eigen::VectorXs sensors, int sensor_id)
 {
   return registerSensors(timeSinceEpochMillis(), sensors, sensor_id);
 }
@@ -197,7 +197,8 @@ void SSID::stop()
 void SSID::runInference(long startTime)
 {
   long startComputeWallTime = timeSinceEpochMillis();
-  int millisPerStep = static_cast<int>(ceil(mScale*mWorld->getTimeStep() * 1000.0));
+  int millisPerStep
+      = static_cast<int>(ceil(mScale * mWorld->getTimeStep() * 1000.0));
   int steps = static_cast<int>(
       ceil(static_cast<s_t>(mPlanningHistoryMillis) / millisPerStep));
 
@@ -205,26 +206,50 @@ void SSID::runInference(long startTime)
   {
     std::shared_ptr<SingleShot> singleshot
         = std::make_shared<SingleShot>(mWorld, *mLoss.get(), steps, false);
+    // multishot->setParallelOperationsEnabled(true);
     mProblem = singleshot;
   }
+  // std::cout<<"Problem Created"<<std::endl;
+  //  Every turn, we need to pin all the forces
   registerLock();
-  Eigen::MatrixXs forceHistory = mControlLog.getRecentValuesBefore(
-    startTime, steps+1);
+  // Eigen::MatrixXs forceHistory = mControlLog.getValues(
+  //     startTime - mPlanningHistoryMillis, steps, millisPerStep);
+  Eigen::MatrixXs forceHistory
+      = mControlLog.getRecentValuesBefore(startTime, steps + 1);
+  Eigen::MatrixXs forceHistory
+      = mControlLog.getRecentValuesBefore(startTime, steps + 1);
   for (int i = 0; i < steps; i++)
   {
     mProblem->pinForce(i, forceHistory.col(i));
   }
+  // std::cout<<"ForcePinned"<<std::endl;
+  //  We also need to set all the sensor history into metadata
 
-  Eigen::MatrixXs poseHistory = mSensorLogs[0].getRecentValuesBefore(startTime,steps+1);
-  Eigen::MatrixXs velHistory = mSensorLogs[1].getRecentValuesBefore(startTime,steps+1);
+  // Eigen::MatrixXs poseHistory = mSensorLogs[0].getValues(
+  //     startTime - mPlanningHistoryMillis, steps, millisPerStep);
+  // Eigen::MatrixXs velHistory = mSensorLogs[1].getValues(
+  //   startTime - mPlanningHistoryMillis, steps, millisPerStep
+  //  );
+  Eigen::MatrixXs poseHistory
+      = mSensorLogs[0].getRecentValuesBefore(startTime, steps + 1);
+  Eigen::MatrixXs velHistory
+      = mSensorLogs[1].getRecentValuesBefore(startTime, steps + 1);
+  Eigen::MatrixXs poseHistory
+      = mSensorLogs[0].getRecentValuesBefore(startTime, steps + 1);
+  Eigen::MatrixXs velHistory
+      = mSensorLogs[1].getRecentValuesBefore(startTime, steps + 1);
   registerUnlock();
+  // std::cout<<"In SSID Force Hist: \n"<<forceHistory<<"\nPos Hist:
+  // \n"<<poseHistory<<"\nVel Hist: \n"<<velHistory<<std::endl;
   mProblem->setMetadata("forces", forceHistory);
   mProblem->setMetadata("sensors", poseHistory);
-  mProblem->setMetadata("velocities",velHistory);
+  mProblem->setMetadata("velocities", velHistory);
   mProblem->setStartPos(mInitialPosEstimator(poseHistory, startTime));
   mProblem->setStartVel(mInitialVelEstimator(velHistory, startTime));
   // Then actually run the optimization
+  // std::cout<<"Ready to Optimize"<<std::endl;
   mSolution = mOptimizer->optimize(mProblem.get());
+  // std::cout<<"Optimization End"<<std::endl;
 
   long computeDurationWallTime = timeSinceEpochMillis() - startComputeWallTime;
 
@@ -237,19 +262,31 @@ void SSID::runInference(long startTime)
   paramMutexLock();
   Eigen::VectorXs param = mParam_Solution;
   paramMutexUnlock();
-  mValue = getTrajConditionNumbers(poseHistory, velHistory); // Should allow different value for each dofs should be identified independently
-  
+  mValue = getTrajConditionNumbers(
+      poseHistory, velHistory); // Should allow different value for each dofs
+                                // should be identified independently
+
   for (auto listener : mInferListeners)
   {
-    listener(startTime, pos, vel, param, computeDurationWallTime, mSteadySolutionFound); 
+    listener(
+        startTime,
+        pos,
+        vel,
+        param,
+        computeDurationWallTime,
+        mSteadySolutionFound);
   }
 }
 
-// Run plotting function should be idenpotent
-// Here it only support 1 body node plotting, but that make sense
-std::pair<Eigen::VectorXs, Eigen::MatrixXs> SSID::runPlotting(long startTime, s_t upper, s_t lower,int samples)
+Eigen::VectorXs SSID::runPlotting(
+    long startTime, s_t upper, s_t lower, int samples)
+    // Run plotting function should be idenpotent
+    // Here it only support 1 body node plotting, but that make sense
+    std::pair<Eigen::VectorXs, Eigen::MatrixXs> SSID::runPlotting(
+        long startTime, s_t upper, s_t lower, int samples)
 {
-  int millisPerStep = static_cast<int>(ceil(mScale*mWorld->getTimeStep() * 1000.0));
+  int millisPerStep
+      = static_cast<int>(ceil(mScale * mWorld->getTimeStep() * 1000.0));
   int steps = static_cast<int>(
       ceil(static_cast<s_t>(mPlanningHistoryMillis) / millisPerStep));
 
@@ -259,32 +296,34 @@ std::pair<Eigen::VectorXs, Eigen::MatrixXs> SSID::runPlotting(long startTime, s_
         = std::make_shared<SingleShot>(mWorld, *mLoss.get(), steps, false);
     mProblem = singleshot;
   }
-  
+
   registerLock();
-  Eigen::MatrixXs forceHistory = mControlLog.getRecentValuesBefore(
-    startTime, steps+1);
+  Eigen::MatrixXs forceHistory
+      = mControlLog.getRecentValuesBefore(startTime, steps + 1);
   for (int i = 0; i < steps; i++)
   {
     mProblem->pinForce(i, forceHistory.col(i));
   }
-  
-  Eigen::MatrixXs poseHistory = mSensorLogs[0].getRecentValuesBefore(startTime,steps+1);
-  Eigen::MatrixXs velHistory = mSensorLogs[1].getRecentValuesBefore(startTime,steps+1);
-  
+
+  Eigen::MatrixXs poseHistory
+      = mSensorLogs[0].getRecentValuesBefore(startTime, steps + 1);
+  Eigen::MatrixXs velHistory
+      = mSensorLogs[1].getRecentValuesBefore(startTime, steps + 1);
+
   registerUnlock();
   mProblem->setMetadata("forces", forceHistory);
   mProblem->setMetadata("sensors", poseHistory);
-  mProblem->setMetadata("velocities",velHistory);
+  mProblem->setMetadata("velocities", velHistory);
   mProblem->setStartPos(mInitialPosEstimator(poseHistory, startTime));
   mProblem->setStartVel(mInitialVelEstimator(velHistory, startTime));
 
   Eigen::VectorXs losses;
-  if(upper != lower)
+  if (upper != lower)
   {
     losses = Eigen::VectorXs::Zero(samples);
-    s_t epsilon = (upper-lower)/samples;
+    s_t epsilon = (upper - lower) / samples;
     s_t probe = lower;
-    for(int i=0;i<samples;i++)
+    for (int i = 0; i < samples; i++)
     {
       mWorld->setMasses(Eigen::Vector1s(probe));
       mProblem->resetDirty();
@@ -302,16 +341,24 @@ std::pair<Eigen::VectorXs, Eigen::MatrixXs> SSID::runPlotting(long startTime, s_
     losses(0) = loss;
   }
 
+  return losses;
+
   std::pair<Eigen::VectorXs, Eigen::MatrixXs> result;
   result.first = losses;
   result.second = poseHistory;
   return result;
 }
 
-
-Eigen::MatrixXs SSID::runPlotting2D(long startTime, Eigen::Vector3s upper, Eigen::Vector3s lower, int x_samples,int y_samples, size_t rest_dim)
+Eigen::MatrixXs SSID::runPlotting2D(
+    long startTime,
+    Eigen::Vector3s upper,
+    Eigen::Vector3s lower,
+    int x_samples,
+    int y_samples,
+    size_t rest_dim)
 {
-  int millisPerStep = static_cast<int>(ceil(mScale * mWorld->getTimeStep() * 1000.0));
+  int millisPerStep
+      = static_cast<int>(ceil(mScale * mWorld->getTimeStep() * 1000.0));
   int steps = static_cast<int>(
       ceil(static_cast<s_t>(mPlanningHistoryMillis) / millisPerStep));
 
@@ -321,39 +368,39 @@ Eigen::MatrixXs SSID::runPlotting2D(long startTime, Eigen::Vector3s upper, Eigen
         = std::make_shared<SingleShot>(mWorld, *mLoss.get(), steps, false);
     mProblem = singleshot;
   }
-  
+
   registerLock();
-  Eigen::MatrixXs forceHistory = mControlLog.getRecentValuesBefore(
-    startTime, steps+1);
+  Eigen::MatrixXs forceHistory
+      = mControlLog.getRecentValuesBefore(startTime, steps + 1);
   for (int i = 0; i < steps; i++)
   {
     mProblem->pinForce(i, forceHistory.col(i));
   }
-  
-  Eigen::MatrixXs poseHistory = mSensorLogs[0].getRecentValuesBefore(startTime,steps+1);
-  Eigen::MatrixXs velHistory = mSensorLogs[1].getRecentValuesBefore(startTime,steps+1);
-  
+
+  Eigen::MatrixXs poseHistory
+      = mSensorLogs[0].getRecentValuesBefore(startTime, steps + 1);
+  Eigen::MatrixXs velHistory
+      = mSensorLogs[1].getRecentValuesBefore(startTime, steps + 1);
+
   registerUnlock();
   mProblem->setMetadata("forces", forceHistory);
   mProblem->setMetadata("sensors", poseHistory);
-  mProblem->setMetadata("velocities",velHistory);
+  mProblem->setMetadata("velocities", velHistory);
   mProblem->setStartPos(mInitialPosEstimator(poseHistory, startTime));
   mProblem->setStartVel(mInitialVelEstimator(velHistory, startTime));
 
-  Eigen::MatrixXs losses = Eigen::MatrixXs::Zero(x_samples,y_samples);
-  
-  
-  
+  Eigen::MatrixXs losses = Eigen::MatrixXs::Zero(x_samples, y_samples);
+
   Eigen::Vector3s probe = lower;
   assert(rest_dim < 3);
   size_t probe_dim_1;
   size_t probe_dim_2;
-  if(rest_dim==0)
+  if (rest_dim == 0)
   {
     probe_dim_1 = 1;
     probe_dim_2 = 2;
   }
-  else if(rest_dim == 1)
+  else if (rest_dim == 1)
   {
     probe_dim_1 = 0;
     probe_dim_2 = 2;
@@ -363,18 +410,20 @@ Eigen::MatrixXs SSID::runPlotting2D(long startTime, Eigen::Vector3s upper, Eigen
     probe_dim_1 = 0;
     probe_dim_2 = 1;
   }
-  assert(lower(probe_dim_1) < upper(probe_dim_1) && lower(probe_dim_2) < upper(probe_dim_2));
-  s_t x_epsilon = (upper(probe_dim_1)-lower(probe_dim_1))/x_samples;
-  s_t y_epsilon = (upper(probe_dim_2)-lower(probe_dim_2))/y_samples;
+  assert(
+      lower(probe_dim_1) < upper(probe_dim_1)
+      && lower(probe_dim_2) < upper(probe_dim_2));
+  s_t x_epsilon = (upper(probe_dim_1) - lower(probe_dim_1)) / x_samples;
+  s_t y_epsilon = (upper(probe_dim_2) - lower(probe_dim_2)) / y_samples;
 
-  for(int x_i=0;x_i<x_samples;x_i++)
+  for (int x_i = 0; x_i < x_samples; x_i++)
   {
     probe(probe_dim_2) = lower(probe_dim_2);
-    for(int y_i=0; y_i < y_samples; y_i++)
+    for (int y_i = 0; y_i < y_samples; y_i++)
     {
       mWorld->setMasses(probe);
       mProblem->resetDirty();
-      losses(x_i,y_i) = mProblem->getLoss(mWorld);
+      losses(x_i, y_i) = mProblem->getLoss(mWorld);
       probe(probe_dim_2) += y_epsilon;
     }
     probe(probe_dim_1) += x_epsilon;
@@ -384,29 +433,31 @@ Eigen::MatrixXs SSID::runPlotting2D(long startTime, Eigen::Vector3s upper, Eigen
 
 void SSID::saveCSVMatrix(std::string filename, Eigen::MatrixXs matrix)
 {
-  const static Eigen::IOFormat CSVFormat(Eigen::FullPrecision, Eigen::DontAlignCols, ", ", "\n");
+  const static Eigen::IOFormat CSVFormat(
+      Eigen::FullPrecision, Eigen::DontAlignCols, ", ", "\n");
   std::ofstream file(filename);
   if (file.is_open())
   {
-      file << matrix.format(CSVFormat);
-      file.close();
+    file << matrix.format(CSVFormat);
+    file.close();
   }
 }
 
 /// This registers a listener to get called when we finish replanning
 void SSID::registerInferListener(
-    std::function<
-        void(long, Eigen::VectorXs, Eigen::VectorXs, Eigen::VectorXs, long, bool)>
+    std::function<void(
+        long, Eigen::VectorXs, Eigen::VectorXs, Eigen::VectorXs, long, bool)>
         inferListener)
 {
   mInferListeners.push_back(inferListener);
 }
 
-void SSID::updateFastThreadBuffer(Eigen::VectorXs new_solution, Eigen::VectorXs new_value)
+void SSID::updateFastThreadBuffer(
+    Eigen::VectorXs new_solution, Eigen::VectorXs new_value)
 {
   mPrev_solutions.push_back(new_solution);
   mPrev_values.push_back(new_value);
-  if(mPrev_solutions.size() > mPrev_Length)
+  if (mPrev_solutions.size() > mPrev_Length)
   {
     mPrev_solutions.erase(mPrev_solutions.begin());
     mPrev_values.erase(mPrev_values.begin());
@@ -423,63 +474,69 @@ void SSID::optimizationThreadLoop()
   sigaddset(&sigset, SIGINT);
   sigaddset(&sigset, SIGTERM);
   pthread_sigmask(SIG_BLOCK, &sigset, nullptr);
-  while(mRunning)
+  while (mRunning)
   {
     long startTime = timeSinceEpochMillis();
-    if(mControlLog.availableStepsBefore(startTime)>mPlanningSteps+1)
+    if (mControlLog.availableStepsBefore(startTime) > mPlanningSteps + 1)
     {
-      
+
       paramMutexLock();
-      if(mInitialize)
+      if (mInitialize)
       {
-        // NOTE: Parameter solution by design support different types of parameters
+        // NOTE: Parameter solution by design support different types of
+        // parameters
         mParam_Solution.segment(0, mMassDim) = mWorld->getMasses();
         mParam_Solution.segment(mMassDim, mDampingDim) = mWorld->getDampings();
-        mParam_Solution.segment(mMassDim+mDampingDim, mSpringDim) = mWorld->getSprings();
+        mParam_Solution.segment(mMassDim + mDampingDim, mSpringDim)
+            = mWorld->getSprings();
       }
       mWorld->setMasses(mParam_Solution.segment(0, mMassDim));
       mWorld->setDampings(mParam_Solution.segment(mMassDim, mDampingDim));
-      mWorld->setSprings(mParam_Solution.segment(mMassDim+mDampingDim, mSpringDim));
+      mWorld->setSprings(
+          mParam_Solution.segment(mMassDim + mDampingDim, mSpringDim));
 
       paramMutexUnlock();
       runInference(startTime);
       // Update mPrev_result buffer
-      Eigen::VectorXs new_solution = Eigen::VectorXs::Zero(mMassDim + mDampingDim + mSpringDim);
+      Eigen::VectorXs new_solution
+          = Eigen::VectorXs::Zero(mMassDim + mDampingDim + mSpringDim);
       new_solution.segment(0, mMassDim) = mWorld->getMasses();
       new_solution.segment(mMassDim, mDampingDim) = mWorld->getDampings();
-      new_solution.segment(mMassDim + mDampingDim, mSpringDim) = mWorld->getSprings();
-      
-      if(!mUseSmoothing)
+      new_solution.segment(mMassDim + mDampingDim, mSpringDim)
+          = mWorld->getSprings();
+
+      if (!mUseSmoothing)
       {
         mParam_Solution = new_solution;
-        //std::cout << "New Solution: " << new_solution(0) << new_solution(1) << std::endl;
+        // std::cout << "New Solution: " << new_solution(0) << new_solution(1)
+        // << std::endl;
         continue;
       }
       // We have a stable solution, then detect changes
-      if(mSteadySolutionFound && mUseConfidence)
+      if (mSteadySolutionFound && mUseConfidence)
       {
-        if(detectEWiseChangeParams().second)
+        if (detectEWiseChangeParams().second)
         {
-          
+
           std::cout << "+++++++++++++++" << std::endl;
           std::cout << "Change Detected" << std::endl;
           std::cout << "+++++++++++++++" << std::endl;
-          
-          
+
           mParamChanged = true;
           mSteadySolutionFound = false;
           paramMutexLock();
           // Flush all the solutions in the buffer
-          if(mUseConfidence)
+          if (mUseConfidence)
           {
             mControlLog.discardBefore(startTime);
-            for(int i = 0; i < mSensorLogs.size(); i++)
+            for (int i = 0; i < mSensorLogs.size(); i++)
             {
               mSensorLogs[i].discardBefore(startTime);
             }
             mPrev_solutions.clear();
             mPrev_values.clear();
-            mCumValue = Eigen::VectorXs::Zero(mMassDim+mDampingDim+mSpringDim);
+            mCumValue
+                = Eigen::VectorXs::Zero(mMassDim + mDampingDim + mSpringDim);
           }
           mInitialize = true;
           paramMutexUnlock();
@@ -487,59 +544,70 @@ void SSID::optimizationThreadLoop()
       }
       updateFastThreadBuffer(new_solution, mValue);
       // We don't have a stable solution, we hope to find one
-      if(mParamChanged==true || mSteadySolutionFound==false)
+      if (mParamChanged == true || mSteadySolutionFound == false)
       {
         // Estimate the result by weighted average
         paramMutexLock();
-        if(mVerbose)
+        if (mVerbose)
         {
-          std::cout << "Param Changed Use Fast Result!" 
-                  << mPrev_solutions[mPrev_solutions.size()-1](0) <<" " 
-                  << mPrev_solutions[mPrev_solutions.size()-1](1) <<" "
-                  << mPrev_solutions[mPrev_solutions.size()-1](2) << std::endl;
+          std::cout << "Param Changed Use Fast Result!"
+                    << mPrev_solutions[mPrev_solutions.size() - 1](0) << " "
+                    << mPrev_solutions[mPrev_solutions.size() - 1](1) << " "
+                    << mPrev_solutions[mPrev_solutions.size() - 1](2)
+                    << std::endl;
         }
-        if(!mInitialize)
+        if (!mInitialize)
         {
-          // Sliding weighted average 
+          // Sliding weighted average
           Eigen::VectorXs conf = computeConfidenceFromValue(mValue);
-          if(mVerbose || true) // TODO: remove the override
+          if (mVerbose || true) // TODO: remove the override
           {
             std::cout << "Confidence: \n" << conf << std::endl;
           }
           Eigen::VectorXs prev_solution = mParam_Solution;
-          if(mUseConfidence)
+          if (mUseConfidence)
           {
-            if(conf.mean()>mConfidence_thresh) // Confidence score is not a sensitive hyper-param, we can use one for all parameters
+            if (conf.mean()
+                > mConfidence_thresh) // Confidence score is not a sensitive
+                                      // hyper-param, we can use one for all
+                                      // parameters
             {
-              mParam_Solution = (mValue.cwiseProduct((mCumValue+mValue).cwiseInverse())).cwiseProduct(new_solution) 
-                              + (mCumValue.cwiseProduct((mCumValue+mValue).cwiseInverse())).cwiseProduct(mParam_Solution);
+              mParam_Solution
+                  = (mValue.cwiseProduct((mCumValue + mValue).cwiseInverse()))
+                        .cwiseProduct(new_solution)
+                    + (mCumValue.cwiseProduct(
+                           (mCumValue + mValue).cwiseInverse()))
+                          .cwiseProduct(mParam_Solution);
               mCumValue += mValue;
             }
             // TODO : Need to use different mParam_change_thresh
-            // If a parameter is detected to change, the other parameter is in its low confidence area. Then we should change the parameter that detected to change
-            // with high confidence score while maintain the same other parameters
-            // if((mParam_Solution-prev_solution).cwiseAbs().maxCoeff() < mParam_change_thresh && conf.mean() > mConfidence_thresh)
-            if(detectEWiseStable(mParam_Solution, prev_solution, conf).second)
+            // If a parameter is detected to change, the other parameter is in
+            // its low confidence area. Then we should change the parameter that
+            // detected to change with high confidence score while maintain the
+            // same other parameters
+            // if((mParam_Solution-prev_solution).cwiseAbs().maxCoeff() <
+            // mParam_change_thresh && conf.mean() > mConfidence_thresh)
+            if (detectEWiseStable(mParam_Solution, prev_solution, conf).second)
             {
               mSteadySolutionFound = true;
               mParamChanged = false;
-              if(mVerbose)
+              if (mVerbose)
               {
                 std::cout << "=====================" << std::endl;
                 std::cout << "Steady Solution Found" << std::endl;
                 std::cout << "=====================" << std::endl;
               }
-              
             }
           }
-          
-          if(!mUseConfidence)
+
+          if (!mUseConfidence)
           {
             mParam_Solution = estimateSolution();
           }
           // How to determine a stable solution has been found
-          // May be if we reject the low confidence result we don't need steady solution, in that case we need to define confidence
-          // of a particular solution, need to rescale the confidence
+          // May be if we reject the low confidence result we don't need steady
+          // solution, in that case we need to define confidence of a particular
+          // solution, need to rescale the confidence
         }
         else
         {
@@ -547,7 +615,7 @@ void SSID::optimizationThreadLoop()
         }
         paramMutexUnlock();
       }
-      if(mInitialize)
+      if (mInitialize)
       {
         mInitialize = false;
       }
@@ -560,19 +628,20 @@ void SSID::setVerbose(bool verbose)
   mVerbose = verbose;
 }
 
-/// The Change of Parameter should be handled independently for each degree of freedom
-/// For simplicity it is a global function right now
+/// The Change of Parameter should be handled independently for each degree of
+/// freedom For simplicity it is a global function right now
 bool SSID::detectChangeParams()
 {
   Eigen::VectorXs mean_params = estimateSolution();
   Eigen::VectorXs confidence = estimateConfidence();
-  if(mVerbose)
+  if (mVerbose)
   {
     std::cout << "Confidence: " << confidence.mean() << std::endl;
   }
   paramMutexLock();
-  if((mean_params - mParam_Solution).cwiseAbs().maxCoeff() > mParam_change_thresh &&
-    (confidence.mean() > mConfidence_thresh|| !mUseConfidence))
+  if ((mean_params - mParam_Solution).cwiseAbs().maxCoeff()
+          > mParam_change_thresh
+      && (confidence.mean() > mConfidence_thresh || !mUseConfidence))
   {
     paramMutexUnlock();
     return true;
@@ -585,7 +654,7 @@ std::pair<std::vector<bool>, bool> SSID::detectEWiseChangeParams()
 {
   Eigen::VectorXs mean_params = estimateSolution();
   Eigen::VectorXs confidence = estimateConfidence();
-  if(mVerbose)
+  if (mVerbose)
   {
     std::cout << "Confidences:\n" << confidence << std::endl;
   }
@@ -593,10 +662,11 @@ std::pair<std::vector<bool>, bool> SSID::detectEWiseChangeParams()
   Eigen::VectorXs params_diff = (mean_params - mParam_Solution).cwiseAbs();
   std::vector<bool> params_change_flag;
   bool param_changed = false;
-  for(int i=0;i < params_diff.size();i++)
+  for (int i = 0; i < params_diff.size(); i++)
   {
-    // NOTE: Since confience score is relatively not sensitive, we use one threshold for all
-    if(params_diff(i) > mEwise_params_change_thresh(i) 
+    // NOTE: Since confience score is relatively not sensitive, we use one
+    // threshold for all
+    if (params_diff(i) > mEwise_params_change_thresh(i)
         && (confidence(i) > mConfidence_thresh || !mUseConfidence))
     {
       params_change_flag.push_back(true);
@@ -612,17 +682,18 @@ std::pair<std::vector<bool>, bool> SSID::detectEWiseChangeParams()
 }
 
 std::pair<std::vector<bool>, bool> SSID::detectEWiseStable(
-  Eigen::VectorXs current, 
-  Eigen::VectorXs reference, 
-  Eigen::VectorXs confidence)
+    Eigen::VectorXs current,
+    Eigen::VectorXs reference,
+    Eigen::VectorXs confidence)
 {
   Eigen::VectorXs diff = (current - reference).cwiseAbs();
   std::vector<bool> stable_flags;
   bool stable_flag = true;
-  for(int i=0;i<diff.size();i++)
+  for (int i = 0; i < diff.size(); i++)
   {
     // NOTE: There should have one confidence threshld at approximately 0.5
-    if(diff(i) > mEwise_params_change_thresh(i) || confidence(i) <= mConfidence_thresh)
+    if (diff(i) > mEwise_params_change_thresh(i)
+        || confidence(i) <= mConfidence_thresh)
     {
       stable_flags.push_back(false);
       stable_flag = false;
@@ -636,29 +707,33 @@ std::pair<std::vector<bool>, bool> SSID::detectEWiseStable(
 }
 
 /// The condition number is with respect to a particular node
-s_t SSID::getTrajConditionNumberOfMassIndex(Eigen::MatrixXs poses, Eigen::MatrixXs vels, size_t index)
+s_t SSID::getTrajConditionNumberOfMassIndex(
+    Eigen::MatrixXs poses, Eigen::MatrixXs vels, size_t index)
 {
   size_t steps = poses.cols();
   s_t cond = 0;
   s_t dt = mWorld->getTimeStep();
   Eigen::VectorXs init_pose = mWorld->getPositions();
   Eigen::VectorXs init_vel = mWorld->getVelocities();
-  for(int i = 1; i < steps; i++)
+  for (int i = 1; i < steps; i++)
   {
     mWorld->setPositions(poses.col(i));
     mWorld->setVelocities(vels.col(i));
-    Eigen::VectorXs acc = (vels.col(i) - vels.col(i-1)) / dt;
-    //Eigen::VectorXs acc = Eigen::VectorXs::Ones(vels.rows()) * dt / dt;
-    Eigen::MatrixXs Ak = mWorld->getSkeleton(mRobotSkelIndex)->getLinkAkMatrixIndex(index);
-    Eigen::MatrixXs Jvk = mWorld->getSkeleton(mRobotSkelIndex)->getLinkJvkMatrixIndex(index);
+    Eigen::VectorXs acc = (vels.col(i) - vels.col(i - 1)) / dt;
+    // Eigen::VectorXs acc = Eigen::VectorXs::Ones(vels.rows()) * dt / dt;
+    Eigen::MatrixXs Ak
+        = mWorld->getSkeleton(mRobotSkelIndex)->getLinkAkMatrixIndex(index);
+    Eigen::MatrixXs Jvk
+        = mWorld->getSkeleton(mRobotSkelIndex)->getLinkJvkMatrixIndex(index);
     cond += (Ak * acc + Jvk.transpose() * mWorld->getGravity()).norm();
   }
   mWorld->setPositions(init_pose);
   mWorld->setVelocities(init_vel);
-  return cond/steps;
+  return cond / steps;
 }
 
-Eigen::Vector3s SSID::getTrajConditionNumberOfCOMIndex(Eigen::MatrixXs poses, Eigen::MatrixXs vels, size_t index)
+Eigen::Vector3s SSID::getTrajConditionNumberOfCOMIndex(
+    Eigen::MatrixXs poses, Eigen::MatrixXs vels, size_t index)
 {
   size_t steps = poses.cols();
   Eigen::Vector3s cond = Eigen::Vector3s::Zero();
@@ -666,27 +741,32 @@ Eigen::Vector3s SSID::getTrajConditionNumberOfCOMIndex(Eigen::MatrixXs poses, Ei
   Eigen::VectorXs init_state = mWorld->getState();
   mWorld->setPositions(poses.col(0));
   mWorld->setVelocities(vels.col(0));
-  Eigen::MatrixXs hat_Jw = mWorld->getSkeleton(mRobotSkelIndex)->getLinkLocalJwkMatrixIndex(index);
-  Eigen::Matrix3s R = mWorld->getSkeleton(mRobotSkelIndex)->getLinkRMatrixIndex(index);
-  for(int i = 1; i < steps; i++)
+  Eigen::MatrixXs hat_Jw
+      = mWorld->getSkeleton(mRobotSkelIndex)->getLinkLocalJwkMatrixIndex(index);
+  Eigen::Matrix3s R
+      = mWorld->getSkeleton(mRobotSkelIndex)->getLinkRMatrixIndex(index);
+  for (int i = 1; i < steps; i++)
   {
     mWorld->setPositions(poses.col(i));
     mWorld->setVelocities(vels.col(i));
-    Eigen::VectorXs acc = (vels.col(i) - vels.col(i-1)) / dt;
-    Eigen::MatrixXs new_R = mWorld->getSkeleton(mRobotSkelIndex)->getLinkRMatrixIndex(index);
-    Eigen::MatrixXs new_hat_Jw = mWorld->getSkeleton(mRobotSkelIndex)->getLinkLocalJwkMatrixIndex(index);
+    Eigen::VectorXs acc = (vels.col(i) - vels.col(i - 1)) / dt;
+    Eigen::MatrixXs new_R
+        = mWorld->getSkeleton(mRobotSkelIndex)->getLinkRMatrixIndex(index);
+    Eigen::MatrixXs new_hat_Jw = mWorld->getSkeleton(mRobotSkelIndex)
+                                     ->getLinkLocalJwkMatrixIndex(index);
     Eigen::MatrixXs dR = (new_R - R) / dt;
     Eigen::MatrixXs d_hat_Jw = (new_hat_Jw - hat_Jw) / dt;
     R = new_R;
     hat_Jw = new_hat_Jw;
     // This should be: 3 x 3 matrix
     Eigen::MatrixXs S = R * vector2skew(hat_Jw * acc)
-                      + dR * vector2skew(hat_Jw * vels.col(i))
-                      + R * vector2skew(d_hat_Jw * vels.col(i));
-    
+                        + dR * vector2skew(hat_Jw * vels.col(i))
+                        + R * vector2skew(d_hat_Jw * vels.col(i));
+
     // This should be: N x 3 matrix
-    Eigen::MatrixXs G = hat_Jw.transpose() * vector2skew(R.transpose() * mWorld->getGravity());
-    //Eigen::VectorXs G = 
+    Eigen::MatrixXs G = hat_Jw.transpose()
+                        * vector2skew(R.transpose() * mWorld->getGravity());
+    // Eigen::VectorXs G =
 
     cond(0) += S.col(0).norm() + G.col(0).norm();
     cond(1) += S.col(1).norm() + G.col(1).norm();
@@ -697,21 +777,24 @@ Eigen::Vector3s SSID::getTrajConditionNumberOfCOMIndex(Eigen::MatrixXs poses, Ei
 }
 
 // Should implement condition number of trajectory
-Eigen::Vector3s SSID::getTrajConditionNumberOfMOIIndex(Eigen::MatrixXs poses, Eigen::MatrixXs vels, size_t index)
+Eigen::Vector3s SSID::getTrajConditionNumberOfMOIIndex(
+    Eigen::MatrixXs poses, Eigen::MatrixXs vels, size_t index)
 {
-  // Whether is is well conditioned is determined by the average of three diagonal terms
-  // Compute Diagonal Matrix:
+  // Whether is is well conditioned is determined by the average of three
+  // diagonal terms Compute Diagonal Matrix:
   size_t steps = poses.cols();
-  Eigen::Vector3s cond =  Eigen::Vector3s::Zero();
+  Eigen::Vector3s cond = Eigen::Vector3s::Zero();
   s_t dt = mWorld->getTimeStep();
   Eigen::VectorXs init_state = mWorld->getState();
-  for(int i = 1; i < steps; i++)
+  for (int i = 1; i < steps; i++)
   {
     mWorld->setPositions(poses.col(i));
     mWorld->setVelocities(vels.col(i));
-    Eigen::VectorXs acc = (vels.col(i) - vels.col(i-1)) / dt;
-    Eigen::MatrixXs Jw = mWorld->getSkeleton(mRobotSkelIndex)->getLinkJwkMatrixIndex(index);
-    Eigen::MatrixXs Jv = mWorld->getSkeleton(mRobotSkelIndex)->getLinkJvkMatrixIndex(index);
+    Eigen::VectorXs acc = (vels.col(i) - vels.col(i - 1)) / dt;
+    Eigen::MatrixXs Jw
+        = mWorld->getSkeleton(mRobotSkelIndex)->getLinkJwkMatrixIndex(index);
+    Eigen::MatrixXs Jv
+        = mWorld->getSkeleton(mRobotSkelIndex)->getLinkJvkMatrixIndex(index);
     Eigen::MatrixXs diag = (Jw * acc).asDiagonal();
     Eigen::MatrixXs Ck = Jw.transpose() * diag;
     cond(0) += Ck.col(0).norm();
@@ -719,90 +802,102 @@ Eigen::Vector3s SSID::getTrajConditionNumberOfMOIIndex(Eigen::MatrixXs poses, Ei
     cond(2) += Ck.col(2).norm();
   }
   mWorld->setState(init_state); // Idempotent
-  return cond/steps;
+  return cond / steps;
 }
 
 /// Here index represent joint index
-s_t SSID::getTrajConditionNumberOfDampingIndex(Eigen::MatrixXs vels, size_t index)
+s_t SSID::getTrajConditionNumberOfDampingIndex(
+    Eigen::MatrixXs vels, size_t index)
 {
   size_t steps = vels.cols();
   s_t cond = 0;
-  for(int i = 0; i < steps; i++)
+  for (int i = 0; i < steps; i++)
   {
     cond += abs(vels(index, i));
   }
-  return cond/steps;
+  return cond / steps;
 }
 
-s_t SSID::getTrajConditionNumberOfSpringIndex(Eigen::MatrixXs poses, size_t index)
+s_t SSID::getTrajConditionNumberOfSpringIndex(
+    Eigen::MatrixXs poses, size_t index)
 {
   size_t steps = poses.cols();
   s_t cond = 0;
-  for(int i = 0; i < steps; i++)
+  for (int i = 0; i < steps; i++)
   {
     cond += abs(poses(index, i) - mWorld->getRestPositionIndex(index));
   }
-  return cond/steps;
+  return cond / steps;
 }
 
-// NOTE: This function can adapt to elementwise different type of parameters, with fixed order
-Eigen::VectorXs SSID::getTrajConditionNumbers(Eigen::MatrixXs poses, Eigen::MatrixXs vels)
+// NOTE: This function can adapt to elementwise different type of parameters,
+// with fixed order
+Eigen::VectorXs SSID::getTrajConditionNumbers(
+    Eigen::MatrixXs poses, Eigen::MatrixXs vels)
 {
-  Eigen::VectorXs conds = Eigen::VectorXs::Zero(mMassDim + mDampingDim + mSpringDim);
+  Eigen::VectorXs conds
+      = Eigen::VectorXs::Zero(mMassDim + mDampingDim + mSpringDim);
   int cur = 0;
-  for(int i = 0; i < mSSIDMassNodeIndices.size(); i++)
+  for (int i = 0; i < mSSIDMassNodeIndices.size(); i++)
   {
-    conds(cur) = getTrajConditionNumberOfMassIndex(poses, vels, mSSIDMassNodeIndices(i));
+    conds(cur) = getTrajConditionNumberOfMassIndex(
+        poses, vels, mSSIDMassNodeIndices(i));
     cur += 1;
   }
-  for(int i = 0; i < mSSIDCOMNodeIndices.size(); i++)
+  for (int i = 0; i < mSSIDCOMNodeIndices.size(); i++)
   {
-    conds.segment(cur, 3) = getTrajConditionNumberOfCOMIndex(poses, vels, mSSIDCOMNodeIndices(i));
+    conds.segment(cur, 3)
+        = getTrajConditionNumberOfCOMIndex(poses, vels, mSSIDCOMNodeIndices(i));
     cur += 3;
   }
-  for(int i = 0; i < mSSIDMOINodeIndices.size(); i++)
+  for (int i = 0; i < mSSIDMOINodeIndices.size(); i++)
   {
-    conds.segment(cur, 3) = getTrajConditionNumberOfMOIIndex(poses, vels, mSSIDMOINodeIndices(i));
+    conds.segment(cur, 3)
+        = getTrajConditionNumberOfMOIIndex(poses, vels, mSSIDMOINodeIndices(i));
     cur += 3;
   }
-  for(int i = 0; i < mSSIDDampingJointIndices.size(); i++)
+  for (int i = 0; i < mSSIDDampingJointIndices.size(); i++)
   {
-    conds(cur) = getTrajConditionNumberOfDampingIndex(vels, mSSIDDampingJointIndices(i));
+    conds(cur) = getTrajConditionNumberOfDampingIndex(
+        vels, mSSIDDampingJointIndices(i));
     cur += 1;
   }
-  for(int i = 0; i < mSSIDSpringJointIndices.size(); i++)
+  for (int i = 0; i < mSSIDSpringJointIndices.size(); i++)
   {
-    conds(cur) = getTrajConditionNumberOfSpringIndex(poses, mSSIDSpringJointIndices(i));
+    conds(cur) = getTrajConditionNumberOfSpringIndex(
+        poses, mSSIDSpringJointIndices(i));
     cur += 1;
   }
   return conds;
 }
 
-void SSID::attachMutex(std::mutex &mutex_lock)
+void SSID::attachMutex(std::mutex& mutex_lock)
 {
   mRegisterMutex = &mutex_lock;
   mLockRegistered = true;
 }
 
-void SSID::attachParamMutex(std::mutex &mutex_lock)
+void SSID::attachParamMutex(std::mutex& mutex_lock)
 {
   mParamMutex = &mutex_lock;
   mParamLockRegistered = true;
 }
 
-
 // This will use previous solutions to detect the change
 // NOTE: Since mPrev_values is evaluated element-wisely it should be fine
 Eigen::VectorXs SSID::estimateSolution()
 {
-  Eigen::VectorXs solution = Eigen::VectorXs::Zero(mMassDim + mDampingDim + mSpringDim);
-  Eigen::VectorXs totalValue = Eigen::VectorXs::Zero(mMassDim + mDampingDim + mSpringDim);
-  Eigen::VectorXs uniformValue = Eigen::VectorXs::Ones(mMassDim + mDampingDim + mSpringDim);
-  //Eigen::VectorXs totalConfidence = estimateConfidence();
+  Eigen::VectorXs solution
+      = Eigen::VectorXs::Zero(mMassDim + mDampingDim + mSpringDim);
+  Eigen::VectorXs totalValue
+      = Eigen::VectorXs::Zero(mMassDim + mDampingDim + mSpringDim);
+  Eigen::VectorXs uniformValue
+      = Eigen::VectorXs::Ones(mMassDim + mDampingDim + mSpringDim);
+  // Eigen::VectorXs totalConfidence = estimateConfidence();
 
-  for(int i = 0; i < mPrev_values.size(); i++)
+  for (int i = 0; i < mPrev_values.size(); i++)
   {
-    if(mUseHeuristicWeight)
+    if (mUseHeuristicWeight)
     {
       solution += mPrev_solutions[i].cwiseProduct(mPrev_values[i]);
       totalValue += mPrev_values[i];
@@ -814,7 +909,8 @@ Eigen::VectorXs SSID::estimateSolution()
     }
   }
   solution = solution.cwiseProduct(totalValue.cwiseInverse());
-  // if(totalConfidence.minCoeff() > mConfidence_thresh && mUseConfidence && findStable)
+  // if(totalConfidence.minCoeff() > mConfidence_thresh && mUseConfidence &&
+  // findStable)
   // {
   //   mSteadySolutionFound = true;
   //   mParamChanged = false;
@@ -823,32 +919,34 @@ Eigen::VectorXs SSID::estimateSolution()
   return solution;
 }
 
-// Here confidence should be not related to trajectory length since it is a relative value
-// Should be group-wise
+// Here confidence should be not related to trajectory length since it is a
+// relative value Should be group-wise
 Eigen::VectorXs SSID::estimateConfidence()
 {
-  Eigen::VectorXs totalValue = Eigen::VectorXs::Zero(mMassDim + mDampingDim + mSpringDim);
-  for(int i = 0; i < mPrev_values.size(); i++)
+  Eigen::VectorXs totalValue
+      = Eigen::VectorXs::Zero(mMassDim + mDampingDim + mSpringDim);
+  for (int i = 0; i < mPrev_values.size(); i++)
   {
     totalValue += mPrev_values[i];
   }
-  return computeConfidenceFromValue(totalValue/mPrev_values.size());
+  return computeConfidenceFromValue(totalValue / mPrev_values.size());
 }
 
 // NOTE: This is already element-wise, need to customize on temperature side
 Eigen::VectorXs SSID::computeConfidenceFromValue(Eigen::VectorXs value)
 {
-  Eigen::VectorXs confidence = Eigen::VectorXs::Zero(mMassDim+mDampingDim+mSpringDim);
-  for(int i = 0; i < mMassDim+mDampingDim+mSpringDim; i++)
+  Eigen::VectorXs confidence
+      = Eigen::VectorXs::Zero(mMassDim + mDampingDim + mSpringDim);
+  for (int i = 0; i < mMassDim + mDampingDim + mSpringDim; i++)
   {
-    confidence(i) = tanh(value(i)/mTemperature(i));
+    confidence(i) = tanh(value(i) / mTemperature(i));
   }
   return confidence;
 }
 
 void SSID::registerLock()
 {
-  if(mLockRegistered)
+  if (mLockRegistered)
   {
     mRegisterMutex->lock();
   }
@@ -856,7 +954,7 @@ void SSID::registerLock()
 
 void SSID::registerUnlock()
 {
-  if(mLockRegistered)
+  if (mLockRegistered)
   {
     mRegisterMutex->unlock();
   }
@@ -864,13 +962,13 @@ void SSID::registerUnlock()
 
 void SSID::paramMutexLock()
 {
-  if(mParamLockRegistered)
+  if (mParamLockRegistered)
     mParamMutex->lock();
 }
 
 void SSID::paramMutexUnlock()
 {
-  if(mParamLockRegistered)
+  if (mParamLockRegistered)
     mParamMutex->unlock();
 }
 
@@ -883,7 +981,6 @@ void SSID::setSSIDMassIndex(Eigen::VectorXi indices)
 {
   mSSIDMassNodeIndices = indices;
 }
-
 
 void SSID::setSSIDCOMIndex(Eigen::VectorXi indices)
 {
@@ -907,7 +1004,7 @@ void SSID::setSSIDSpringIndex(Eigen::VectorXi indices)
 
 void SSID::setTemperature(Eigen::VectorXs temp)
 {
-  assert(temp.size() == mMassDim+mDampingDim+mSpringDim);
+  assert(temp.size() == mMassDim + mDampingDim + mSpringDim);
   mTemperature = temp;
 }
 
@@ -946,13 +1043,13 @@ void SSID::useSmoothing()
 Eigen::Matrix3s SSID::vector2skew(Eigen::Vector3s vec)
 {
   Eigen::Matrix3s skew = Eigen::Matrix3s::Zero();
-  skew(2,1) = vec(0);
-  skew(1,2) = -vec(0);
+  skew(2, 1) = vec(0);
+  skew(1, 2) = -vec(0);
   skew(2, 0) = -vec(1);
   skew(0, 2) = vec(1);
   skew(1, 0) = vec(2);
   skew(0, 1) = -vec(2);
-  return skew; 
+  return skew;
 }
 
 } // namespace realtime

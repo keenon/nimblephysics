@@ -72,6 +72,10 @@ public:
   // Documentation inherited
   const std::vector<const DegreeOfFreedom*>& getDependentDofs() const override;
 
+  /// Returns a DegreeOfFreedom vector containing the dofs that form a Chain
+  /// leading up to this JacobianNode from the root of the Skeleton.
+  const std::vector<DegreeOfFreedom*> getChainDofs() override;
+
   // Documentation inherited
   const std::vector<const DegreeOfFreedom*> getChainDofs() const override;
 

@@ -104,7 +104,8 @@ public:
       const Eigen::Vector2s& _positions,
       const Eigen::Vector2s& _velocities) const;
 
-  math::Jacobian getRelativeJacobianDeriv(size_t index) const override;
+  Eigen::Matrix<s_t, 6, 2> getRelativeJacobianDerivWrtPositionStatic(
+      size_t index) const override;
 
   math::Jacobian getRelativeJacobianTimeDerivDerivWrtPosition(
       size_t index) const override;
@@ -135,6 +136,11 @@ public:
       const Eigen::Vector2s& velocities,
       int index,
       bool useRidders = true) const;
+
+  /// Returns the value for q that produces the nearest rotation to
+  /// `relativeRotation` passed in.
+  Eigen::VectorXs getNearestPositionToDesiredRotation(
+      const Eigen::Matrix3s& relativeRotation) override;
 
 protected:
   /// Constructor called by Skeleton class

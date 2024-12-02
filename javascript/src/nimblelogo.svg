@@ -1,28 +1,28 @@
-<svg width="50" height="45" viewBox="0 0 50 45" fill="none" xmlns="http://www.w3.org/2000/svg">
-<mask id="mask0_406:3" style="mask-type:alpha" maskUnits="userSpaceOnUse" x="0" y="0" width="51" height="45">
-<rect y="30.3969" width="17.5237" height="6.15696" fill="black"/>
-<rect x="32.4546" y="38.2059" width="17.5458" height="6.15696" fill="black"/>
-<rect y="26.5662" width="17.5458" height="2.1789" fill="black"/>
-<rect width="17.5599" height="2.19499" transform="matrix(0.990268 -0.139173 -0.139173 -0.990268 32.5566 24.8881)" fill="black"/>
-<rect width="17.5599" height="2.19499" transform="matrix(0.816138 -0.577858 -0.577858 -0.816138 31.7998 21.4785)" fill="black"/>
-<rect width="17.5599" height="2.19499" transform="matrix(0.4602 -0.887815 -0.887815 -0.4602 29.3696 18.7115)" fill="black"/>
-<rect x="17.4019" y="24.8881" width="17.5599" height="2.19499" transform="rotate(-172 17.4019 24.8881)" fill="black"/>
-<rect x="18.1592" y="21.4785" width="17.5599" height="2.19499" transform="rotate(-144.7 18.1592 21.4785)" fill="black"/>
-<rect x="20.5889" y="18.7115" width="17.5599" height="2.19499" transform="rotate(-117.4 20.5889 18.7115)" fill="black"/>
-<rect x="25.9746" y="0.0179443" width="17.5458" height="2.1789" transform="rotate(90 25.9746 0.0179443)" fill="black"/>
-<rect width="17.5458" height="2.1789" transform="matrix(-1 0 0 1 49.9429 26.5662)" fill="black"/>
-<rect width="17.5458" height="2.23624" transform="matrix(-1 0 0 1 49.9429 30.408)" fill="black"/>
-<rect width="17.5458" height="2.23624" transform="matrix(-1 0 0 1 49.9429 34.307)" fill="black"/>
+<svg width="36" height="36" viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg">
+<g clip-path="url(#clip0_704_2)">
+<rect width="36" height="36" rx="10.5469" fill="black"/>
+<mask id="mask0_704_2" style="mask-type:alpha" maskUnits="userSpaceOnUse" x="3" y="2" width="29" height="27">
+<rect x="3.09375" y="20.3206" width="10.0572" height="3.53362" fill="black"/>
+<rect x="21.72" y="24.8022" width="10.07" height="3.53362" fill="black"/>
+<rect x="3.09375" y="18.1218" width="10.07" height="1.25052" fill="black"/>
+<rect width="10.078" height="1.25975" transform="matrix(0.990268 -0.139173 -0.139173 -0.990268 21.7786 17.1589)" fill="black"/>
+<rect width="10.078" height="1.25975" transform="matrix(0.816138 -0.577858 -0.577858 -0.816138 21.3442 15.2019)" fill="black"/>
+<rect width="10.078" height="1.25975" transform="matrix(0.4602 -0.887815 -0.887815 -0.4602 19.9497 13.614)" fill="black"/>
+<rect x="13.0811" y="17.1589" width="10.078" height="1.25975" transform="rotate(-172 13.0811 17.1589)" fill="black"/>
+<rect x="13.5154" y="15.2019" width="10.078" height="1.25975" transform="rotate(-144.7 13.5154 15.2019)" fill="black"/>
+<rect x="14.9099" y="13.614" width="10.078" height="1.25975" transform="rotate(-117.4 14.9099 13.614)" fill="black"/>
+<rect x="18.0012" y="2.88525" width="10.07" height="1.25052" transform="rotate(90 18.0012 2.88525)" fill="black"/>
+<rect width="10.07" height="1.25052" transform="matrix(-1 0 0 1 31.7568 18.1218)" fill="black"/>
+<rect width="10.07" height="1.28343" transform="matrix(-1 0 0 1 31.7568 20.3267)" fill="black"/>
+<rect width="10.07" height="1.28343" transform="matrix(-1 0 0 1 31.7568 22.5645)" fill="black"/>
 </mask>
-<g mask="url(#mask0_406:3)">
-<rect x="-9.67578" y="-3.56799" width="68.9444" height="52.8416" fill="url(#paint0_linear_406:3)"/>
+<g mask="url(#mask0_704_2)">
+<rect x="-2.45898" y="0.827393" width="39.5688" height="30.327" fill="white"/>
+</g>
 </g>
 <defs>
-<linearGradient id="paint0_linear_406:3" x1="7.13746" y1="12.8393" x2="51.2172" y2="46.0936" gradientUnits="userSpaceOnUse">
-<stop stop-color="#FFB800"/>
-<stop offset="0.354167" stop-color="#F54747"/>
-<stop offset="0.65625" stop-color="#CF329E"/>
-<stop offset="1" stop-color="#8D19E9"/>
-</linearGradient>
+<clipPath id="clip0_704_2">
+<rect width="36" height="36" fill="white"/>
+</clipPath>
 </defs>
 </svg>

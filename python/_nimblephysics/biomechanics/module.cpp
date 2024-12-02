@@ -40,13 +40,26 @@ namespace py = pybind11;
 namespace dart {
 namespace python {
 
+void ForcePlate(py::module& sm);
 void LilypadSolver(py::module& sm);
 void BatchGaitInverseDynamics(py::module& sm);
 void OpenSimParser(py::module& sm);
 void SkeletonConverter(py::module& sm);
 void MarkerFitter(py::module& sm);
+void DynamicsFitter(py::module& sm);
+void MarkerFixer(py::module& sm);
+void MarkerLabeller(py::module& sm);
 void IKErrorReport(py::module& sm);
 void Anthropometrics(py::module& sm);
+void C3DLoader(py::module& sm);
+void SubjectOnDisk(py::module& sm);
+void CortexStreaming(py::module& sm);
+void StreamingMarkerTraces(py::module& sm);
+void StreamingIK(py::module& sm);
+void StreamingMocapLab(py::module& sm);
+void MarkerBeamSearch(py::module& sm);
+void MarkerMultiBeamSearch(py::module& sm);
+void LinkBeamSearch(py::module& sm);
 
 void dart_biomechanics(py::module& m)
 {
@@ -56,13 +69,26 @@ void dart_biomechanics(py::module& m)
       = "This provides biomechanics utilities in Nimble, including inverse "
         "dynamics and (eventually) mocap support and muscle estimation.";
 
+  ForcePlate(sm);
+  C3DLoader(sm);
+  Anthropometrics(sm);
   LilypadSolver(sm);
   BatchGaitInverseDynamics(sm);
   OpenSimParser(sm);
   SkeletonConverter(sm);
+  MarkerFixer(sm);
   MarkerFitter(sm);
+  DynamicsFitter(sm);
+  MarkerLabeller(sm);
   IKErrorReport(sm);
-  Anthropometrics(sm);
+  SubjectOnDisk(sm);
+  CortexStreaming(sm);
+  StreamingMarkerTraces(sm);
+  StreamingIK(sm);
+  StreamingMocapLab(sm);
+  MarkerBeamSearch(sm);
+  MarkerMultiBeamSearch(sm);
+  LinkBeamSearch(sm);
 }
 
 } // namespace python

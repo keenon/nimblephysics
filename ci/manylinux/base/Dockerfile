@@ -234,9 +234,9 @@ RUN pushd grpc && \
     mkdir -p cmake/build && \
     pushd cmake/build && \
     cmake -DgRPC_INSTALL=ON \
-          -DgRPC_BUILD_TESTS=OFF \
-          -DCMAKE_POSITION_INDEPENDENT_CODE=ON \
-          ../.. && \
+    -DgRPC_BUILD_TESTS=OFF \
+    -DCMAKE_POSITION_INDEPENDENT_CODE=ON \
+    ../.. && \
     make -j3 && \
     make install && \
     popd && \
@@ -257,27 +257,35 @@ RUN rm -rf benchmark
 
 # Install MPFR - Arbirtatry precision floating point math
 RUN yum install -y gmp-devel
-RUN curl https://www.mpfr.org/mpfr-current/mpfr-4.1.0.tar.gz > mpfr-4.1.0.tar.gz && \
-    tar -zxf mpfr-4.1.0.tar.gz && \
-    pushd mpfr-4.1.0 && \
+RUN curl https://www.mpfr.org/mpfr-current/mpfr-4.2.1.tar.gz > mpfr-4.2.1.tar.gz && \
+    tar -zxf mpfr-4.2.1.tar.gz && \
+    pushd mpfr-4.2.1 && \
     ./configure && \
     make && \
     make install && \
     popd && \
-    rm -rf mpfr-4.1.0 && \
-    rm mpfr-4.1.0.tar.gz
+    rm -rf mpfr-4.2.1 && \
+    rm mpfr-4.2.1.tar.gz
 
-# Install MPIR - Arbirtatry precision integer math
-RUN yum install -y yasm m4
-RUN curl http://mpir.org/mpir-3.0.0.tar.bz2 > mpir-3.0.0.tar.bz2 && \
-    tar -xf mpir-3.0.0.tar.bz2 && \
-    pushd mpir-3.0.0 && \
-    ./configure --enable-cxx && \
-    make && \
-    make install && \
-    popd && \
-    rm -rf mpir-3.0.0 && \
-    rm mpir-3.0.0.tar.bz2
+# # Install MPIR - Arbirtatry precision integer math
+# RUN yum install -y yasm m4
+# RUN git clone https://github.com/wbhart/mpir.git && \
+#     pushd mpir && \
+#     git checkout mpir-3.0.0 && \
+#     ./configure --enable-cxx && \
+#     make && \
+#     make install && \
+#     popd && \
+#     rm -rf mpir
+# RUN curl http://mpir.org/mpir-3.0.0.tar.bz2 > mpir-3.0.0.tar.bz2 && \
+#     tar -xf mpir-3.0.0.tar.bz2 && \
+#     pushd mpir-3.0.0 && \
+#     ./configure --enable-cxx && \
+#     make && \
+#     make install && \
+#     popd && \
+#     rm -rf mpir-3.0.0 && \
+#     rm mpir-3.0.0.tar.bz2
 
 # Install MPFRC++
 RUN wget https://github.com/advanpix/mpreal/archive/refs/tags/mpfrc++-3.6.8.tar.gz
@@ -287,6 +295,18 @@ RUN tar -xzf mpfrc++-3.6.8.tar.gz && \
     popd && \
     rm -rf mpreal-mpfrc-3.6.8 && \
     rm mpfrc++-3.6.8.tar.gz
+
+# Install ezc3d
+RUN git clone https://github.com/pyomeca/ezc3d.git
+RUN pushd ezc3d && \
+    git checkout Release_1.4.7 && \
+    mkdir build && \
+    pushd build && \
+    cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_POSITION_INDEPENDENT_CODE=ON .. && \
+    make install && \
+    popd && \
+    popd
+RUN rm -rf ezc3d
 
 # RUN ls /usr/local/lib64 | grep assimp
 # RUN ls /usr/local/lib | grep assimp

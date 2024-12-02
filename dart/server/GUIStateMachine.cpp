@@ -1,11 +1,13 @@
 #include "dart/server/GUIStateMachine.hpp"
 
 #include <chrono>
+#include <cstring>
 #include <fstream>
 #include <sstream>
 
 #include <assimp/scene.h>
 #include <boost/filesystem.hpp>
+// #include <urdf_sensor/sensor.h>
 
 #include "dart/collision/CollisionResult.hpp"
 #include "dart/common/Aspect.hpp"
@@ -13,13 +15,17 @@
 #include "dart/dynamics/BodyNode.hpp"
 #include "dart/dynamics/BoxShape.hpp"
 #include "dart/dynamics/CapsuleShape.hpp"
+#include "dart/dynamics/ConstantCurveIncompressibleJoint.hpp"
+#include "dart/dynamics/Inertia.hpp"
 #include "dart/dynamics/MeshShape.hpp"
 #include "dart/dynamics/ShapeFrame.hpp"
 #include "dart/dynamics/ShapeNode.hpp"
 #include "dart/dynamics/Skeleton.hpp"
 #include "dart/dynamics/SphereShape.hpp"
 #include "dart/math/Geometry.hpp"
+#include "dart/math/MathTypes.hpp"
 #include "dart/neural/RestorableSnapshot.hpp"
+#include "dart/proto/GUI.pb.h"
 #include "dart/server/RawJsonUtils.hpp"
 #include "dart/server/external/base64/base64.h"
 #include "dart/simulation/World.hpp"
@@ -29,7 +35,6 @@ namespace server {
 
 GUIStateMachine::GUIStateMachine() : mMessagesQueued(0)
 {
-  mJson << "[";
 }
 
 GUIStateMachine::~GUIStateMachine()
@@ -38,130 +43,104 @@ GUIStateMachine::~GUIStateMachine()
 
 std::string GUIStateMachine::getCurrentStateAsJson()
 {
-  std::stringstream json;
-  json << "[";
-  bool isFirst = true;
+  proto::CommandList list;
+  for (auto pair : mLayers)
+  {
+    encodeCreateLayer(list, pair.second);
+  }
   for (auto pair : mBoxes)
   {
-    if (isFirst)
-      isFirst = false;
-    else
-      json << ",";
-    encodeCreateBox(json, pair.second);
-  }
-  for (auto pair : mSpheres)
-  {
-    if (isFirst)
-      isFirst = false;
-    else
-      json << ",";
-    encodeCreateSphere(json, pair.second);
-  }
-  for (auto pair : mCapsules)
-  {
-    if (isFirst)
-      isFirst = false;
-    else
-      json << ",";
-    encodeCreateCapsule(json, pair.second);
-  }
-  for (auto pair : mLines)
-  {
-    if (isFirst)
-      isFirst = false;
-    else
-      json << ",";
-    encodeCreateLine(json, pair.second);
+    encodeCreateBox(list, pair.second);
   }
   for (auto pair : mTextures)
   {
-    if (isFirst)
-      isFirst = false;
-    else
-      json << ",";
-    encodeCreateTexture(json, pair.second);
+    encodeCreateTexture(list, pair.second);
   }
   for (auto pair : mMeshes)
   {
-    if (isFirst)
-      isFirst = false;
-    else
-      json << ",";
-    encodeCreateMesh(json, pair.second);
+    encodeCreateMesh(list, pair.second);
+  }
+  for (auto pair : mSpheres)
+  {
+    encodeCreateSphere(list, pair.second);
+  }
+  for (auto pair : mCapsules)
+  {
+    encodeCreateCapsule(list, pair.second);
+  }
+  for (auto pair : mCones)
+  {
+    encodeCreateCone(list, pair.second);
+  }
+  for (auto pair : mCylinders)
+  {
+    encodeCreateCylinder(list, pair.second);
+  }
+  for (auto pair : mLines)
+  {
+    encodeCreateLine(list, pair.second);
+  }
+  for (auto pair : mTooltips)
+  {
+    encodeSetTooltip(list, pair.second);
+  }
+  for (auto pair : mObjectWarnings)
+  {
+    encodeSetObjectWarning(list, pair.second);
+  }
+  for (auto pair : mSpanWarnings)
+  {
+    encodeSetSpanWarning(list, pair.second);
   }
   for (auto pair : mText)
   {
-    if (isFirst)
-      isFirst = false;
-    else
-      json << ",";
-    encodeCreateText(json, pair.second);
+    encodeCreateText(list, pair.second);
   }
   for (auto pair : mButtons)
   {
-    if (isFirst)
-      isFirst = false;
-    else
-      json << ",";
-    encodeCreateButton(json, pair.second);
+    encodeCreateButton(list, pair.second);
   }
   for (auto pair : mSliders)
   {
-    if (isFirst)
-      isFirst = false;
-    else
-      json << ",";
-    encodeCreateSlider(json, pair.second);
+    encodeCreateSlider(list, pair.second);
   }
   for (auto pair : mPlots)
   {
-    if (isFirst)
-      isFirst = false;
-    else
-      json << ",";
-    encodeCreatePlot(json, pair.second);
+    encodeCreatePlot(list, pair.second);
   }
   for (auto pair : mRichPlots)
   {
-    if (isFirst)
-      isFirst = false;
-    else
-      json << ",";
-    encodeCreateRichPlot(json, pair.second);
+    encodeCreateRichPlot(list, pair.second);
     for (auto dataPair : pair.second.data)
     {
-      json << ",";
-      encodeSetRichPlotData(json, pair.second.key, dataPair.second);
+      encodeSetRichPlotData(list, pair.second.key, dataPair.second);
     }
   }
-  for (auto key : mMouseInteractionEnabled)
+  for (auto key : mDragEnabled)
   {
-    if (isFirst)
-      isFirst = false;
-    else
-      json << ",";
-    encodeEnableMouseInteraction(json, key);
+    encodeEnableDrag(list, key);
+  }
+  for (auto key : mTooltipEditable)
+  {
+    encodeEnableEditTooltip(list, key);
   }
 
-  json << "]";
-
-  return json.str();
+  return list.SerializeAsString();
 }
 
 /// This formats the latest set of commands as JSON, and clears the buffer
 std::string GUIStateMachine::flushJson()
 {
-  const std::lock_guard<std::recursive_mutex> lock(mJsonMutex);
+  const std::lock_guard<std::recursive_mutex> lock(mProtoMutex);
 
-  mJson << "]";
-  std::string json = mJson.str();
+  mCommandListOutputBuffer.clear();
+  mCommandList.SerializeToString(&mCommandListOutputBuffer);
 
   // Reset
   mMessagesQueued = 0;
-  mJson = std::stringstream();
-  mJson << "[";
+  mCommandList.Clear();
 
-  return json;
+  return mCommandListOutputBuffer;
 }
 
 /// This is a high-level command that creates/updates all the shapes in a
@@ -170,13 +149,15 @@ void GUIStateMachine::renderWorld(
     const std::shared_ptr<simulation::World>& world,
     const std::string& prefix,
     bool renderForces,
-    bool renderForceMagnitudes)
+    bool renderForceMagnitudes,
+    const std::string& layer)
 {
   const std::lock_guard<std::recursive_mutex> lock(this->globalMutex);
 
   for (int i = 0; i < world->getNumSkeletons(); i++)
   {
-    renderSkeleton(world->getSkeletonRef(i), prefix);
+    renderSkeleton(
+        world->getSkeletonRef(i), prefix, Eigen::Vector4s::Ones() * -1, layer);
   }
 
   const collision::CollisionResult& result = world->getLastCollisionResult();
@@ -190,14 +171,19 @@ void GUIStateMachine::renderWorld(
       std::vector<Eigen::Vector3s> points;
       points.push_back(contact.point);
       points.push_back(contact.point + (contact.normal * scale));
-      createLine(prefix + "__contact_" + std::to_string(i) + "_a", points);
+      createLine(
+          prefix + "__contact_" + std::to_string(i) + "_a",
+          points,
+          Eigen::Vector4s(1.0, 0.5, 0.5, 1.0),
+          layer);
       std::vector<Eigen::Vector3s> pointsB;
       pointsB.push_back(contact.point);
       pointsB.push_back(contact.point - (contact.normal * scale));
       createLine(
           prefix + "__contact_" + std::to_string(i) + "_b",
           pointsB,
-          Eigen::Vector4s(0, 1, 0, 1.0));
+          Eigen::Vector4s(0, 1, 0, 1.0),
+          layer);
     }
   }
 }
@@ -207,7 +193,8 @@ void GUIStateMachine::renderBasis(
     s_t scale,
     const std::string& prefix,
     const Eigen::Vector3s pos,
-    const Eigen::Vector3s euler)
+    const Eigen::Vector3s euler,
+    const std::string& layer)
 {
   const std::lock_guard<std::recursive_mutex> lock(this->globalMutex);
 
@@ -227,11 +214,20 @@ void GUIStateMachine::renderBasis(
 
   deleteObjectsByPrefix(prefix + "__basis_");
   createLine(
-      prefix + "__basis_unitX", pointsX, Eigen::Vector4s(1.0, 0.0, 0.0, 1.0));
+      prefix + "__basis_unitX",
+      pointsX,
+      Eigen::Vector4s(1.0, 0.0, 0.0, 1.0),
+      layer);
   createLine(
-      prefix + "__basis_unitY", pointsY, Eigen::Vector4s(0.0, 1.0, 0.0, 1.0));
+      prefix + "__basis_unitY",
+      pointsY,
+      Eigen::Vector4s(0.0, 1.0, 0.0, 1.0),
+      layer);
   createLine(
-      prefix + "__basis_unitZ", pointsZ, Eigen::Vector4s(0.0, 0.0, 1.0, 1.0));
+      prefix + "__basis_unitZ",
+      pointsZ,
+      Eigen::Vector4s(0.0, 0.0, 1.0, 1.0),
+      layer);
 }
 
 /// This is a high-level command that creates/updates all the shapes in a
@@ -239,12 +235,62 @@ void GUIStateMachine::renderBasis(
 void GUIStateMachine::renderSkeleton(
     const std::shared_ptr<dynamics::Skeleton>& skel,
     const std::string& prefix,
-    Eigen::Vector4s overrideColor)
+    Eigen::Vector4s overrideColor,
+    const std::string& layer)
 {
   const std::lock_guard<std::recursive_mutex> lock(this->globalMutex);
 
   bool useOriginalColor = overrideColor == -1 * Eigen::Vector4s::Ones();
 
+  for (int j = 0; j < skel->getNumJoints(); j++)
+  {
+    dynamics::Joint* joint = skel->getJoint(j);
+    if (joint->getType()
+        == dynamics::ConstantCurveIncompressibleJoint::getStaticType())
+    {
+      dynamics::ConstantCurveIncompressibleJoint* curveJoint
+          = static_cast<dynamics::ConstantCurveIncompressibleJoint*>(joint);
+      Eigen::Isometry3s parentT
+          = curveJoint->getParentBodyNode() != nullptr
+                ? curveJoint->getParentBodyNode()->getWorldTransform()
+                : Eigen::Isometry3s::Identity();
+
+      Eigen::Vector3s neutralPos = curveJoint->getNeutralPos();
+      Eigen::Vector3s totalPos = neutralPos + curveJoint->getPositionsStatic();
+      curveJoint->setNeutralPos(Eigen::Vector3s::Zero());
+      std::vector<Eigen::Vector3s> points;
+      int numPoints = 10;
+      for (int i = 0; i <= numPoints; i++)
+      {
+        s_t frac = ((s_t)(i) / (s_t)numPoints);
+        Eigen::Isometry3s localT
+            = parentT
+              * curveJoint->getRelativeTransformAt(
+                  frac * totalPos, frac * curveJoint->getLength());
+        points.push_back(localT.translation());
+      }
+      curveJoint->setNeutralPos(neutralPos);
+      Eigen::Isometry3s T = curveJoint->getChildBodyNode()->getWorldTransform();
+      renderBasis(
+          0.05,
+          curveJoint->getName(),
+          T.translation(),
+          math::matrixToEulerXYZ(T.linear()));
+
+      std::stringstream jointNameStream;
+      jointNameStream << prefix << "_";
+      jointNameStream << skel->getName();
+      jointNameStream << "_";
+      jointNameStream << joint->getName();
+      std::string jointName = jointNameStream.str();
+
+      createLine(
+          jointName,
+          points,
+          useOriginalColor ? Eigen::Vector4s(1, 0, 0, 1) : overrideColor,
+          layer);
+    }
+  }
   for (int j = 0; j < skel->getNumBodyNodes(); j++)
   {
     dynamics::BodyNode* node = skel->getBodyNode(j);
@@ -301,6 +347,7 @@ void GUIStateMachine::renderSkeleton(
                 shapeNode->getWorldTransform().translation(),
                 math::matrixToEulerXYZ(shapeNode->getWorldTransform().linear()),
                 useOriginalColor ? visual->getRGBA() : overrideColor,
+                layer,
                 visual->getCastShadows(),
                 visual->getReceiveShadows());
           }
@@ -316,6 +363,7 @@ void GUIStateMachine::renderSkeleton(
                 math::matrixToEulerXYZ(shapeNode->getWorldTransform().linear()),
                 meshShape->getScale(),
                 useOriginalColor ? visual->getRGBA() : overrideColor,
+                layer,
                 visual->getCastShadows(),
                 visual->getReceiveShadows());
           }
@@ -328,6 +376,7 @@ void GUIStateMachine::renderSkeleton(
                 sphereShape->getRadius(),
                 shapeNode->getWorldTransform().translation(),
                 useOriginalColor ? visual->getRGBA() : overrideColor,
+                layer,
                 visual->getCastShadows(),
                 visual->getReceiveShadows());
           }
@@ -342,6 +391,7 @@ void GUIStateMachine::renderSkeleton(
                 shapeNode->getWorldTransform().translation(),
                 math::matrixToEulerXYZ(shapeNode->getWorldTransform().linear()),
                 useOriginalColor ? visual->getRGBA() : overrideColor,
+                layer,
                 visual->getCastShadows(),
                 visual->getReceiveShadows());
           }
@@ -356,6 +406,7 @@ void GUIStateMachine::renderSkeleton(
                 sphereShape->getRadii()[0],
                 shapeNode->getWorldTransform().translation(),
                 useOriginalColor ? visual->getRGBA() : overrideColor,
+                layer,
                 visual->getCastShadows(),
                 visual->getReceiveShadows());
           }
@@ -370,6 +421,7 @@ void GUIStateMachine::renderSkeleton(
                      "and MeshShape and CapsuleShape are "
                   << "supported. This shape will be invisible in the GUI.\n";
           }
+          setObjectTooltip(shapeName, node->getName());
         }
       }
       else
@@ -430,11 +482,113 @@ void GUIStateMachine::renderSkeleton(
             setObjectPosition(shapeName, pos);
           if (getObjectRotation(shapeName) != euler)
             setObjectRotation(shapeName, euler);
-          if (getObjectColor(shapeName) != color)
+          if (getObjectColor(shapeName) != color && !useOriginalColor)
             setObjectColor(shapeName, color);
         }
       }
     }
+  }
+}
+
+/// This is a high-level command that creates/updates all the shapes in a
+/// world by calling the lower-level commands
+void GUIStateMachine::renderSkeletonInertiaCubes(
+    const std::shared_ptr<dynamics::Skeleton>& skel,
+    const std::string& prefix,
+    Eigen::Vector4s color,
+    const std::string& layer)
+{
+  const std::lock_guard<std::recursive_mutex> lock(this->globalMutex);
+
+  for (int j = 0; j < skel->getNumBodyNodes(); j++)
+  {
+    dynamics::BodyNode* node = skel->getBodyNode(j);
+    if (node == nullptr)
+    {
+      std::cout << "ERROR! GUIStateMachine found a null body node! This "
+                   "isn't supposed to be possible. Proceeding anyways."
+                << std::endl;
+      continue;
+    }
+
+    Eigen::Vector3s com = node->getCOM();
+    Eigen::Vector6s dimsAndEuler = node->getInertia().getDimsAndEulerVector();
+    Eigen::Vector3s dims = dimsAndEuler.head<3>();
+    Eigen::Vector3s euler = dimsAndEuler.tail<3>();
+    Eigen::Matrix3s R = math::eulerXYZToMatrix(euler);
+    std::string name = prefix + node->getName();
+
+    createBox(
+        name,
+        dims,
+        com,
+        math::matrixToEulerXYZ(node->getWorldTransform().linear() * R),
+        color,
+        layer,
+        false,
+        false);
+    setObjectTooltip(name, node->getName() + " Inertia");
+  }
+}
+
+/// This either creates or moves an arrow to have the new start and end points
+void GUIStateMachine::renderArrow(
+    Eigen::Vector3s start,
+    Eigen::Vector3s end,
+    s_t bodyRadius,
+    s_t tipRadius,
+    Eigen::Vector4s color,
+    const std::string& prefix,
+    const std::string& layer)
+{
+  std::string cylinderKey = prefix + "_cylinder";
+  std::string coneKey = prefix + "_cone";
+
+  s_t length = (end - start).norm();
+  s_t headRatio = 0.5;
+  s_t headLength = length * headRatio;
+  s_t bodyLength = length * (1.0 - headRatio);
+
+  Eigen::Vector3s bodyCenter
+      = start + (end - start).normalized() * bodyLength * 0.5;
+  Eigen::Vector3s headCenter
+      = end + (start - end).normalized() * headLength * 0.5;
+
+  Eigen::Matrix3s R = Eigen::Matrix3s::Zero();
+  R.col(1) = (end - start).normalized();
+  Eigen::Vector3s cross = Eigen::Vector3s::UnitX();
+  if ((R.col(1) - cross).norm() < 1e-8)
+  {
+    cross = Eigen::Vector3s::UnitZ();
+  }
+  R.col(0) = R.col(1).cross(cross).normalized();
+  R.col(2) = R.col(1).cross(R.col(0)).normalized();
+  Eigen::Vector3s euler = math::matrixToEulerXYZ(R);
+
+  // If this arrow alread exists, just update it
+  if (mCones.find(coneKey) != mCones.end()
+      && mCylinders.find(cylinderKey) != mCylinders.end())
+  {
+    setObjectPosition(cylinderKey, bodyCenter);
+    setObjectRotation(cylinderKey, euler);
+    setObjectScale(
+        cylinderKey, Eigen::Vector3s(bodyRadius, bodyLength, bodyRadius));
+    setObjectColor(cylinderKey, color);
+
+    setObjectPosition(coneKey, headCenter);
+    setObjectRotation(coneKey, euler);
+    setObjectScale(coneKey, Eigen::Vector3s(tipRadius, headLength, tipRadius));
+    setObjectColor(coneKey, color);
+  }
+  // If it doesn't yet exist, we've got to create the objects
+  else
+  {
+    createCylinder(cylinderKey, 1.0, 1.0, bodyCenter, euler, color, layer);
+    setObjectScale(
+        cylinderKey, Eigen::Vector3s(bodyRadius, bodyLength, bodyRadius));
+
+    createCone(coneKey, 1.0, 1.0, headCenter, euler, color, layer);
+    setObjectScale(coneKey, Eigen::Vector3s(tipRadius, headLength, tipRadius));
   }
 }
 
@@ -443,7 +597,8 @@ void GUIStateMachine::renderSkeleton(
 void GUIStateMachine::renderTrajectoryLines(
     std::shared_ptr<simulation::World> originalWorld,
     Eigen::MatrixXs positions,
-    std::string prefix)
+    std::string prefix,
+    const std::string& layer)
 {
   // Just clone the world, to avoid contention for the world, since this method
   // can spend a long time setting the world into different states.
@@ -488,7 +643,7 @@ void GUIStateMachine::renderTrajectoryLines(
   for (auto pair : paths)
   {
     // This command will automatically overwrite any lines with the same key
-    createLine(pair.first, pair.second, colors[pair.first]);
+    createLine(pair.first, pair.second, colors[pair.first], layer);
   }
 }
 
@@ -497,7 +652,8 @@ void GUIStateMachine::renderBodyWrench(
     const dynamics::BodyNode* body,
     Eigen::Vector6s wrench,
     s_t scaleFactor,
-    std::string prefix)
+    std::string prefix,
+    const std::string& layer)
 {
   const std::lock_guard<std::recursive_mutex> lock(this->globalMutex);
 
@@ -528,17 +684,22 @@ void GUIStateMachine::renderBodyWrench(
   createLine(
       prefix + "_" + body->getName() + "_torque",
       torqueLine,
-      Eigen::Vector4s(0.8, 0.8, 0.8, 1.0));
+      Eigen::Vector4s(0.8, 0.8, 0.8, 1.0),
+      layer);
   createLine(
       prefix + "_" + body->getName() + "_force",
       forceLine,
-      Eigen::Vector4s(1.0, 0.0, 0.0, 1.0));
+      Eigen::Vector4s(1.0, 0.0, 0.0, 1.0),
+      layer);
 }
 
 /// This renders little velocity lines starting at every vertex in the passed
 /// in body
 void GUIStateMachine::renderMovingBodyNodeVertices(
-    const dynamics::BodyNode* body, s_t scaleFactor, std::string prefix)
+    const dynamics::BodyNode* body,
+    s_t scaleFactor,
+    std::string prefix,
+    const std::string& layer)
 {
   std::vector<dynamics::BodyNode::MovingVertex> verts
       = body->getMovingVerticesInWorldSpace();
@@ -551,7 +712,8 @@ void GUIStateMachine::renderMovingBodyNodeVertices(
     createLine(
         prefix + "_" + body->getName() + "_" + std::to_string(i),
         line,
-        Eigen::Vector4s(1.0, 0.0, 0.0, 1.0));
+        Eigen::Vector4s(1.0, 0.0, 0.0, 1.0),
+        layer);
   }
 }
 
@@ -570,10 +732,15 @@ void GUIStateMachine::clear()
 {
   const std::lock_guard<std::recursive_mutex> lock(this->globalMutex);
 
-  queueCommand(
-      [&](std::stringstream& json) { json << "{ \"type\": \"clear_all\" }"; });
+  queueCommand([&](proto::CommandList& list) {
+    proto::Command* command = list.add_command();
+    command->mutable_clear_all()->set_dummy(true);
+  });
+
   mBoxes.clear();
   mSpheres.clear();
+  mCylinders.clear();
+  mCones.clear();
   mCapsules.clear();
   mLines.clear();
   mMeshes.clear();
@@ -583,6 +750,32 @@ void GUIStateMachine::clear()
   mPlots.clear();
 }
 
+/// Set frames per second
+void GUIStateMachine::setFramesPerSecond(int framesPerSecond)
+{
+  const std::lock_guard<std::recursive_mutex> lock(this->globalMutex);
+
+  queueCommand([this, framesPerSecond](proto::CommandList& json) {
+    encodeSetFramesPerSecond(json, framesPerSecond);
+  });
+}
+
+/// This creates a layer in the web GUI
+void GUIStateMachine::createLayer(
+    std::string key, const Eigen::Vector4s& color, bool defaultShow)
+{
+  const std::lock_guard<std::recursive_mutex> lock(this->globalMutex);
+
+  Layer& layer = mLayers[key];
+  layer.key = key;
+  layer.color = color;
+  layer.defaultShow = defaultShow;
+
+  queueCommand([this, key](proto::CommandList& json) {
+    encodeCreateLayer(json, mLayers[key]);
+  });
+}
+
 /// This creates a box in the web GUI under a specified key
 void GUIStateMachine::createBox(
     std::string key,
@@ -590,6 +783,7 @@ void GUIStateMachine::createBox(
     const Eigen::Vector3s& pos,
     const Eigen::Vector3s& euler,
     const Eigen::Vector4s& color,
+    const std::string& layer,
     bool castShadows,
     bool receiveShadows)
 {
@@ -601,11 +795,12 @@ void GUIStateMachine::createBox(
   box.pos = pos;
   box.euler = euler;
   box.color = color;
+  box.layer = layer;
   box.castShadows = castShadows;
   box.receiveShadows = receiveShadows;
 
-  queueCommand([this, key](std::stringstream& json) {
-    encodeCreateBox(json, mBoxes[key]);
+  queueCommand([this, key](proto::CommandList& list) {
+    encodeCreateBox(list, mBoxes[key]);
   });
 }
 
@@ -615,6 +810,21 @@ void GUIStateMachine::createSphere(
     s_t radius,
     const Eigen::Vector3s& pos,
     const Eigen::Vector4s& color,
+    const std::string& layer,
+    bool castShadows,
+    bool receiveShadows)
+{
+  Eigen::Vector3s radii = Eigen::Vector3s::Constant(radius);
+  createSphere(key, radii, pos, color, layer, castShadows, receiveShadows);
+}
+
+/// This creates a sphere in the web GUI under a specified key
+void GUIStateMachine::createSphere(
+    std::string key,
+    Eigen::Vector3s radii,
+    const Eigen::Vector3s& pos,
+    const Eigen::Vector4s& color,
+    const std::string& layer,
     bool castShadows,
     bool receiveShadows)
 {
@@ -622,14 +832,73 @@ void GUIStateMachine::createSphere(
 
   Sphere& sphere = mSpheres[key];
   sphere.key = key;
-  sphere.radius = radius;
+  sphere.radii = radii;
   sphere.pos = pos;
   sphere.color = color;
+  sphere.layer = layer;
   sphere.castShadows = castShadows;
   sphere.receiveShadows = receiveShadows;
 
-  queueCommand([this, key](std::stringstream& json) {
-    encodeCreateSphere(json, mSpheres[key]);
+  queueCommand([this, key](proto::CommandList& list) {
+    encodeCreateSphere(list, mSpheres.at(key));
+  });
+}
+
+/// This creates a cone in the web GUI under a specified key
+void GUIStateMachine::createCone(
+    std::string key,
+    s_t radius,
+    s_t height,
+    const Eigen::Vector3s& pos,
+    const Eigen::Vector3s& euler,
+    const Eigen::Vector4s& color,
+    const std::string& layer,
+    bool castShadows,
+    bool receiveShadows)
+{
+  const std::lock_guard<std::recursive_mutex> lock(this->globalMutex);
+
+  Cone& cone = mCones[key];
+  cone.key = key;
+  cone.radius = radius;
+  cone.height = height;
+  cone.pos = pos;
+  cone.euler = euler;
+  cone.color = color;
+  cone.layer = layer;
+  cone.castShadows = castShadows;
+  cone.receiveShadows = receiveShadows;
+
+  queueCommand([this, key](proto::CommandList& list) {
+    encodeCreateCone(list, mCones.at(key));
+  });
+}
+
+/// This creates a cylinder in the web GUI under a specified key
+void GUIStateMachine::createCylinder(
+    std::string key,
+    s_t radius,
+    s_t height,
+    const Eigen::Vector3s& pos,
+    const Eigen::Vector3s& euler,
+    const Eigen::Vector4s& color,
+    const std::string& layer,
+    bool castShadows,
+    bool receiveShadows)
+{
+  Cylinder& cylinder = mCylinders[key];
+  cylinder.key = key;
+  cylinder.radius = radius;
+  cylinder.height = height;
+  cylinder.pos = pos;
+  cylinder.euler = euler;
+  cylinder.color = color;
+  cylinder.layer = layer;
+  cylinder.castShadows = castShadows;
+  cylinder.receiveShadows = receiveShadows;
+
+  queueCommand([this, key](proto::CommandList& list) {
+    encodeCreateCylinder(list, mCylinders.at(key));
   });
 }
 
@@ -641,6 +910,7 @@ void GUIStateMachine::createCapsule(
     const Eigen::Vector3s& pos,
     const Eigen::Vector3s& euler,
     const Eigen::Vector4s& color,
+    const std::string& layer,
     bool castShadows,
     bool receiveShadows)
 {
@@ -653,11 +923,12 @@ void GUIStateMachine::createCapsule(
   capsule.pos = pos;
   capsule.euler = euler;
   capsule.color = color;
+  capsule.layer = layer;
   capsule.castShadows = castShadows;
   capsule.receiveShadows = receiveShadows;
 
-  queueCommand([this, key](std::stringstream& json) {
-    encodeCreateCapsule(json, mCapsules[key]);
+  queueCommand([this, key](proto::CommandList& list) {
+    encodeCreateCapsule(list, mCapsules.at(key));
   });
 }
 
@@ -665,7 +936,9 @@ void GUIStateMachine::createCapsule(
 void GUIStateMachine::createLine(
     std::string key,
     const std::vector<Eigen::Vector3s>& points,
-    const Eigen::Vector4s& color)
+    const Eigen::Vector4s& color,
+    const std::string& layer,
+    const std::vector<s_t>& width)
 {
   const std::lock_guard<std::recursive_mutex> lock(this->globalMutex);
 
@@ -673,9 +946,22 @@ void GUIStateMachine::createLine(
   line.key = key;
   line.points = points;
   line.color = color;
+  line.layer = layer;
+  line.width.clear();
+  for (int i = 0; i < line.points.size(); i++)
+  {
+    if (i < width.size())
+    {
+      line.width.push_back(width[i]);
+    }
+    else
+    {
+      line.width.push_back(1.0);
+    }
+  }
 
-  queueCommand([this, key](std::stringstream& json) {
-    encodeCreateLine(json, mLines[key]);
+  queueCommand([this, key](proto::CommandList& list) {
+    encodeCreateLine(list, mLines.at(key));
   });
 }
 
@@ -693,6 +979,7 @@ void GUIStateMachine::createMesh(
     const Eigen::Vector3s& euler,
     const Eigen::Vector3s& scale,
     const Eigen::Vector4s& color,
+    const std::string& layer,
     bool castShadows,
     bool receiveShadows)
 {
@@ -710,11 +997,12 @@ void GUIStateMachine::createMesh(
   mesh.euler = euler;
   mesh.scale = scale;
   mesh.color = color;
+  mesh.layer = layer;
   mesh.castShadows = castShadows;
   mesh.receiveShadows = receiveShadows;
 
-  queueCommand([this, key](std::stringstream& json) {
-    encodeCreateMesh(json, mMeshes[key]);
+  queueCommand([this, key](proto::CommandList& list) {
+    encodeCreateMesh(list, mMeshes.at(key));
   });
 }
 
@@ -728,6 +1016,7 @@ void GUIStateMachine::createMeshASSIMP(
     const Eigen::Vector3s& euler,
     const Eigen::Vector3s& scale,
     const Eigen::Vector4s& color,
+    const std::string& layer,
     bool castShadows,
     bool receiveShadows)
 {
@@ -814,6 +1103,7 @@ void GUIStateMachine::createMeshASSIMP(
       euler,
       scale,
       color,
+      layer,
       castShadows,
       receiveShadows);
 }
@@ -825,6 +1115,7 @@ void GUIStateMachine::createMeshFromShape(
     const Eigen::Vector3s& euler,
     const Eigen::Vector3s& scale,
     const Eigen::Vector4s& color,
+    const std::string& layer,
     bool castShadows,
     bool receiveShadows)
 {
@@ -836,6 +1127,7 @@ void GUIStateMachine::createMeshFromShape(
       euler,
       scale,
       color,
+      layer,
       castShadows,
       receiveShadows);
 }
@@ -852,8 +1144,9 @@ void GUIStateMachine::createTexture(
 
   mTextures[key] = tex;
 
-  queueCommand(
-      [&](std::stringstream& json) { encodeCreateTexture(json, tex); });
+  queueCommand([this, key](proto::CommandList& list) {
+    encodeCreateTexture(list, mTextures[key]);
+  });
 }
 
 /// This creates a texture object by loading it from a file
@@ -883,6 +1176,10 @@ bool GUIStateMachine::hasObject(const std::string& key)
     return true;
   if (mCapsules.find(key) != mCapsules.end())
     return true;
+  if (mCylinders.find(key) != mCylinders.end())
+    return true;
+  if (mCones.find(key) != mCones.end())
+    return true;
   if (mLines.find(key) != mLines.end())
     return true;
   if (mMeshes.find(key) != mMeshes.end())
@@ -897,13 +1194,17 @@ Eigen::Vector3s GUIStateMachine::getObjectPosition(const std::string& key)
   const std::lock_guard<std::recursive_mutex> lock(this->globalMutex);
 
   if (mBoxes.find(key) != mBoxes.end())
-    return mBoxes[key].pos;
+    return mBoxes.at(key).pos;
   if (mSpheres.find(key) != mSpheres.end())
-    return mSpheres[key].pos;
+    return mSpheres.at(key).pos;
   if (mCapsules.find(key) != mCapsules.end())
-    return mCapsules[key].pos;
+    return mCapsules.at(key).pos;
+  if (mCones.find(key) != mCones.end())
+    return mCones.at(key).pos;
+  if (mCylinders.find(key) != mCylinders.end())
+    return mCylinders.at(key).pos;
   if (mMeshes.find(key) != mMeshes.end())
-    return mMeshes[key].pos;
+    return mMeshes.at(key).pos;
   return Eigen::Vector3s::Zero();
 }
 
@@ -914,11 +1215,15 @@ Eigen::Vector3s GUIStateMachine::getObjectRotation(const std::string& key)
   const std::lock_guard<std::recursive_mutex> lock(this->globalMutex);
 
   if (mBoxes.find(key) != mBoxes.end())
-    return mBoxes[key].euler;
+    return mBoxes.at(key).euler;
   if (mCapsules.find(key) != mCapsules.end())
-    return mCapsules[key].euler;
+    return mCapsules.at(key).euler;
+  if (mCones.find(key) != mCones.end())
+    return mCones.at(key).euler;
+  if (mCylinders.find(key) != mCylinders.end())
+    return mCylinders.at(key).euler;
   if (mMeshes.find(key) != mMeshes.end())
-    return mMeshes[key].euler;
+    return mMeshes.at(key).euler;
   return Eigen::Vector3s::Zero();
 }
 
@@ -929,15 +1234,19 @@ Eigen::Vector4s GUIStateMachine::getObjectColor(const std::string& key)
   const std::lock_guard<std::recursive_mutex> lock(this->globalMutex);
 
   if (mBoxes.find(key) != mBoxes.end())
-    return mBoxes[key].color;
+    return mBoxes.at(key).color;
   if (mSpheres.find(key) != mSpheres.end())
-    return mSpheres[key].color;
+    return mSpheres.at(key).color;
   if (mCapsules.find(key) != mCapsules.end())
-    return mCapsules[key].color;
+    return mCapsules.at(key).color;
+  if (mCones.find(key) != mCones.end())
+    return mCones.at(key).color;
+  if (mCylinders.find(key) != mCylinders.end())
+    return mCylinders.at(key).color;
   if (mLines.find(key) != mLines.end())
-    return mLines[key].color;
+    return mLines.at(key).color;
   if (mMeshes.find(key) != mMeshes.end())
-    return mMeshes[key].color;
+    return mMeshes.at(key).color;
   return Eigen::Vector4s::Zero();
 }
 
@@ -948,11 +1257,11 @@ Eigen::Vector3s GUIStateMachine::getObjectScale(const std::string& key)
   const std::lock_guard<std::recursive_mutex> lock(this->globalMutex);
 
   if (mBoxes.find(key) != mBoxes.end())
-    return mBoxes[key].size;
+    return mBoxes.at(key).size;
   if (mSpheres.find(key) != mSpheres.end())
-    return Eigen::Vector3s::Ones() * mSpheres[key].radius;
+    return mSpheres.at(key).radii;
   if (mMeshes.find(key) != mMeshes.end())
-    return mMeshes[key].scale;
+    return mMeshes.at(key).scale;
   return Eigen::Vector3s::Zero();
 }
 
@@ -964,26 +1273,35 @@ void GUIStateMachine::setObjectPosition(
 
   if (mBoxes.find(key) != mBoxes.end())
   {
-    mBoxes[key].pos = pos;
+    mBoxes.at(key).pos = pos;
   }
   if (mSpheres.find(key) != mSpheres.end())
   {
-    mSpheres[key].pos = pos;
+    mSpheres.at(key).pos = pos;
   }
   if (mCapsules.find(key) != mCapsules.end())
   {
-    mCapsules[key].pos = pos;
+    mCapsules.at(key).pos = pos;
+  }
+  if (mCones.find(key) != mCones.end())
+  {
+    mCones.at(key).pos = pos;
+  }
+  if (mCylinders.find(key) != mCylinders.end())
+  {
+    mCylinders.at(key).pos = pos;
   }
   if (mMeshes.find(key) != mMeshes.end())
   {
-    mMeshes[key].pos = pos;
+    mMeshes.at(key).pos = pos;
   }
 
-  queueCommand([&](std::stringstream& json) {
-    json << "{ \"type\": \"set_object_pos\", \"key\": \"" << key
-         << "\", \"pos\": ";
-    vec3ToJson(json, pos);
-    json << "}";
+  queueCommand([&](proto::CommandList& list) {
+    proto::Command* command = list.add_command();
+    command->mutable_set_object_position()->set_key(getStringCode(key));
+    command->mutable_set_object_position()->add_data((double)pos(0));
+    command->mutable_set_object_position()->add_data((double)pos(1));
+    command->mutable_set_object_position()->add_data((double)pos(2));
   });
 }
 
@@ -995,22 +1313,31 @@ void GUIStateMachine::setObjectRotation(
 
   if (mBoxes.find(key) != mBoxes.end())
   {
-    mBoxes[key].euler = euler;
+    mBoxes.at(key).euler = euler;
   }
   if (mCapsules.find(key) != mCapsules.end())
   {
-    mCapsules[key].euler = euler;
+    mCapsules.at(key).euler = euler;
+  }
+  if (mCylinders.find(key) != mCylinders.end())
+  {
+    mCylinders.at(key).euler = euler;
+  }
+  if (mCones.find(key) != mCones.end())
+  {
+    mCones.at(key).euler = euler;
   }
   if (mMeshes.find(key) != mMeshes.end())
   {
-    mMeshes[key].euler = euler;
+    mMeshes.at(key).euler = euler;
   }
 
-  queueCommand([&](std::stringstream& json) {
-    json << "{ \"type\": \"set_object_rotation\", \"key\": \"" << key
-         << "\", \"euler\": ";
-    vec3ToJson(json, euler);
-    json << "}";
+  queueCommand([&](proto::CommandList& list) {
+    proto::Command* command = list.add_command();
+    command->mutable_set_object_rotation()->set_key(getStringCode(key));
+    command->mutable_set_object_rotation()->add_data((double)euler(0));
+    command->mutable_set_object_rotation()->add_data((double)euler(1));
+    command->mutable_set_object_rotation()->add_data((double)euler(2));
   });
 }
 
@@ -1022,30 +1349,40 @@ void GUIStateMachine::setObjectColor(
 
   if (mBoxes.find(key) != mBoxes.end())
   {
-    mBoxes[key].color = color;
+    mBoxes.at(key).color = color;
   }
   if (mSpheres.find(key) != mSpheres.end())
   {
-    mSpheres[key].color = color;
+    mSpheres.at(key).color = color;
   }
   if (mLines.find(key) != mLines.end())
   {
-    mLines[key].color = color;
+    mLines.at(key).color = color;
   }
   if (mMeshes.find(key) != mMeshes.end())
   {
-    mMeshes[key].color = color;
+    mMeshes.at(key).color = color;
   }
   if (mCapsules.find(key) != mCapsules.end())
   {
-    mCapsules[key].color = color;
+    mCapsules.at(key).color = color;
+  }
+  if (mCylinders.find(key) != mCylinders.end())
+  {
+    mCylinders.at(key).color = color;
+  }
+  if (mCones.find(key) != mCones.end())
+  {
+    mCones.at(key).color = color;
   }
 
-  queueCommand([&](std::stringstream& json) {
-    json << "{ \"type\": \"set_object_color\", \"key\": \"" << key
-         << "\", \"color\": ";
-    vec4ToJson(json, color);
-    json << "}";
+  queueCommand([&](proto::CommandList& list) {
+    proto::Command* command = list.add_command();
+    command->mutable_set_object_color()->set_key(getStringCode(key));
+    command->mutable_set_object_color()->add_data((double)color(0));
+    command->mutable_set_object_color()->add_data((double)color(1));
+    command->mutable_set_object_color()->add_data((double)color(2));
+    command->mutable_set_object_color()->add_data((double)color(3));
   });
 }
 
@@ -1058,31 +1395,146 @@ void GUIStateMachine::setObjectScale(
 
   if (mBoxes.find(key) != mBoxes.end())
   {
-    mBoxes[key].size = scale;
+    mBoxes.at(key).size = scale;
   }
   if (mSpheres.find(key) != mSpheres.end())
   {
-    mSpheres[key].radius = scale(0);
+    mSpheres.at(key).radii = scale;
   }
   if (mMeshes.find(key) != mMeshes.end())
   {
-    mMeshes[key].scale = scale;
+    mMeshes.at(key).scale = scale;
+  }
+  if (mCapsules.find(key) != mCapsules.end())
+  {
+    mCapsules.at(key).height = scale(1);
+    mCapsules.at(key).radius = scale(0);
+  }
+  if (mCylinders.find(key) != mCylinders.end())
+  {
+    mCylinders.at(key).height = scale(1);
+    mCylinders.at(key).radius = scale(0);
+  }
+  if (mCones.find(key) != mCones.end())
+  {
+    mCones.at(key).height = scale(1);
+    mCones.at(key).radius = scale(0);
   }
 
-  queueCommand([&](std::stringstream& json) {
-    json << "{ \"type\": \"set_object_scale\", \"key\": \"" << key
-         << "\", \"scale\": ";
-    vec3ToJson(json, scale);
-    json << "}";
+  queueCommand([&](proto::CommandList& list) {
+    proto::Command* command = list.add_command();
+    command->mutable_set_object_scale()->set_key(getStringCode(key));
+    command->mutable_set_object_scale()->add_data((double)scale(0));
+    command->mutable_set_object_scale()->add_data((double)scale(1));
+    command->mutable_set_object_scale()->add_data((double)scale(2));
   });
 }
 
-/// This sets an object to allow mouse interaction on the GUI
-void GUIStateMachine::setObjectMouseInteractionEnabled(const std::string& key)
+/// This sets a tooltip for the object at key.
+void GUIStateMachine::setObjectTooltip(
+    const std::string& key, const std::string& tooltip)
 {
-  mMouseInteractionEnabled.emplace(key);
-  queueCommand([&](std::stringstream& json) {
-    encodeEnableMouseInteraction(json, key);
+  const std::lock_guard<std::recursive_mutex> lock(this->globalMutex);
+
+  Tooltip& t = mTooltips[key];
+  t.key = key;
+  t.tooltip = tooltip;
+
+  queueCommand([this, key](proto::CommandList& list) {
+    encodeSetTooltip(list, mTooltips[key]);
+  });
+}
+
+/// This removes a tooltip for the object at key.
+void GUIStateMachine::deleteObjectTooltip(const std::string& key)
+{
+  const std::lock_guard<std::recursive_mutex> lock(this->globalMutex);
+
+  mTooltips.erase(key);
+
+  queueCommand([&](proto::CommandList& list) {
+    proto::Command* command = list.add_command();
+    command->mutable_delete_object_tooltip()->set_key(getStringCode(key));
+  });
+}
+
+/// This sets a warning on a span of timesteps - only has an effect on the
+/// replay viewer, not on a live view
+void GUIStateMachine::setSpanWarning(
+    int startTimestep,
+    int endTimestep,
+    const std::string& warningKey,
+    const std::string& warning,
+    const std::string& layer)
+{
+  const std::lock_guard<std::recursive_mutex> lock(this->globalMutex);
+
+  SpanWarning& w = mSpanWarnings[warningKey];
+  w.warningKey = warningKey;
+  w.warning = warning;
+  w.startTimestep = startTimestep;
+  w.endTimestep = endTimestep;
+  w.layer = layer;
+
+  queueCommand([this, warningKey](proto::CommandList& list) {
+    encodeSetSpanWarning(list, mSpanWarnings[warningKey]);
+  });
+}
+
+/// This sets a warning for the object at key.
+void GUIStateMachine::setObjectWarning(
+    const std::string& key,
+    const std::string& warningKey,
+    const std::string& warning,
+    const std::string& layer)
+{
+  const std::lock_guard<std::recursive_mutex> lock(this->globalMutex);
+
+  ObjectWarning& w = mObjectWarnings[warningKey];
+  w.key = key;
+  w.warningKey = warningKey;
+  w.warning = warning;
+  w.layer = layer;
+
+  queueCommand([this, warningKey](proto::CommandList& list) {
+    encodeSetObjectWarning(list, mObjectWarnings[warningKey]);
+  });
+}
+
+/// This deletes a warning for the object at key.
+void GUIStateMachine::deleteObjectWarning(
+    const std::string& key, const std::string& warningKey)
+{
+  const std::lock_guard<std::recursive_mutex> lock(this->globalMutex);
+
+  mObjectWarnings.erase(key);
+
+  queueCommand([&](proto::CommandList& list) {
+    proto::Command* command = list.add_command();
+    command->mutable_delete_object_warning()->set_key(getStringCode(key));
+    command->mutable_delete_object_warning()->set_warning_key(
+        getStringCode(warningKey));
+  });
+}
+
+/// This sets an object to allow dragging around by the mouse on the GUI
+void GUIStateMachine::setObjectDragEnabled(const std::string& key)
+{
+  mDragEnabled.emplace(key);
+  queueCommand([&](proto::CommandList& list) {
+    proto::Command* command = list.add_command();
+    command->mutable_enable_drag()->set_key(getStringCode(key));
+  });
+}
+
+/// This sets an object to allow editing the tooltip by double-clicking on the
+/// object
+void GUIStateMachine::setObjectTooltipEditable(const std::string& key)
+{
+  mTooltipEditable.emplace(key);
+  queueCommand([&](proto::CommandList& list) {
+    proto::Command* command = list.add_command();
+    command->mutable_enable_edit_tooltip()->set_key(getStringCode(key));
   });
 }
 
@@ -1091,14 +1543,25 @@ void GUIStateMachine::deleteObject(const std::string& key)
 {
   const std::lock_guard<std::recursive_mutex> lock(this->globalMutex);
 
+  // We actually want to delete objects even if they don't currently exist,
+  // because people may skip frames in the visualizer and we want to properly
+  // clean up. if (!hasObject(key))
+  // {
+  //   return;
+  // }
+
   mBoxes.erase(key);
   mSpheres.erase(key);
   mLines.erase(key);
   mMeshes.erase(key);
   mCapsules.erase(key);
+  mCones.erase(key);
+  mCylinders.erase(key);
+  mTooltips.erase(key);
 
-  queueCommand([&](std::stringstream& json) {
-    json << "{ \"type\": \"delete_object\", \"key\": \"" << key << "\" }";
+  queueCommand([&](proto::CommandList& list) {
+    proto::Command* command = list.add_command();
+    command->mutable_delete_object()->set_key(getStringCode(key));
   });
 }
 
@@ -1178,6 +1641,34 @@ void GUIStateMachine::deleteObjectsByPrefix(const std::string& prefix)
     }
   }
 
+  for (auto& pair : mCylinders)
+  {
+    if (prefix.size() <= pair.first.size())
+    {
+      auto res
+          = std::mismatch(prefix.begin(), prefix.end(), pair.first.begin());
+      if (res.first == prefix.end())
+      {
+        // We've got a match!
+        toDelete.push_back(pair.first);
+      }
+    }
+  }
+
+  for (auto& pair : mCones)
+  {
+    if (prefix.size() <= pair.first.size())
+    {
+      auto res
+          = std::mismatch(prefix.begin(), prefix.end(), pair.first.begin());
+      if (res.first == prefix.end())
+      {
+        // We've got a match!
+        toDelete.push_back(pair.first);
+      }
+    }
+  }
+
   for (std::string key : toDelete)
   {
     deleteObject(key);
@@ -1189,7 +1680,8 @@ void GUIStateMachine::createText(
     const std::string& key,
     const std::string& contents,
     const Eigen::Vector2i& fromTopLeft,
-    const Eigen::Vector2i& size)
+    const Eigen::Vector2i& size,
+    const std::string& layer)
 {
   const std::lock_guard<std::recursive_mutex> lock(this->globalMutex);
 
@@ -1198,10 +1690,11 @@ void GUIStateMachine::createText(
   text.contents = contents;
   text.fromTopLeft = fromTopLeft;
   text.size = size;
+  text.layer = layer;
 
   mText[key] = text;
 
-  queueCommand([&](std::stringstream& json) { encodeCreateText(json, text); });
+  queueCommand([&](proto::CommandList& list) { encodeCreateText(list, text); });
 }
 
 /// This changes the contents of text on the screen
@@ -1214,9 +1707,10 @@ void GUIStateMachine::setTextContents(
   {
     mText[key].contents = newContents;
 
-    queueCommand([&](std::stringstream& json) {
-      json << "{ \"type\": \"set_text_contents\", \"key\": " << key
-           << "\", \"label\": \"" << escapeJson(newContents) << "\" }";
+    queueCommand([&](proto::CommandList& list) {
+      proto::Command* command = list.add_command();
+      command->mutable_set_text_contents()->set_key(getStringCode(key));
+      command->mutable_set_text_contents()->set_contents(newContents);
     });
   }
   else
@@ -1234,7 +1728,8 @@ void GUIStateMachine::createButton(
     const std::string& label,
     const Eigen::Vector2i& fromTopLeft,
     const Eigen::Vector2i& size,
-    std::function<void()> onClick)
+    std::function<void()> onClick,
+    const std::string& layer)
 {
   const std::lock_guard<std::recursive_mutex> lock(this->globalMutex);
 
@@ -1244,11 +1739,12 @@ void GUIStateMachine::createButton(
   button.fromTopLeft = fromTopLeft;
   button.size = size;
   button.onClick = onClick;
+  button.layer = layer;
 
   mButtons[key] = button;
 
   queueCommand(
-      [&](std::stringstream& json) { encodeCreateButton(json, button); });
+      [&](proto::CommandList& list) { encodeCreateButton(list, button); });
 }
 
 /// This changes the contents of text on the screen
@@ -1261,9 +1757,10 @@ void GUIStateMachine::setButtonLabel(
   {
     mButtons[key].label = newLabel;
 
-    queueCommand([&](std::stringstream& json) {
-      json << "{ \"type\": \"set_button_label\", \"key\": " << key
-           << "\", \"label\": \"" << escapeJson(newLabel) << "\" }";
+    queueCommand([&](proto::CommandList& list) {
+      proto::Command* command = list.add_command();
+      command->mutable_set_button_label()->set_key(getStringCode(key));
+      command->mutable_set_button_label()->set_label(newLabel);
     });
   }
   else
@@ -1285,7 +1782,8 @@ void GUIStateMachine::createSlider(
     s_t value,
     bool onlyInts,
     bool horizontal,
-    std::function<void(s_t)> onChange)
+    std::function<void(s_t)> onChange,
+    const std::string& layer)
 {
   const std::lock_guard<std::recursive_mutex> lock(this->globalMutex);
 
@@ -1299,11 +1797,12 @@ void GUIStateMachine::createSlider(
   slider.onlyInts = onlyInts;
   slider.horizontal = horizontal;
   slider.onChange = onChange;
+  slider.layer = layer;
 
   mSliders[key] = slider;
 
   queueCommand(
-      [&](std::stringstream& json) { encodeCreateSlider(json, slider); });
+      [&](proto::CommandList& list) { encodeCreateSlider(list, slider); });
 }
 
 /// This changes the contents of text on the screen
@@ -1315,9 +1814,10 @@ void GUIStateMachine::setSliderValue(const std::string& key, s_t value)
   {
     mSliders[key].value = value;
 
-    queueCommand([&](std::stringstream& json) {
-      json << "{ \"type\": \"set_slider_value\", \"key\": " << key
-           << "\", \"value\": " << numberToJson(value) << " }";
+    queueCommand([&](proto::CommandList& list) {
+      proto::Command* command = list.add_command();
+      command->mutable_set_slider_value()->set_key(getStringCode(key));
+      command->mutable_set_slider_value()->set_value((double)value);
     });
   }
   else
@@ -1338,9 +1838,10 @@ void GUIStateMachine::setSliderMin(const std::string& key, s_t min)
   {
     mSliders[key].min = min;
 
-    queueCommand([&](std::stringstream& json) {
-      json << "{ \"type\": \"set_slider_min\", \"key\": " << key
-           << "\", \"value\": " << numberToJson(min) << " }";
+    queueCommand([&](proto::CommandList& list) {
+      proto::Command* command = list.add_command();
+      command->mutable_set_slider_min()->set_key(getStringCode(key));
+      command->mutable_set_slider_min()->set_value((double)min);
     });
   }
   else
@@ -1361,9 +1862,10 @@ void GUIStateMachine::setSliderMax(const std::string& key, s_t max)
   {
     mSliders[key].max = max;
 
-    queueCommand([&](std::stringstream& json) {
-      json << "{ \"type\": \"set_slider_max\", \"key\": " << key
-           << "\", \"value\": " << numberToJson(max) << " }";
+    queueCommand([&](proto::CommandList& list) {
+      proto::Command* command = list.add_command();
+      command->mutable_set_slider_max()->set_key(getStringCode(key));
+      command->mutable_set_slider_max()->set_value((double)max);
     });
   }
   else
@@ -1386,7 +1888,8 @@ void GUIStateMachine::createPlot(
     const std::vector<s_t>& ys,
     s_t minY,
     s_t maxY,
-    const std::string& type)
+    const std::string& type,
+    const std::string& layer)
 {
   const std::lock_guard<std::recursive_mutex> lock(this->globalMutex);
 
@@ -1401,10 +1904,11 @@ void GUIStateMachine::createPlot(
   plot.minY = minY;
   plot.maxY = maxY;
   plot.type = type;
+  plot.layer = layer;
 
   mPlots[key] = plot;
 
-  queueCommand([&](std::stringstream& json) { encodeCreatePlot(json, plot); });
+  queueCommand([&](proto::CommandList& list) { encodeCreatePlot(list, plot); });
 }
 
 /// This changes the contents of a plot, along with its display limits
@@ -1428,17 +1932,21 @@ void GUIStateMachine::setPlotData(
     mPlots[key].minY = minY;
     mPlots[key].maxY = maxY;
 
-    queueCommand([&](std::stringstream& json) {
-      json << "{ \"type\": \"set_plot_data\", \"key\": " << key
-           << "\", \"xs\": ";
-      vecToJson(json, xs);
-      json << ", \"ys\": ";
-      vecToJson(json, ys);
-      json << ", \"min_x\": " << numberToJson(minX);
-      json << ", \"max_x\": " << numberToJson(maxX);
-      json << ", \"min_y\": " << numberToJson(minY);
-      json << ", \"max_y\": " << numberToJson(maxY);
-      json << " }";
+    queueCommand([&](proto::CommandList& list) {
+      proto::Command* command = list.add_command();
+      command->mutable_set_plot_data()->set_key(getStringCode(key));
+      command->mutable_set_plot_data()->add_bounds((double)minX);
+      command->mutable_set_plot_data()->add_bounds((double)maxX);
+      command->mutable_set_plot_data()->add_bounds((double)minY);
+      command->mutable_set_plot_data()->add_bounds((double)maxY);
+      for (s_t x : xs)
+      {
+        command->mutable_set_plot_data()->add_xs((double)x);
+      }
+      for (s_t y : ys)
+      {
+        command->mutable_set_plot_data()->add_ys((double)y);
+      }
     });
   }
   else
@@ -1462,7 +1970,8 @@ void GUIStateMachine::createRichPlot(
     s_t maxY,
     const std::string& title,
     const std::string& xAxisLabel,
-    const std::string& yAxisLabel)
+    const std::string& yAxisLabel,
+    const std::string& layer)
 {
   const std::lock_guard<std::recursive_mutex> lock(this->globalMutex);
 
@@ -1477,11 +1986,12 @@ void GUIStateMachine::createRichPlot(
   plot.title = title;
   plot.xAxisLabel = xAxisLabel;
   plot.yAxisLabel = yAxisLabel;
+  plot.layer = layer;
 
   mRichPlots[key] = plot;
 
   queueCommand(
-      [&](std::stringstream& json) { encodeCreateRichPlot(json, plot); });
+      [&](proto::CommandList& list) { encodeCreateRichPlot(list, plot); });
 }
 
 /// This sets a single data stream for a rich plot. `name` should be human
@@ -1507,8 +2017,8 @@ void GUIStateMachine::setRichPlotData(
     data.ys = ys;
     mRichPlots[key].data[name] = data;
 
-    queueCommand([this, key, data](std::stringstream& json) {
-      encodeSetRichPlotData(json, key, data);
+    queueCommand([this, key, data](proto::CommandList& list) {
+      encodeSetRichPlotData(list, key, data);
     });
   }
   else
@@ -1533,14 +2043,13 @@ void GUIStateMachine::setRichPlotBounds(
     mRichPlots[key].minY = minY;
     mRichPlots[key].maxY = maxY;
 
-    queueCommand([&](std::stringstream& json) {
-      json << "{ \"type\": \"set_rich_plot_bounds\", \"key\": " << key
-           << "\", \"xs\": ";
-      json << ", \"min_x\": " << numberToJson(minX);
-      json << ", \"max_x\": " << numberToJson(maxX);
-      json << ", \"min_y\": " << numberToJson(minY);
-      json << ", \"max_y\": " << numberToJson(maxY);
-      json << " }";
+    queueCommand([&](proto::CommandList& list) {
+      proto::Command* command = list.add_command();
+      command->mutable_set_rich_plot_bounds()->set_key(getStringCode(key));
+      command->mutable_set_rich_plot_bounds()->add_bounds((double)minX);
+      command->mutable_set_rich_plot_bounds()->add_bounds((double)maxX);
+      command->mutable_set_rich_plot_bounds()->add_bounds((double)minY);
+      command->mutable_set_rich_plot_bounds()->add_bounds((double)maxY);
     });
   }
   else
@@ -1575,11 +2084,11 @@ void GUIStateMachine::setUIElementPosition(
     mPlots[key].fromTopLeft = fromTopLeft;
   }
 
-  queueCommand([&](std::stringstream& json) {
-    json << "{ \"type\": \"set_ui_elem_pos\", \"key\": " << key
-         << "\", \"from_top_left\": ";
-    vec2iToJson(json, fromTopLeft);
-    json << " }";
+  queueCommand([&](proto::CommandList& list) {
+    proto::Command* command = list.add_command();
+    command->mutable_set_ui_elem_pos()->set_key(getStringCode(key));
+    command->mutable_set_ui_elem_pos()->add_fromtopleft(fromTopLeft(0));
+    command->mutable_set_ui_elem_pos()->add_fromtopleft(fromTopLeft(1));
   });
 }
 
@@ -1610,11 +2119,11 @@ void GUIStateMachine::setUIElementSize(
     mRichPlots[key].size = size;
   }
 
-  queueCommand([&](std::stringstream& json) {
-    json << "{ \"type\": \"set_ui_elem_size\", \"key\": " << key
-         << "\", \"size\": ";
-    vec2iToJson(json, size);
-    json << " }";
+  queueCommand([&](proto::CommandList& list) {
+    proto::Command* command = list.add_command();
+    command->mutable_set_ui_elem_size()->set_key(getStringCode(key));
+    command->mutable_set_ui_elem_size()->add_size(size(0));
+    command->mutable_set_ui_elem_size()->add_size(size(1));
   });
 }
 
@@ -1629,248 +2138,396 @@ void GUIStateMachine::deleteUIElement(const std::string& key)
   mPlots.erase(key);
   mRichPlots.erase(key);
 
-  queueCommand([&](std::stringstream& json) {
-    json << "{ \"type\": \"delete_ui_elem\", \"key\": \"" << key << "\" }";
+  queueCommand([&](proto::CommandList& list) {
+    proto::Command* command = list.add_command();
+    command->mutable_delete_ui_elem()->set_key(getStringCode(key));
   });
 }
 
-void GUIStateMachine::queueCommand(
-    std::function<void(std::stringstream&)> writeCommand)
+/// This gets an integer code for a string
+int GUIStateMachine::getStringCode(const std::string& key)
 {
-  const std::lock_guard<std::recursive_mutex> lock(mJsonMutex);
-
-  if (mMessagesQueued > 0)
+  if (mStringCodes.count(key) == 0)
   {
-    mJson << ",";
+    int code = mStringCodes.size() + 1;
+    mStringCodes[key] = code;
+    mCodeStrings[code] = key;
   }
-  mMessagesQueued++;
-  writeCommand(mJson);
+  return mStringCodes[key];
 }
 
-void GUIStateMachine::encodeCreateBox(std::stringstream& json, Box& box)
+/// This gets a string code for an integer
+std::string GUIStateMachine::getCodeString(int code)
 {
-  json << "{ \"type\": \"create_box\", \"key\": \"" << box.key
-       << "\", \"size\": ";
-  vec3ToJson(json, box.size);
-  json << ", \"pos\": ";
-  vec3ToJson(json, box.pos);
-  json << ", \"euler\": ";
-  vec3ToJson(json, box.euler);
-  json << ", \"color\": ";
-  vec4ToJson(json, box.color);
-  json << ", \"cast_shadows\": " << (box.castShadows ? "true" : "false");
-  json << ", \"receive_shadows\": " << (box.receiveShadows ? "true" : "false");
-  json << "}";
+  if (mCodeStrings.count(code) != 0)
+  {
+    return mCodeStrings[code];
+  }
+  else
+  {
+    return "";
+  }
+}
+
+void GUIStateMachine::queueCommand(
+    std::function<void(proto::CommandList&)> writeCommand)
+{
+  const std::lock_guard<std::recursive_mutex> lock(mProtoMutex);
+
+  writeCommand(mCommandList);
+  mMessagesQueued++;
+}
+
+void GUIStateMachine::encodeSetFramesPerSecond(
+    proto::CommandList& list, int framesPerSecond)
+{
+  proto::Command* command = list.add_command();
+  command->mutable_set_frames_per_second()->set_framespersecond(
+      framesPerSecond);
+}
+
+void GUIStateMachine::encodeCreateLayer(proto::CommandList& list, Layer& layer)
+{
+  proto::Command* command = list.add_command();
+  command->mutable_layer()->set_key(getStringCode(layer.key));
+  command->mutable_layer()->set_name(layer.key);
+  command->mutable_layer()->add_color((double)layer.color(0));
+  command->mutable_layer()->add_color((double)layer.color(1));
+  command->mutable_layer()->add_color((double)layer.color(2));
+  command->mutable_layer()->add_color((double)layer.color(3));
+  command->mutable_layer()->set_default_show(layer.defaultShow);
+}
+
+void GUIStateMachine::encodeCreateBox(proto::CommandList& list, Box& box)
+{
+  proto::Command* command = list.add_command();
+  command->mutable_box()->set_key(getStringCode(box.key));
+  command->mutable_box()->set_layer(getStringCode(box.layer));
+  command->mutable_box()->add_data((double)box.size(0));
+  command->mutable_box()->add_data((double)box.size(1));
+  command->mutable_box()->add_data((double)box.size(2));
+  command->mutable_box()->add_data((double)box.pos(0));
+  command->mutable_box()->add_data((double)box.pos(1));
+  command->mutable_box()->add_data((double)box.pos(2));
+  command->mutable_box()->add_data((double)box.euler(0));
+  command->mutable_box()->add_data((double)box.euler(1));
+  command->mutable_box()->add_data((double)box.euler(2));
+  command->mutable_box()->add_data((double)box.color(0));
+  command->mutable_box()->add_data((double)box.color(1));
+  command->mutable_box()->add_data((double)box.color(2));
+  command->mutable_box()->add_data((double)box.color(3));
+  command->mutable_box()->set_cast_shadows(box.castShadows);
+  command->mutable_box()->set_receive_shadows(box.receiveShadows);
 }
 
 void GUIStateMachine::encodeCreateSphere(
-    std::stringstream& json, Sphere& sphere)
+    proto::CommandList& list, Sphere& sphere)
 {
+  proto::Command* command = list.add_command();
+  command->mutable_sphere()->set_key(getStringCode(sphere.key));
+  command->mutable_sphere()->set_layer(getStringCode(sphere.layer));
+  command->mutable_sphere()->set_cast_shadows(sphere.castShadows);
+  command->mutable_sphere()->set_receive_shadows(sphere.receiveShadows);
+  command->mutable_sphere()->add_data((double)sphere.radii(0));
+  command->mutable_sphere()->add_data((double)sphere.radii(1));
+  command->mutable_sphere()->add_data((double)sphere.radii(2));
+  command->mutable_sphere()->add_data((double)sphere.pos(0));
+  command->mutable_sphere()->add_data((double)sphere.pos(1));
+  command->mutable_sphere()->add_data((double)sphere.pos(2));
+  command->mutable_sphere()->add_data((double)sphere.color(0));
+  command->mutable_sphere()->add_data((double)sphere.color(1));
+  command->mutable_sphere()->add_data((double)sphere.color(2));
+  command->mutable_sphere()->add_data((double)sphere.color(3));
+
+  /*
   json << "{ \"type\": \"create_sphere\", \"key\": \"" << sphere.key
        << "\", \"radius\": " << numberToJson(sphere.radius);
   json << ", \"pos\": ";
   vec3ToJson(json, sphere.pos);
   json << ", \"color\": ";
   vec4ToJson(json, sphere.color);
+  json << ", \"layer\": \"" << sphere.layer << "\"";
   json << ", \"cast_shadows\": " << (sphere.castShadows ? "true" : "false");
   json << ", \"receive_shadows\": "
        << (sphere.receiveShadows ? "true" : "false");
   json << "}";
+  */
+}
+
+void GUIStateMachine::encodeCreateCone(proto::CommandList& list, Cone& cone)
+{
+  proto::Command* command = list.add_command();
+  command->mutable_cone()->set_key(getStringCode(cone.key));
+  command->mutable_cone()->set_layer(getStringCode(cone.layer));
+  command->mutable_cone()->set_cast_shadows(cone.castShadows);
+  command->mutable_cone()->set_receive_shadows(cone.receiveShadows);
+  command->mutable_cone()->add_data((double)cone.radius);
+  command->mutable_cone()->add_data((double)cone.height);
+  command->mutable_cone()->add_data((double)cone.pos(0));
+  command->mutable_cone()->add_data((double)cone.pos(1));
+  command->mutable_cone()->add_data((double)cone.pos(2));
+  command->mutable_cone()->add_data((double)cone.euler(0));
+  command->mutable_cone()->add_data((double)cone.euler(1));
+  command->mutable_cone()->add_data((double)cone.euler(2));
+  command->mutable_cone()->add_data((double)cone.color(0));
+  command->mutable_cone()->add_data((double)cone.color(1));
+  command->mutable_cone()->add_data((double)cone.color(2));
+  command->mutable_cone()->add_data((double)cone.color(3));
+}
+
+void GUIStateMachine::encodeCreateCylinder(
+    proto::CommandList& list, Cylinder& cylinder)
+{
+  proto::Command* command = list.add_command();
+  command->mutable_cylinder()->set_key(getStringCode(cylinder.key));
+  command->mutable_cylinder()->set_layer(getStringCode(cylinder.layer));
+  command->mutable_cylinder()->set_cast_shadows(cylinder.castShadows);
+  command->mutable_cylinder()->set_receive_shadows(cylinder.receiveShadows);
+  command->mutable_cylinder()->add_data((double)cylinder.radius);
+  command->mutable_cylinder()->add_data((double)cylinder.height);
+  command->mutable_cylinder()->add_data((double)cylinder.pos(0));
+  command->mutable_cylinder()->add_data((double)cylinder.pos(1));
+  command->mutable_cylinder()->add_data((double)cylinder.pos(2));
+  command->mutable_cylinder()->add_data((double)cylinder.euler(0));
+  command->mutable_cylinder()->add_data((double)cylinder.euler(1));
+  command->mutable_cylinder()->add_data((double)cylinder.euler(2));
+  command->mutable_cylinder()->add_data((double)cylinder.color(0));
+  command->mutable_cylinder()->add_data((double)cylinder.color(1));
+  command->mutable_cylinder()->add_data((double)cylinder.color(2));
+  command->mutable_cylinder()->add_data((double)cylinder.color(3));
 }
 
 void GUIStateMachine::encodeCreateCapsule(
-    std::stringstream& json, Capsule& capsule)
+    proto::CommandList& list, Capsule& capsule)
 {
-  json << "{ \"type\": \"create_capsule\", \"key\": \"" << capsule.key
-       << "\", \"radius\": " << numberToJson(capsule.radius)
-       << ", \"height\": " << numberToJson(capsule.height);
-  json << ", \"pos\": ";
-  vec3ToJson(json, capsule.pos);
-  json << ", \"euler\": ";
-  vec3ToJson(json, capsule.euler);
-  json << ", \"color\": ";
-  vec4ToJson(json, capsule.color);
-  json << ", \"cast_shadows\": " << (capsule.castShadows ? "true" : "false");
-  json << ", \"receive_shadows\": "
-       << (capsule.receiveShadows ? "true" : "false");
-  json << "}";
+  proto::Command* command = list.add_command();
+  command->mutable_capsule()->set_key(getStringCode(capsule.key));
+  command->mutable_capsule()->set_layer(getStringCode(capsule.layer));
+  command->mutable_capsule()->set_cast_shadows(capsule.castShadows);
+  command->mutable_capsule()->set_receive_shadows(capsule.receiveShadows);
+  command->mutable_capsule()->add_data((double)capsule.radius);
+  command->mutable_capsule()->add_data((double)capsule.height);
+  command->mutable_capsule()->add_data((double)capsule.pos(0));
+  command->mutable_capsule()->add_data((double)capsule.pos(1));
+  command->mutable_capsule()->add_data((double)capsule.pos(2));
+  command->mutable_capsule()->add_data((double)capsule.euler(0));
+  command->mutable_capsule()->add_data((double)capsule.euler(1));
+  command->mutable_capsule()->add_data((double)capsule.euler(2));
+  command->mutable_capsule()->add_data((double)capsule.color(0));
+  command->mutable_capsule()->add_data((double)capsule.color(1));
+  command->mutable_capsule()->add_data((double)capsule.color(2));
+  command->mutable_capsule()->add_data((double)capsule.color(3));
 }
 
-void GUIStateMachine::encodeCreateLine(std::stringstream& json, Line& line)
+void GUIStateMachine::encodeCreateLine(proto::CommandList& list, Line& line)
 {
-  json << "{ \"type\": \"create_line\", \"key\": \"" << line.key;
-  json << "\", \"points\": [";
-  bool firstPoint = true;
+  proto::Command* command = list.add_command();
+  command->mutable_line()->set_key(getStringCode(line.key));
+  command->mutable_line()->set_layer(getStringCode(line.layer));
+  command->mutable_line()->add_color((double)line.color(0));
+  command->mutable_line()->add_color((double)line.color(1));
+  command->mutable_line()->add_color((double)line.color(2));
+  command->mutable_line()->add_color((double)line.color(3));
   for (Eigen::Vector3s& point : line.points)
   {
-    if (firstPoint)
-      firstPoint = false;
-    else
-      json << ", ";
-    vec3ToJson(json, point);
+    command->mutable_line()->add_points((double)point(0));
+    command->mutable_line()->add_points((double)point(1));
+    command->mutable_line()->add_points((double)point(2));
   }
-  json << "], \"color\": ";
-  vec4ToJson(json, line.color);
-  json << "}";
+  for (s_t width : line.width)
+  {
+    command->mutable_line()->add_width(width);
+  }
 }
 
-void GUIStateMachine::encodeCreateMesh(std::stringstream& json, Mesh& mesh)
+void GUIStateMachine::encodeCreateMesh(proto::CommandList& list, Mesh& mesh)
 {
-  json << "{ \"type\": \"create_mesh\", \"key\": \"" << mesh.key;
-  json << "\", \"vertices\": [";
-  bool firstPoint = true;
+  proto::Command* command = list.add_command();
+  command->mutable_mesh()->set_key(getStringCode(mesh.key));
+  command->mutable_mesh()->set_layer(getStringCode(mesh.layer));
   for (Eigen::Vector3s& vertex : mesh.vertices)
   {
-    if (firstPoint)
-      firstPoint = false;
-    else
-      json << ", ";
-    vec3ToJson(json, vertex);
+    command->mutable_mesh()->add_vertex((double)vertex(0));
+    command->mutable_mesh()->add_vertex((double)vertex(1));
+    command->mutable_mesh()->add_vertex((double)vertex(2));
   }
-  json << "], \"vertex_normals\": [";
-  firstPoint = true;
   for (Eigen::Vector3s& normal : mesh.vertexNormals)
   {
-    if (firstPoint)
-      firstPoint = false;
-    else
-      json << ", ";
-    vec3ToJson(json, normal);
+    command->mutable_mesh()->add_vertex_normal((double)normal(0));
+    command->mutable_mesh()->add_vertex_normal((double)normal(1));
+    command->mutable_mesh()->add_vertex_normal((double)normal(2));
   }
-  json << "], \"faces\": [";
-  firstPoint = true;
   for (Eigen::Vector3i& face : mesh.faces)
   {
-    if (firstPoint)
-      firstPoint = false;
-    else
-      json << ", ";
-    vec3iToJson(json, face);
+    command->mutable_mesh()->add_face(face(0));
+    command->mutable_mesh()->add_face(face(1));
+    command->mutable_mesh()->add_face(face(2));
   }
-  json << "], \"uv\": [";
-  firstPoint = true;
   for (Eigen::Vector2s& uv : mesh.uv)
   {
-    if (firstPoint)
-      firstPoint = false;
-    else
-      json << ", ";
-    vec2dToJson(json, uv);
+    command->mutable_mesh()->add_uv((double)uv(0));
+    command->mutable_mesh()->add_uv((double)uv(1));
   }
-  json << "], \"texture_starts\": [";
-  firstPoint = true;
   for (int i = 0; i < mesh.textures.size(); i++)
   {
-    if (firstPoint)
-      firstPoint = false;
-    else
-      json << ", ";
-    json << "{ \"key\": \"" << mesh.textures[i]
-         << "\", \"start\": " << mesh.textureStartIndices[i] << "}";
+    command->mutable_mesh()->add_texture(getStringCode(mesh.textures[i]));
+    command->mutable_mesh()->add_texture_start(mesh.textureStartIndices[i]);
   }
-  json << "], \"color\": ";
-  vec4ToJson(json, mesh.color);
-  json << ", \"pos\": ";
-  vec3ToJson(json, mesh.pos);
-  json << ", \"euler\": ";
-  vec3ToJson(json, mesh.euler);
-  json << ", \"scale\": ";
-  vec3ToJson(json, mesh.scale);
-  json << ", \"cast_shadows\": " << (mesh.castShadows ? "true" : "false");
-  json << ", \"receive_shadows\": " << (mesh.receiveShadows ? "true" : "false");
-  json << "}";
+  command->mutable_mesh()->add_data((double)mesh.scale(0));
+  command->mutable_mesh()->add_data((double)mesh.scale(1));
+  command->mutable_mesh()->add_data((double)mesh.scale(2));
+  command->mutable_mesh()->add_data((double)mesh.pos(0));
+  command->mutable_mesh()->add_data((double)mesh.pos(1));
+  command->mutable_mesh()->add_data((double)mesh.pos(2));
+  command->mutable_mesh()->add_data((double)mesh.euler(0));
+  command->mutable_mesh()->add_data((double)mesh.euler(1));
+  command->mutable_mesh()->add_data((double)mesh.euler(2));
+  command->mutable_mesh()->add_data((double)mesh.color(0));
+  command->mutable_mesh()->add_data((double)mesh.color(1));
+  command->mutable_mesh()->add_data((double)mesh.color(2));
+  command->mutable_mesh()->add_data((double)mesh.color(3));
+  command->mutable_mesh()->set_cast_shadows(mesh.castShadows);
+  command->mutable_mesh()->set_receive_shadows(mesh.receiveShadows);
+}
+
+void GUIStateMachine::encodeSetTooltip(
+    proto::CommandList& list, Tooltip& tooltip)
+{
+  proto::Command* command = list.add_command();
+  command->mutable_set_object_tooltip()->set_key(getStringCode(tooltip.key));
+  command->mutable_set_object_tooltip()->set_tooltip(tooltip.tooltip);
+}
+
+void GUIStateMachine::encodeSetObjectWarning(
+    proto::CommandList& list, ObjectWarning& warning)
+{
+  proto::Command* command = list.add_command();
+  command->mutable_set_object_warning()->set_key(getStringCode(warning.key));
+  command->mutable_set_object_warning()->set_warning_key(
+      getStringCode(warning.warningKey));
+  command->mutable_set_object_warning()->set_warning(warning.warning);
+  command->mutable_set_object_warning()->set_layer(
+      getStringCode(warning.layer));
+}
+
+void GUIStateMachine::encodeSetSpanWarning(
+    proto::CommandList& list, SpanWarning& warning)
+{
+  proto::Command* command = list.add_command();
+  command->mutable_set_span_warning()->set_warning_key(
+      getStringCode(warning.warningKey));
+  command->mutable_set_span_warning()->set_warning(warning.warning);
+  command->mutable_set_span_warning()->set_start_timestep(
+      warning.startTimestep);
+  command->mutable_set_span_warning()->set_end_timestep(warning.endTimestep);
+  command->mutable_set_span_warning()->set_layer(getStringCode(warning.layer));
 }
 
 void GUIStateMachine::encodeCreateTexture(
-    std::stringstream& json, Texture& texture)
+    proto::CommandList& list, Texture& texture)
 {
-  json << "{ \"type\": \"create_texture\", \"key\": \"" << texture.key;
-  json << "\", \"base64\": \"" << texture.base64 << "\" }";
+  proto::Command* command = list.add_command();
+  command->mutable_texture()->set_key(getStringCode(texture.key));
+  command->mutable_texture()->set_base64(texture.base64);
 }
 
-void GUIStateMachine::encodeEnableMouseInteraction(
-    std::stringstream& json, const std::string& key)
+void GUIStateMachine::encodeEnableDrag(
+    proto::CommandList& list, const std::string& key)
 {
-  json << "{ \"type\": \"enable_mouse\", \"key\": \"" << key << "\" }";
+  proto::Command* command = list.add_command();
+  command->mutable_enable_drag()->set_key(getStringCode(key));
 }
 
-void GUIStateMachine::encodeCreateText(std::stringstream& json, Text& text)
+void GUIStateMachine::encodeEnableEditTooltip(
+    proto::CommandList& list, const std::string& key)
 {
-  json << "{ \"type\": \"create_text\", \"key\": \"" << text.key
-       << "\", \"from_top_left\": ";
-  vec2iToJson(json, text.fromTopLeft);
-  json << ", \"size\": ";
-  vec2iToJson(json, text.size);
-  json << ", \"contents\": \"" << escapeJson(text.contents);
-  json << "\" }";
+  proto::Command* command = list.add_command();
+  command->mutable_enable_edit_tooltip()->set_key(getStringCode(key));
+}
+
+void GUIStateMachine::encodeCreateText(proto::CommandList& list, Text& text)
+{
+  proto::Command* command = list.add_command();
+  command->mutable_text()->set_key(getStringCode(text.key));
+  command->mutable_text()->set_layer(getStringCode(text.layer));
+  command->mutable_text()->add_pos(text.fromTopLeft(0));
+  command->mutable_text()->add_pos(text.fromTopLeft(1));
+  command->mutable_text()->add_pos(text.size(0));
+  command->mutable_text()->add_pos(text.size(1));
+  command->mutable_text()->set_contents(text.contents);
 }
 
 void GUIStateMachine::encodeCreateButton(
-    std::stringstream& json, Button& button)
+    proto::CommandList& list, Button& button)
 {
-  json << "{ \"type\": \"create_button\", \"key\": \"" << button.key
-       << "\", \"from_top_left\": ";
-  vec2iToJson(json, button.fromTopLeft);
-  json << ", \"size\": ";
-  vec2iToJson(json, button.size);
-  json << ", \"label\": \"" << escapeJson(button.label);
-  json << "\" }";
+  proto::Command* command = list.add_command();
+  command->mutable_button()->set_key(getStringCode(button.key));
+  command->mutable_button()->set_layer(getStringCode(button.layer));
+  command->mutable_button()->add_pos(button.fromTopLeft(0));
+  command->mutable_button()->add_pos(button.fromTopLeft(1));
+  command->mutable_button()->add_pos(button.size(0));
+  command->mutable_button()->add_pos(button.size(1));
+  command->mutable_button()->set_label(button.label);
 }
 
 void GUIStateMachine::encodeCreateSlider(
-    std::stringstream& json, Slider& slider)
+    proto::CommandList& list, Slider& slider)
 {
-  json << "{ \"type\": \"create_slider\", \"key\": \"" << slider.key
-       << "\", \"from_top_left\": ";
-  vec2iToJson(json, slider.fromTopLeft);
-  json << ", \"size\": ";
-  vec2iToJson(json, slider.size);
-  json << ", \"max\": " << numberToJson(slider.max);
-  json << ", \"min\": " << numberToJson(slider.min);
-  json << ", \"value\": " << numberToJson(slider.value);
-  json << ", \"only_ints\": " << (slider.onlyInts ? "true" : "false");
-  json << ", \"horizontal\": " << (slider.horizontal ? "true" : "false");
-  json << "}";
+  proto::Command* command = list.add_command();
+  command->mutable_slider()->set_key(getStringCode(slider.key));
+  command->mutable_slider()->set_layer(getStringCode(slider.layer));
+  command->mutable_slider()->add_pos(slider.fromTopLeft(0));
+  command->mutable_slider()->add_pos(slider.fromTopLeft(1));
+  command->mutable_slider()->add_pos(slider.size(0));
+  command->mutable_slider()->add_pos(slider.size(1));
+  command->mutable_slider()->add_data((double)slider.min);
+  command->mutable_slider()->add_data((double)slider.max);
+  command->mutable_slider()->add_data((double)slider.value);
+  command->mutable_slider()->set_only_ints(slider.onlyInts);
+  command->mutable_slider()->set_horizontal(slider.horizontal);
 }
 
-void GUIStateMachine::encodeCreatePlot(std::stringstream& json, Plot& plot)
+void GUIStateMachine::encodeCreatePlot(proto::CommandList& list, Plot& plot)
 {
-  json << "{ \"type\": \"create_plot\", \"key\": \"" << plot.key
-       << "\", \"from_top_left\": ";
-  vec2iToJson(json, plot.fromTopLeft);
-  json << ", \"size\": ";
-  vec2iToJson(json, plot.size);
-  json << ", \"max_x\": " << numberToJson(plot.maxX);
-  json << ", \"min_x\": " << numberToJson(plot.minX);
-  json << ", \"max_y\": " << numberToJson(plot.maxY);
-  json << ", \"min_y\": " << numberToJson(plot.minY);
-  json << ", \"xs\": ";
-  vecToJson(json, plot.xs);
-  json << ", \"ys\": ";
-  vecToJson(json, plot.ys);
-  json << ", \"plot_type\": \"" << plot.type;
-  json << "\" }";
+  proto::Command* command = list.add_command();
+  command->mutable_plot()->set_key(getStringCode(plot.key));
+  command->mutable_plot()->set_layer(getStringCode(plot.layer));
+  command->mutable_plot()->set_plot_type(plot.type);
+  command->mutable_plot()->add_pos(plot.fromTopLeft(0));
+  command->mutable_plot()->add_pos(plot.fromTopLeft(1));
+  command->mutable_plot()->add_pos(plot.size(0));
+  command->mutable_plot()->add_pos(plot.size(1));
+  command->mutable_plot()->add_bounds((double)plot.minX);
+  command->mutable_plot()->add_bounds((double)plot.maxX);
+  command->mutable_plot()->add_bounds((double)plot.minY);
+  command->mutable_plot()->add_bounds((double)plot.maxY);
+  for (s_t x : plot.xs)
+  {
+    command->mutable_plot()->add_xs((double)x);
+  }
+  for (s_t y : plot.ys)
+  {
+    command->mutable_plot()->add_ys((double)y);
+  }
 }
 
 void GUIStateMachine::encodeCreateRichPlot(
-    std::stringstream& json, RichPlot& plot)
+    proto::CommandList& list, RichPlot& plot)
 {
-  json << "{ \"type\": \"create_rich_plot\", \"key\": \"" << plot.key
-       << "\", \"from_top_left\": ";
-  vec2iToJson(json, plot.fromTopLeft);
-  json << ", \"size\": ";
-  vec2iToJson(json, plot.size);
-  json << ", \"max_x\": " << numberToJson(plot.maxX);
-  json << ", \"min_x\": " << numberToJson(plot.minX);
-  json << ", \"max_y\": " << numberToJson(plot.maxY);
-  json << ", \"min_y\": " << numberToJson(plot.minY);
-  json << ", \"title\": \"";
-  json << plot.title;
-  json << "\", \"x_axis_label\": \"";
-  json << plot.xAxisLabel;
-  json << "\", \"y_axis_label\": \"";
-  json << plot.yAxisLabel;
-  json << "\" }";
+  proto::Command* command = list.add_command();
+  command->mutable_rich_plot()->set_key(getStringCode(plot.key));
+  command->mutable_rich_plot()->set_layer(getStringCode(plot.layer));
+  command->mutable_rich_plot()->add_pos(plot.fromTopLeft(0));
+  command->mutable_rich_plot()->add_pos(plot.fromTopLeft(1));
+  command->mutable_rich_plot()->add_pos(plot.size(0));
+  command->mutable_rich_plot()->add_pos(plot.size(1));
+  command->mutable_rich_plot()->add_bounds((double)plot.minX);
+  command->mutable_rich_plot()->add_bounds((double)plot.maxX);
+  command->mutable_rich_plot()->add_bounds((double)plot.minY);
+  command->mutable_rich_plot()->add_bounds((double)plot.maxY);
+  command->mutable_rich_plot()->set_title(plot.title);
+  command->mutable_rich_plot()->set_x_axis_label(plot.xAxisLabel);
+  command->mutable_rich_plot()->set_y_axis_label(plot.yAxisLabel);
 }
 
 /*
@@ -1885,22 +2542,23 @@ export type SetRichPlotData = {
 };
 */
 void GUIStateMachine::encodeSetRichPlotData(
-    std::stringstream& json,
+    proto::CommandList& list,
     const std::string& plotKey,
     const RichPlotData& data)
 {
-  json << "{ \"type\": \"set_rich_plot_data\", \"key\": \"" << plotKey
-       << "\", \"name\": \"";
-  json << data.name;
-  json << "\", \"color\": \"";
-  json << data.color;
-  json << "\", \"plot_type\": \"";
-  json << data.type;
-  json << "\", \"xs\": ";
-  vecToJson(json, data.xs);
-  json << ", \"ys\": ";
-  vecToJson(json, data.ys);
-  json << "}";
+  proto::Command* command = list.add_command();
+  command->mutable_set_rich_plot_data()->set_key(getStringCode(plotKey));
+  command->mutable_set_rich_plot_data()->set_name(data.name);
+  command->mutable_set_rich_plot_data()->set_color(data.color);
+  command->mutable_set_rich_plot_data()->set_plot_type(data.type);
+  for (s_t x : data.xs)
+  {
+    command->mutable_set_rich_plot_data()->add_xs((double)x);
+  }
+  for (s_t y : data.ys)
+  {
+    command->mutable_set_rich_plot_data()->add_ys((double)y);
+  }
 }
 
 } // namespace server

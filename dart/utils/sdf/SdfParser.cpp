@@ -49,7 +49,9 @@
 #include "dart/dynamics/BallJoint.hpp"
 #include "dart/dynamics/BodyNode.hpp"
 #include "dart/dynamics/BoxShape.hpp"
+#include "dart/dynamics/CustomJoint.hpp"
 #include "dart/dynamics/CylinderShape.hpp"
+#include "dart/dynamics/EulerJoint.hpp"
 #include "dart/dynamics/FreeJoint.hpp"
 #include "dart/dynamics/MeshShape.hpp"
 #include "dart/dynamics/PrismaticJoint.hpp"
@@ -344,6 +346,404 @@ dynamics::SkeletonPtr readSkeleton(
   dynamics::SkeletonPtr newSkeleton = readSkeleton(skelElement, uri, retriever);
 
   return newSkeleton;
+}
+
+//==============================================================================
+std::string writeVec3(Eigen::Vector3s vec)
+{
+  return std::to_string((double)vec(0)) + " " + std::to_string((double)vec(1))
+         + " " + std::to_string((double)vec(2));
+}
+
+//==============================================================================
+void appendShapeNodeToSDF(
+    tinyxml2::XMLDocument* xmlDoc,
+    tinyxml2::XMLElement* link,
+    dynamics::BodyNode* body,
+    dynamics::ShapeNode* shapeNode,
+    Eigen::Isometry3s offsetT)
+{
+  using namespace tinyxml2;
+  XMLElement* visual = nullptr;
+  XMLElement* visualGeometry = nullptr;
+
+  XMLElement* collision = nullptr;
+  XMLElement* collisionGeometry = nullptr;
+
+  dynamics::Shape* shape = shapeNode->getShape().get();
+
+  if (shapeNode->hasVisualAspect())
+  {
+    visual = xmlDoc->NewElement("visual");
+    visual->SetAttribute("name", (body->getName() + "_visual").c_str());
+    link->InsertEndChild(visual);
+    visualGeometry = xmlDoc->NewElement("geometry");
+    visual->InsertEndChild(visualGeometry);
+    XMLElement* visualPose = xmlDoc->NewElement("pose");
+    visual->InsertEndChild(visualPose);
+    visualPose->SetText(
+        (writeVec3(offsetT * shapeNode->getRelativeTranslation()) + " "
+         + writeVec3(math::matrixToEulerXYZ(
+             offsetT * shapeNode->getRelativeRotation())))
+            .c_str());
+  }
+  if (shapeNode->hasCollisionAspect())
+  {
+    collision = xmlDoc->NewElement("collision");
+    collision->SetAttribute("name", (body->getName() + "_collision").c_str());
+    link->InsertEndChild(collision);
+    collisionGeometry = xmlDoc->NewElement("geometry");
+    collision->InsertEndChild(collisionGeometry);
+    XMLElement* collisionPose = xmlDoc->NewElement("pose");
+    collision->InsertEndChild(collisionPose);
+    collisionPose->SetText(
+        (writeVec3(offsetT * shapeNode->getRelativeTranslation()) + " "
+         + writeVec3(math::matrixToEulerXYZ(
+             offsetT * shapeNode->getRelativeRotation())))
+            .c_str());
+  }
+
+  // Create the object from scratch
+  if (shape->getType() == "BoxShape")
+  {
+    dynamics::BoxShape* boxShape = dynamic_cast<dynamics::BoxShape*>(shape);
+
+    if (shapeNode->hasVisualAspect())
+    {
+      XMLElement* visualBox = xmlDoc->NewElement("box");
+      XMLElement* scale = xmlDoc->NewElement("scale");
+      scale->SetText(writeVec3(boxShape->getSize()).c_str());
+      visualBox->InsertEndChild(scale);
+      visualGeometry->InsertEndChild(visualBox);
+    }
+    if (shapeNode->hasCollisionAspect())
+    {
+      XMLElement* collisionBox = xmlDoc->NewElement("box");
+      XMLElement* scale = xmlDoc->NewElement("scale");
+      scale->SetText(writeVec3(boxShape->getSize()).c_str());
+      collisionBox->InsertEndChild(scale);
+      collisionGeometry->InsertEndChild(collisionBox);
+    }
+  }
+  else if (shape->getType() == "MeshShape")
+  {
+    dynamics::MeshShape* meshShape = dynamic_cast<dynamics::MeshShape*>(shape);
+    std::string meshAbsolutePath = meshShape->getMeshPath();
+    int geometryStart = meshAbsolutePath.find("Geometry");
+    if (geometryStart != std::string::npos)
+    {
+      meshAbsolutePath = meshAbsolutePath.substr(geometryStart);
+    }
+
+    if (shapeNode->hasVisualAspect())
+    {
+      XMLElement* visualMesh = xmlDoc->NewElement("mesh");
+      XMLElement* scale = xmlDoc->NewElement("scale");
+      scale->SetText(writeVec3(meshShape->getScale()).c_str());
+      visualMesh->InsertEndChild(scale);
+      XMLElement* uri = xmlDoc->NewElement("uri");
+      uri->SetText(meshAbsolutePath.c_str());
+      visualMesh->InsertEndChild(uri);
+      visualGeometry->InsertEndChild(visualMesh);
+    }
+    if (shapeNode->hasCollisionAspect())
+    {
+      XMLElement* collisionMesh = xmlDoc->NewElement("mesh");
+      XMLElement* scale = xmlDoc->NewElement("scale");
+      scale->SetText(writeVec3(meshShape->getScale()).c_str());
+      collisionMesh->InsertEndChild(scale);
+      XMLElement* uri = xmlDoc->NewElement("uri");
+      uri->SetText(meshAbsolutePath.c_str());
+      collisionMesh->InsertEndChild(uri);
+      collisionGeometry->InsertEndChild(collisionMesh);
+    }
+  }
+  else if (shape->getType() == "SphereShape")
+  {
+    dynamics::SphereShape* sphereShape
+        = dynamic_cast<dynamics::SphereShape*>(shape);
+
+    if (shapeNode->hasVisualAspect())
+    {
+      XMLElement* visualSphere = xmlDoc->NewElement("sphere");
+      visualSphere->SetAttribute("radius", (double)sphereShape->getRadius());
+      XMLElement* radius = xmlDoc->NewElement("radius");
+      radius->SetText(std::to_string((double)sphereShape->getRadius()).c_str());
+      visualSphere->InsertEndChild(radius);
+      visualGeometry->InsertEndChild(visualSphere);
+    }
+    if (shapeNode->hasCollisionAspect())
+    {
+      XMLElement* collisionSphere = xmlDoc->NewElement("sphere");
+      XMLElement* radius = xmlDoc->NewElement("radius");
+      radius->SetText(std::to_string((double)sphereShape->getRadius()).c_str());
+      collisionSphere->InsertEndChild(radius);
+      collisionGeometry->InsertEndChild(collisionSphere);
+    }
+  }
+  else if (shape->getType() == "CapsuleShape")
+  {
+    // Ignore
+  }
+  else if (
+      shape->getType() == "EllipsoidShape"
+      && dynamic_cast<dynamics::EllipsoidShape*>(shape)->isSphere())
+  {
+    // Ignore
+  }
+  else
+  {
+    // Ignore
+  }
+}
+
+//==============================================================================
+void writeSkeleton(const std::string& path, dynamics::SkeletonPtr skel)
+{
+  using namespace tinyxml2;
+
+  tinyxml2::XMLDocument xmlDoc;
+
+  XMLElement* sdf = xmlDoc.NewElement("sdf");
+  sdf->SetAttribute("version", "1.4");
+  xmlDoc.InsertFirstChild(sdf);
+
+  XMLElement* model = xmlDoc.NewElement("model");
+  model->SetAttribute("name", skel->getName().c_str());
+  sdf->InsertFirstChild(model);
+
+  for (int i = 0; i < skel->getNumBodyNodes(); i++)
+  {
+    auto* body = skel->getBodyNode(i);
+
+    XMLElement* link = xmlDoc.NewElement("link");
+    link->SetAttribute("name", body->getName().c_str());
+
+    XMLElement* linkPose = xmlDoc.NewElement("pose");
+    linkPose->SetText((writeVec3(body->getWorldTransform().translation()) + " "
+                       + writeVec3(math::matrixToEulerZYX(
+                           body->getWorldTransform().linear())))
+                          .c_str());
+    link->InsertEndChild(linkPose);
+
+    for (int j = 0; j < body->getNumShapeNodes(); j++)
+    {
+      dynamics::ShapeNode* shapeNode = body->getShapeNode(j);
+      appendShapeNodeToSDF(
+          &xmlDoc, link, body, shapeNode, Eigen::Isometry3s::Identity());
+    }
+
+    XMLElement* inertial = xmlDoc.NewElement("inertial");
+    link->InsertEndChild(inertial);
+
+    s_t totalMass = body->getMass();
+    Eigen::Vector3s COM = body->getInertia().getLocalCOM();
+    // dart::dynamics::Inertia inertia = body->getInertia();
+
+    XMLElement* inertialMass = xmlDoc.NewElement("mass");
+    inertialMass->SetText(std::to_string((double)totalMass).c_str());
+    inertial->InsertEndChild(inertialMass);
+    XMLElement* inertialPose = xmlDoc.NewElement("pose");
+    inertialPose->SetText(
+        (writeVec3(COM) + " " + writeVec3(Eigen::Vector3s::Zero())).c_str());
+    inertial->InsertEndChild(inertialPose);
+
+    XMLElement* inertialInertia = xmlDoc.NewElement("inertia");
+    s_t i_xx = 0;
+    s_t i_xy = 0;
+    s_t i_xz = 0;
+    s_t i_yy = 0;
+    s_t i_yz = 0;
+    s_t i_zz = 0;
+    body->getMomentOfInertia(i_xx, i_yy, i_zz, i_xy, i_xz, i_yz);
+    XMLElement* inertiaXX = xmlDoc.NewElement("ixx");
+    inertiaXX->SetText(std::to_string((double)i_xx).c_str());
+    inertialInertia->InsertEndChild(inertiaXX);
+
+    XMLElement* inertiaXY = xmlDoc.NewElement("ixy");
+    inertiaXY->SetText(std::to_string((double)i_xy).c_str());
+    inertialInertia->InsertEndChild(inertiaXY);
+
+    XMLElement* inertiaXZ = xmlDoc.NewElement("ixz");
+    inertiaXZ->SetText(std::to_string((double)i_xz).c_str());
+    inertialInertia->InsertEndChild(inertiaXZ);
+
+    XMLElement* inertiaYY = xmlDoc.NewElement("iyy");
+    inertiaYY->SetText(std::to_string((double)i_yy).c_str());
+    inertialInertia->InsertEndChild(inertiaYY);
+
+    XMLElement* inertiaYZ = xmlDoc.NewElement("iyz");
+    inertiaYZ->SetText(std::to_string((double)i_yz).c_str());
+    inertialInertia->InsertEndChild(inertiaYZ);
+
+    XMLElement* inertiaZZ = xmlDoc.NewElement("izz");
+    inertiaZZ->SetText(std::to_string((double)i_zz).c_str());
+    inertialInertia->InsertEndChild(inertiaZZ);
+
+    inertial->InsertEndChild(inertialInertia);
+
+    model->InsertEndChild(link);
+  }
+
+  for (int i = 0; i < skel->getNumJoints(); i++)
+  {
+    auto* joint = skel->getJoint(i);
+    if (joint->getParentBodyNode() == nullptr)
+      continue;
+
+    XMLElement* jointXml = xmlDoc.NewElement("joint");
+    jointXml->SetAttribute("name", joint->getName().c_str());
+    model->InsertEndChild(jointXml);
+
+    /*
+      childToJoint
+      = getValueIsometry3sWithExtrinsicRotation(_jointElement, "pose");
+    */
+    XMLElement* jointPose = xmlDoc.NewElement("pose");
+    Eigen::Isometry3s T = joint->getTransformFromChildBodyNode().inverse();
+    jointPose->SetText((writeVec3(T.translation()) + " "
+                        + writeVec3(math::matrixToEulerZYX(T.linear())))
+                           .c_str());
+    jointXml->InsertEndChild(jointPose);
+
+    if (joint->getType() == dynamics::RevoluteJoint::getStaticType())
+    {
+      dynamics::RevoluteJoint* revolute
+          = static_cast<dynamics::RevoluteJoint*>(joint);
+
+      jointXml->SetAttribute("type", "revolute");
+      XMLElement* axis = xmlDoc.NewElement("axis");
+      XMLElement* xyz = xmlDoc.NewElement("xyz");
+      xyz->SetText(writeVec3(revolute->getAxis()).c_str());
+      axis->InsertEndChild(xyz);
+
+      XMLElement* limit = xmlDoc.NewElement("limit");
+      XMLElement* lowerLimit = xmlDoc.NewElement("lower");
+      limit->InsertEndChild(lowerLimit);
+      lowerLimit->SetText(
+          std::to_string((double)revolute->getPositionLowerLimit(0)).c_str());
+      XMLElement* upperLimit = xmlDoc.NewElement("upper");
+      limit->InsertEndChild(upperLimit);
+      upperLimit->SetText(
+          std::to_string((double)revolute->getPositionUpperLimit(0)).c_str());
+      axis->InsertEndChild(limit);
+
+      jointXml->InsertEndChild(axis);
+    }
+    else if (joint->getType() == dynamics::UniversalJoint::getStaticType())
+    {
+      dynamics::UniversalJoint* universal
+          = static_cast<dynamics::UniversalJoint*>(joint);
+
+      jointXml->SetAttribute("type", "revolute2");
+      XMLElement* axis1 = xmlDoc.NewElement("axis");
+      XMLElement* xyz1 = xmlDoc.NewElement("xyz");
+      xyz1->SetText(writeVec3(universal->getAxis1()).c_str());
+      axis1->InsertEndChild(xyz1);
+      jointXml->InsertEndChild(axis1);
+
+      XMLElement* axis2 = xmlDoc.NewElement("axis2");
+      XMLElement* xyz2 = xmlDoc.NewElement("xyz");
+      xyz2->SetText(writeVec3(universal->getAxis2()).c_str());
+      axis2->InsertEndChild(xyz2);
+      jointXml->InsertEndChild(axis2);
+    }
+    else if (joint->getType() == dynamics::EulerJoint::getStaticType())
+    {
+      dynamics::EulerJoint* euler = static_cast<dynamics::EulerJoint*>(joint);
+      (void)euler;
+      jointXml->SetAttribute("type", "ball");
+    }
+    else if (joint->getType() == dynamics::BallJoint::getStaticType())
+    {
+      dynamics::BallJoint* ball = static_cast<dynamics::BallJoint*>(joint);
+      (void)ball;
+      jointXml->SetAttribute("type", "ball");
+    }
+    else if (joint->getType() == dynamics::WeldJoint::getStaticType())
+    {
+      dynamics::WeldJoint* weld = static_cast<dynamics::WeldJoint*>(joint);
+      (void)weld;
+      jointXml->SetAttribute("type", "fixed");
+    }
+    else if (joint->getType() == dynamics::CustomJoint<1>::getStaticType())
+    {
+      std::cout
+          << "SDF Does not support <CustomJoint> types, so this joint will be "
+             "ignored when writing. Use Skeleton::simplifySkeleton() first to "
+             "approximate CustomJoints with simpler joints."
+          << std::endl;
+      continue;
+
+      /*
+      dynamics::CustomJoint<1>* custom
+          = static_cast<dynamics::CustomJoint<1>*>(joint);
+      (void)custom;
+      jointXml->SetAttribute("type", "revolute");
+
+      Eigen::Vector3s axisDir = Eigen::Vector3s::UnitX();
+
+      // Figure out the axis properly
+      s_t oldPos = custom->getPosition(0);
+      custom->setPosition(0, 0);
+      Eigen::Isometry3s T_zero = custom->getRelativeTransform();
+      custom->setPosition(0, custom->getPositionLowerLimit(0));
+      Eigen::Isometry3s T_lower = custom->getRelativeTransform();
+      custom->setPosition(0, custom->getPositionUpperLimit(0));
+      Eigen::Isometry3s T_upper = custom->getRelativeTransform();
+      custom->setPosition(0, oldPos);
+      Eigen::Isometry3s relative = (T_lower.inverse() * T_upper);
+      axisDir = (T.inverse().linear() * math::logMap(relative.linear()))
+                    .normalized();
+      Eigen::Isometry3s T_upperLimit = (T_zero.inverse() * T_upper);
+      Eigen::Vector3s upperLimitRot
+          = (T.inverse().linear() * math::logMap(T_upperLimit.linear()));
+      s_t upperLimitVal = axisDir.dot(upperLimitRot);
+      Eigen::Isometry3s T_lowerLimit = (T_zero.inverse() * T_lower);
+      Eigen::Vector3s lowerLimitRot
+          = (T.inverse().linear() * math::logMap(T_lowerLimit.linear()));
+      s_t lowerLimitVal = axisDir.dot(lowerLimitRot);
+
+      XMLElement* axis = xmlDoc.NewElement("axis");
+      XMLElement* xyz = xmlDoc.NewElement("xyz");
+      xyz->SetText(writeVec3(axisDir).c_str());
+      axis->InsertEndChild(xyz);
+
+      XMLElement* limit = xmlDoc.NewElement("limit");
+      XMLElement* lowerLimit = xmlDoc.NewElement("lower");
+      limit->InsertEndChild(lowerLimit);
+      lowerLimit->SetText(std::to_string(lowerLimitVal).c_str());
+      XMLElement* upperLimit = xmlDoc.NewElement("lower");
+      limit->InsertEndChild(upperLimit);
+      upperLimit->SetText(std::to_string(upperLimitVal).c_str());
+      axis->InsertEndChild(limit);
+
+      jointXml->InsertEndChild(axis);
+      */
+    }
+    else
+    {
+      std::cout << "Unsupported joint type! " << joint->getType()
+                << " on joint " << joint->getName() << std::endl;
+      std::cout << "Joint " << joint->getName() << " parent body is "
+                << joint->getParentBodyNode()->getName() << std::endl;
+      std::cout << "Defaulting to a fixed joint!" << std::endl;
+      jointXml->SetAttribute("type", "fixed");
+    }
+
+    XMLElement* parentXml = xmlDoc.NewElement("parent");
+    parentXml->SetText(joint->getParentBodyNode()->getName().c_str());
+    jointXml->InsertEndChild(parentXml);
+
+    XMLElement* childXml = xmlDoc.NewElement("child");
+    childXml->SetText(joint->getChildBodyNode()->getName().c_str());
+    jointXml->InsertEndChild(childXml);
+
+    joint->getType();
+  }
+
+  std::cout << "Saving SDF file to " << path << std::endl;
+  xmlDoc.SaveFile(path.c_str());
 }
 
 namespace {

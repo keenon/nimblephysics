@@ -25,6 +25,8 @@ struct IKConfig
   IKConfig& setDontExitTranspose(bool v);
   IKConfig& setLineSearch(bool v);
   IKConfig& setLogOutput(bool v);
+  IKConfig& setInputNames(const std::vector<std::string>& inputNames);
+  IKConfig& setOutputNames(const std::vector<std::string>& outputNames);
 
   s_t convergenceThreshold = 1e-7;
   int maxStepCount = 100;
@@ -35,17 +37,53 @@ struct IKConfig
   bool dontExitTranspose = false;
   bool lineSearch = true;
   bool logOutput = false;
+  std::vector<std::string> inputNames;
+  std::vector<std::string> outputNames;
 };
 
-s_t solveIK(
-    Eigen::VectorXs initialPos,
+struct IKResult
+{
+  s_t loss;
+  Eigen::VectorXs pos;
+  bool clamped;
+};
+
+void verifyJacobian(
+    const Eigen::VectorXs& atPos,
+    const Eigen::VectorXs& upperBound,
+    const Eigen::VectorXs& lowerBound,
     int targetSize,
     std::function<Eigen::VectorXs(
-        /* in*/ const Eigen::VectorXs pos, bool clamp)> setPosAndClamp,
+        /* in*/ const Eigen::VectorXs& pos, bool clamp)> setPosAndClamp,
     std::function<void(
-        /*out*/ Eigen::VectorXs& diff,
-        /*out*/ Eigen::MatrixXs& jac)> eval,
-    std::function<void(/*out*/ Eigen::VectorXs& pos)> getRandomRestart,
+        /*out*/ Eigen::Ref<Eigen::VectorXs> diff,
+        /*out*/ Eigen::Ref<Eigen::MatrixXs> jac)> eval,
+    IKConfig config = IKConfig());
+
+s_t solveIK(
+    const Eigen::VectorXs& initialPos,
+    const Eigen::VectorXs& upperBound,
+    const Eigen::VectorXs& lowerBound,
+    int targetSize,
+    std::function<Eigen::VectorXs(
+        /* in*/ const Eigen::VectorXs& pos, bool clamp)> setPosAndClamp,
+    std::function<void(
+        /*out*/ Eigen::Ref<Eigen::VectorXs> diff,
+        /*out*/ Eigen::Ref<Eigen::MatrixXs> jac)> eval,
+    std::function<void(/*out*/ Eigen::Ref<Eigen::VectorXs> pos)>
+        getRandomRestart,
+    IKConfig config = IKConfig());
+
+IKResult refineIK(
+    const Eigen::VectorXs& initialPos,
+    const Eigen::VectorXs& upperBound,
+    const Eigen::VectorXs& lowerBound,
+    int targetSize,
+    std::function<Eigen::VectorXs(
+        /* in*/ const Eigen::VectorXs& pos, bool clamp)> setPosAndClamp,
+    std::function<void(
+        /*out*/ Eigen::Ref<Eigen::VectorXs> diff,
+        /*out*/ Eigen::Ref<Eigen::MatrixXs> jac)> eval,
     IKConfig config = IKConfig());
 
 } // namespace math

@@ -263,9 +263,15 @@ void riddersMethod(
     return;
 
   s_t originalStepSize = eps;
+#ifdef DART_USE_ARBITRARY_PRECISION
+  const s_t con = 1.1, con2 = (con * con);
+  const s_t safeThreshold = 10.0;
+  const int tabSize = 20;
+#else
   const s_t con = 1.4, con2 = (con * con);
   const s_t safeThreshold = 2.0;
   const int tabSize = 10;
+#endif
 
   // Run central differences for every column of the result separately
   for (std::size_t dof = 0; dof < result.size(); dof++)
@@ -583,6 +589,8 @@ template void finiteDifference<Eigen::Matrix6s>(
     std::function<bool(s_t, Eigen::Matrix6s&)>, Eigen::Matrix6s&, s_t, bool);
 template void finiteDifference<Eigen::Matrix3s>(
     std::function<bool(s_t, Eigen::Matrix3s&)>, Eigen::Matrix3s&, s_t, bool);
+template void finiteDifference<Eigen::Matrix4s>(
+    std::function<bool(s_t, Eigen::Matrix4s&)>, Eigen::Matrix4s&, s_t, bool);
 template void finiteDifference<Eigen::Matrix<s_t, 6, 2>>(
     std::function<bool(s_t, Eigen::Matrix<s_t, 6, 2>&)>,
     Eigen::Matrix<s_t, 6, 2>&,
@@ -601,6 +609,12 @@ template void finiteDifference<Eigen::VectorXs>(
     std::function<bool(s_t, int, s_t&)>, Eigen::VectorXs&, s_t, bool);
 template void finiteDifference<Eigen::Vector6s>(
     std::function<bool(s_t, int, s_t&)>, Eigen::Vector6s&, s_t, bool);
+template void finiteDifference<Eigen::Vector4s>(
+    std::function<bool(s_t, int, s_t&)>, Eigen::Vector4s&, s_t, bool);
+template void finiteDifference<Eigen::Vector3s>(
+    std::function<bool(s_t, int, s_t&)>, Eigen::Vector3s&, s_t, bool);
+template void finiteDifference<Eigen::Vector2s>(
+    std::function<bool(s_t, int, s_t&)>, Eigen::Vector2s&, s_t, bool);
 
 } // namespace math
 } // namespace dart

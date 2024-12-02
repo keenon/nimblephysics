@@ -2,32 +2,24 @@ import React, { useRef, useEffect, useCallback } from "react";
 import NimbleStandalone from "./NimbleStandalone";
 
 type NimbleStandaloneReactProps = {
-  loading: boolean;
-  loadingProgress: number;
-  recording: any;
+  loadUrl: string;
   style?: any;
   className?: any;
+  defaultPlaybackSpeed?: number;
+  // Making the controls accessible from the mounted component
+  playing?: boolean;
+  onPlayPause?: (playing: boolean) => void;
+  frame?: number;
+  onFrameChange?: (frame: number) => void;
+  backgroundColor?: string;
 }
 
 const NimbleStandaloneReact: ((props: NimbleStandaloneReactProps) => React.ReactElement) = (props: NimbleStandaloneReactProps) => {
   // This is responsible for calling the imperitive methods on the GUI to reflect what's currently going on in the props.
-  const setPropsOnStandalone = (gui: null | NimbleStandalone, pr: NimbleStandaloneReactProps) => {
+  const setLoadingPropsOnStandalone = (gui: null | NimbleStandalone, pr: NimbleStandaloneReactProps) => {
     if (gui != null) {
-      if (pr.loading) {
-        gui.setLoadingProgress(pr.loadingProgress);
-      }
-      else {
-        gui.hideLoadingBar();
-        if (pr.recording != null) {
-          gui.setRecording(pr.recording);
-          // Call onWindowResize() a few times right after mounting, to try to prevent grey screen syndrome
-          for (let i = 0; i < 5; i++) {
-            setTimeout(() => {
-              gui.view.view.onWindowResize();
-            }, i * 200);
-          }
-        }
-      }
+      gui.loadRecording(pr.loadUrl);
+      gui.setPlaybackSpeed(pr.defaultPlaybackSpeed || 1);
     }
   };
 
@@ -44,8 +36,9 @@ const NimbleStandaloneReact: ((props: NimbleStandaloneReactProps) => React.React
       }
       // Create the standalone GUI
       if (node != null) {
+        console.log("Creating a NimbleStandalone");
         let newStandalone = new NimbleStandalone(node);
-        setPropsOnStandalone(newStandalone, props);
+        setLoadingPropsOnStandalone(newStandalone, props);
         // This doesn't cause a re-render
         standalone.current = newStandalone;
       }
@@ -64,8 +57,47 @@ const NimbleStandaloneReact: ((props: NimbleStandaloneReactProps) => React.React
 
   // Handle the props changes
   useEffect(() => {
-    setPropsOnStandalone(standalone.current, props);
-  }, [props.loading, props.loadingProgress, props.recording]);
+    setLoadingPropsOnStandalone(standalone.current, props);
+  }, [props.loadUrl]);
+
+  useEffect(() => {
+    const pr = props;
+    const gui = standalone.current;
+    if (gui != null) {
+      if (pr.playing != null && pr.playing != gui.getPlaying()) {
+        gui.setPlaying(pr.playing);
+      }
+    }
+  }, [props.playing]);
+
+  useEffect(() => {
+    const pr = props;
+    const gui = standalone.current;
+    if (gui != null) {
+      gui.registerPlayPauseListener(pr.onPlayPause);
+      gui.registerFrameChangeListener(pr.onFrameChange);
+    }
+  }, [props.onPlayPause, props.onFrameChange]);
+
+  useEffect(() => {
+    const pr = props;
+    const gui = standalone.current;
+    if (gui != null) {
+      if (pr.frame != null && pr.frame != gui.getFrame()) {
+        gui.setFrame(pr.frame);
+      }
+    }
+  }, [props.frame]);
+
+  useEffect(() => {
+    const pr = props;
+    const gui = standalone.current;
+    if (gui != null) {
+      if (pr.backgroundColor != null && pr.backgroundColor != gui.view.getBackgroundColor()) {
+        gui.view.setBackgroundColor(pr.backgroundColor);
+      }
+    }
+  }, [props.backgroundColor]);
 
   return React.createElement(
     "div",

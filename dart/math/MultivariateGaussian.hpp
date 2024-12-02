@@ -24,6 +24,8 @@ public:
 
   s_t getMean(std::string variable);
 
+  s_t getVariance(std::string variable);
+
   Eigen::VectorXs convertFromMap(const std::map<std::string, s_t>& values);
 
   std::map<std::string, s_t> convertToMap(const Eigen::VectorXs& values);

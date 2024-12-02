@@ -38,6 +38,7 @@
 #include "dart/dynamics/DegreeOfFreedom.hpp"
 #include "dart/math/Geometry.hpp"
 #include "dart/math/Helpers.hpp"
+#include "dart/math/MathTypes.hpp"
 
 namespace dart {
 namespace dynamics {
@@ -207,6 +208,33 @@ Eigen::Matrix<s_t, 6, 3> PlanarJoint::getRelativeJacobianStatic(
   assert(!math::isNan(J));
 
   return J;
+}
+
+//==============================================================================
+/// Returns the value for q that produces the nearest rotation to
+/// `relativeRotation` passed in.
+Eigen::VectorXs PlanarJoint::getNearestPositionToDesiredRotation(
+    const Eigen::Matrix3s& relativeRotation)
+{
+  // We can treat this like a 2D rotation, by establishing a basis around the
+  // rotational axis, and then doing all our work projected onto the two
+  // orthogonal planes.
+  Eigen::Vector3s x = getTranslationalAxis1();
+  Eigen::Vector3s y = getTranslationalAxis2();
+
+  Eigen::Vector3s rotated = relativeRotation * x;
+  s_t xProj = x.dot(rotated);
+  s_t yProj = y.dot(rotated);
+  s_t angle = acos(xProj);
+  if (yProj < 0)
+  {
+    angle += M_PI;
+  }
+
+  Eigen::VectorXs positions = getPositions();
+  positions(2) = angle;
+
+  return positions;
 }
 
 //==============================================================================

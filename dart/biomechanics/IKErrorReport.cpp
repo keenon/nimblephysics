@@ -1,18 +1,53 @@
 #include "dart/biomechanics/IKErrorReport.hpp"
 
+#include <fstream>
+#include <ostream>
+#include <string>
+
+#include "dart/utils/StringUtils.hpp"
+
 namespace dart {
+using namespace utils;
 namespace biomechanics {
 
 IKErrorReport::IKErrorReport(
     std::shared_ptr<dynamics::Skeleton> skel,
     dynamics::MarkerMap markers,
     Eigen::MatrixXs poses,
-    std::vector<std::map<std::string, Eigen::Vector3s>> observations)
+    std::vector<std::map<std::string, Eigen::Vector3s>> observations,
+    std::shared_ptr<Anthropometrics> anthropometrics)
   : averageRootMeanSquaredError(0.0),
     averageSumSquaredError(0.0),
     averageMaxError(0.0)
 {
+  anthroPDF = 0.0;
+  if (anthropometrics)
+  {
+    anthroPDF = anthropometrics->getLogPDF(skel);
+  }
+
+  // Collect the names of all the observed markers on any timestep into a single
+  // vector
+  for (int i = 0; i < observations.size(); i++)
+  {
+    for (auto& pair : observations[i])
+    {
+      std::string trimmedMarkerName = trim(pair.first);
+      if (std::find(markerNames.begin(), markerNames.end(), trimmedMarkerName)
+          == markerNames.end())
+      {
+        markerNames.push_back(trimmedMarkerName);
+      }
+    }
+  }
+
   Eigen::VectorXs originalPos = skel->getPositions();
+
+  for (std::string& name : markerNames)
+  {
+    rmseMarkerErrors[name] = 0;
+    numMarkerObservations[name] = 0;
+  }
 
   for (int i = 0; i < observations.size(); i++)
   {
@@ -27,6 +62,12 @@ IKErrorReport::IKErrorReport(
     Eigen::Vector3s worstMarkerReal = Eigen::Vector3s::Zero();
     Eigen::Vector3s worstMarkerPredicted = Eigen::Vector3s::Zero();
 
+    std::map<std::string, s_t> markerErrorTableEntry;
+    for (std::string& name : markerNames)
+    {
+      markerErrorTableEntry[name] = 0.;
+    }
+
     for (auto pair : observations[i])
     {
       std::string markerName = pair.first;
@@ -35,6 +76,9 @@ IKErrorReport::IKErrorReport(
         Eigen::Vector3s diff
             = observations[i][markerName] - worldMarkers[markerName];
         s_t squaredError = diff.squaredNorm();
+        markerErrorTableEntry[markerName] = sqrt(squaredError);
+        rmseMarkerErrors[markerName] += squaredError;
+        numMarkerObservations[markerName]++;
         thisTotalSquaredError += squaredError;
         thisMaxError = std::max(thisMaxError, diff.norm());
         if (diff.squaredNorm() > worstMarkerError.squaredNorm())
@@ -50,6 +94,7 @@ IKErrorReport::IKErrorReport(
     worstMarkerErrors.push_back(worstMarkerError);
     worstMarkerReals.push_back(worstMarkerReal);
     worstMarkerPredicteds.push_back(worstMarkerPredicted);
+    markerErrorTimesteps.push_back(markerErrorTableEntry);
 
     s_t thisRootMeanSquaredError
         = sqrt(thisTotalSquaredError / observations[i].size());
@@ -57,8 +102,8 @@ IKErrorReport::IKErrorReport(
     this->maxError.push_back(thisMaxError);
     this->sumSquaredError.push_back(thisTotalSquaredError);
 
-    if (std::isfinite(thisRootMeanSquaredError)
-        && std::isfinite(thisTotalSquaredError) && std::isfinite(thisMaxError))
+    if (isfinite(thisRootMeanSquaredError) && isfinite(thisTotalSquaredError)
+        && isfinite(thisMaxError))
     {
       this->averageRootMeanSquaredError += thisRootMeanSquaredError;
       this->averageSumSquaredError += thisTotalSquaredError;
@@ -69,6 +114,15 @@ IKErrorReport::IKErrorReport(
   this->averageSumSquaredError /= observations.size();
   this->averageMaxError /= observations.size();
 
+  for (std::string& name : markerNames)
+  {
+    if (numMarkerObservations[name] > 0)
+    {
+      rmseMarkerErrors[name] /= numMarkerObservations[name];
+      rmseMarkerErrors[name] = sqrt(rmseMarkerErrors[name]);
+    }
+  }
+
   skel->setPositions(originalPos);
 }
 
@@ -77,8 +131,8 @@ void IKErrorReport::printReport(int limitTimesteps)
   std::cout << "IK Error Report:" << std::endl;
   std::cout << "sum_squared (" << this->averageSumSquaredError
             << " avg) -- RMSE (" << this->averageRootMeanSquaredError
-            << " avg) -- Max (" << this->averageMaxError
-            << " avg):" << std::endl;
+            << " avg) -- Max (" << this->averageMaxError << " avg) -- Anthro ("
+            << this->anthroPDF << "):" << std::endl;
 
   int printTimesteps = this->rootMeanSquaredError.size();
   if (limitTimesteps > 0 && limitTimesteps < printTimesteps)
@@ -107,6 +161,55 @@ void IKErrorReport::printReport(int limitTimesteps)
               << "]";
     std::cout << std::endl;
   }
+}
+
+void IKErrorReport::saveCSVMarkerErrorReport(const std::string& path)
+{
+  std::ofstream errorCSV;
+  errorCSV.open(path);
+
+  errorCSV << "Timestep";
+  for (std::string& markerName : markerNames)
+  {
+    errorCSV << "," << markerName;
+  }
+  errorCSV << std::endl;
+
+  errorCSV << "All Timesteps RMSE";
+  for (std::string& markerName : markerNames)
+  {
+    errorCSV << "," << rmseMarkerErrors.at(markerName);
+  }
+  errorCSV << std::endl;
+
+  for (int i = 0; i < markerErrorTimesteps.size(); i++)
+  {
+    errorCSV << i;
+    for (std::string& markerName : markerNames)
+    {
+      errorCSV << "," << markerErrorTimesteps.at(i).at(markerName);
+    }
+    errorCSV << std::endl;
+  }
+
+  errorCSV.close();
+}
+
+std::vector<std::pair<std::string, s_t>> IKErrorReport::getSortedMarkerRMSE()
+{
+  std::vector<std::pair<std::string, s_t>> sortedRMSE;
+  for (auto& pair : rmseMarkerErrors)
+  {
+    sortedRMSE.push_back(pair);
+  }
+  std::sort(
+      sortedRMSE.begin(),
+      sortedRMSE.end(),
+      [](const std::pair<std::string, s_t>& s1,
+         const std::pair<std::string, s_t>& s2) {
+        return s1.second > s2.second;
+      });
+  return sortedRMSE;
 }
 
 } // namespace biomechanics

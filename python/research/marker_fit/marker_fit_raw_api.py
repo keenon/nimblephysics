@@ -30,6 +30,7 @@ customOsim: nimble.biomechanics.OpenSimFile = nimble.biomechanics.OpenSimParser.
 
 fitter = nimble.biomechanics.MarkerFitter(
     customOsim.skeleton, customOsim.markersMap)
+fitter.setTriadsToTracking()
 fitter.setInitialIKSatisfactoryLoss(0.05)
 fitter.setInitialIKMaxRestarts(50)
 fitter.setIterationLimit(300)

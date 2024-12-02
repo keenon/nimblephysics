@@ -39,8 +39,13 @@ namespace python {
 
 void DartLoader(py::module& sm);
 void SkelParser(py::module& sm);
+void SdfParser(py::module& sm);
+void StringUtils(py::module& sm);
+void MJCFExporter(py::module& sm);
 void UniversalLoader(py::module& sm);
 void AccelerationSmoother(py::module& sm);
+void AccelerationMinimizer(py::module& sm);
+void AccelerationTrackAndMinimize(py::module& sm);
 
 void dart_utils(py::module& m)
 {
@@ -48,8 +53,13 @@ void dart_utils(py::module& m)
 
   DartLoader(sm);
   SkelParser(sm);
+  SdfParser(sm);
+  StringUtils(sm);
+  MJCFExporter(sm);
   UniversalLoader(sm);
   AccelerationSmoother(sm);
+  AccelerationMinimizer(sm);
+  AccelerationTrackAndMinimize(sm);
 }
 
 } // namespace python

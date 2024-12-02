@@ -30,7 +30,14 @@
  *   POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <memory>
+
+#include <dart/dynamics/BodyNode.hpp>
+#include <dart/dynamics/Frame.hpp>
+#include <dart/dynamics/Skeleton.hpp>
+#include <pybind11/functional.h>
 #include <pybind11/pybind11.h>
+#include <pybind11/stl.h>
 
 namespace py = pybind11;
 
@@ -39,8 +46,10 @@ namespace python {
 
 void Shape(py::module& sm);
 
-void Entity(py::module& sm);
-void Frame(py::module& sm);
+void Entity(py::module& sm, ::py::class_<dart::dynamics::Entity>& entity);
+void Frame(
+    py::module& sm,
+    ::py::class_<dart::dynamics::Frame, dart::dynamics::Entity>& frame);
 void ShapeFrame(py::module& sm);
 void SimpleFrame(py::module& sm);
 
@@ -50,10 +59,25 @@ void ShapeNode(py::module& sm);
 
 void DegreeOfFreedom(py::module& sm);
 
-void BodyNode(py::module& sm);
+void BodyNode(
+    py::module& sm,
+    ::py::class_<dart::dynamics::detail::BodyNodeAspectProperties>&
+        bodyNodeAspectProps,
+    ::py::class_<dart::dynamics::BodyNode::Properties>& bodyNodeProps,
+    ::py::class_<
+            dart::dynamics::TemplatedJacobianNode<dart::dynamics::BodyNode>,
+            dart::dynamics::JacobianNode>&
+            templatedJacobianBodyNode,
+    ::py::class_<
+        dart::dynamics::BodyNode,
+        dart::dynamics::TemplatedJacobianNode<dart::dynamics::BodyNode>,
+        dart::dynamics::Frame>& bodyNode);
 void Inertia(py::module& sm);
 
-void Joint(py::module& sm);
+void Joint(
+    py::module& sm,
+    ::py::class_<dart::dynamics::detail::JointProperties>& jointProps,
+    ::py::class_<dart::dynamics::Joint>& joint);
 void ZeroDofJoint(py::module& sm);
 void WeldJoint(py::module& sm);
 void GenericJoint(py::module& sm);
@@ -65,16 +89,26 @@ void TranslationalJoint2D(py::module& sm);
 void PlanarJoint(py::module& sm);
 void EulerJoint(py::module& sm);
 void EulerFreeJoint(py::module& sm);
+void ScapulathoracicJoint(py::module& sm);
 void CustomJoint(py::module& sm);
 void BallJoint(py::module& sm);
 void TranslationalJoint(py::module& sm);
 void FreeJoint(py::module& sm);
 
-void MetaSkeleton(py::module& sm);
+void MetaSkeleton(
+    py::module& sm,
+    ::py::class_<
+        dart::dynamics::MetaSkeleton,
+        std::shared_ptr<dart::dynamics::MetaSkeleton>>& metaSkeleton);
 void ReferentialSkeleton(py::module& sm);
 void Linkage(py::module& sm);
 void Chain(py::module& sm);
-void Skeleton(py::module& sm);
+void Skeleton(
+    py::module& sm,
+    ::py::class_<
+        dart::dynamics::Skeleton,
+        dart::dynamics::MetaSkeleton,
+        std::shared_ptr<dart::dynamics::Skeleton>>& skeleton);
 
 void dart_dynamics(py::module& m)
 {
@@ -82,21 +116,61 @@ void dart_dynamics(py::module& m)
 
   Shape(sm);
 
-  Entity(sm);
-  Frame(sm);
+  //////////////////////////////////////////////////////////////////////////////////
+  auto entity = ::py::class_<dart::dynamics::Entity>(sm, "Entity");
+  auto frame = ::py::class_<dart::dynamics::Frame, dart::dynamics::Entity>(
+      sm, "Frame");
+  //////////////////////////////////////////////////////////////////////////////////
+
+  Entity(sm, entity);
+  Frame(sm, frame);
   ShapeFrame(sm);
   SimpleFrame(sm);
+
+  /////////////////////////////////////////////////////////////////////////////////
+  // Predefine classes involved in circular references
+  auto metaSkeleton = ::py::class_<
+      dart::dynamics::MetaSkeleton,
+      std::shared_ptr<dart::dynamics::MetaSkeleton>>(sm, "MetaSkeleton");
+
+  auto skeleton = ::py::class_<
+      dart::dynamics::Skeleton,
+      dart::dynamics::MetaSkeleton,
+      std::shared_ptr<dart::dynamics::Skeleton>>(sm, "Skeleton");
+  /////////////////////////////////////////////////////////////////////////////////
 
   Node(sm);
   JacobianNode(sm);
   ShapeNode(sm);
 
+  /////////////////////////////////////////////////////////////////////////////////
+  // Predefine classes involved in circular references
+  auto jointProps = ::py::class_<dart::dynamics::detail::JointProperties>(
+      sm, "JointProperties");
+
+  auto joint = ::py::class_<dart::dynamics::Joint>(sm, "Joint");
+
+  auto bodyNodeAspectProps
+      = ::py::class_<dart::dynamics::detail::BodyNodeAspectProperties>(
+          sm, "BodyNodeAspectProperties");
+
+  auto bodyNodeProps = ::py::class_<dart::dynamics::BodyNode::Properties>(
+      sm, "BodyNodeProperties");
+
+    auto templatedJacobianBodyNode = ::py::class_<
+            dart::dynamics::TemplatedJacobianNode<dart::dynamics::BodyNode>,
+            dart::dynamics::JacobianNode>(sm, "TemplatedJacobianBodyNode");
+    auto bodyNode = ::py::class_<
+        dart::dynamics::BodyNode,
+        dart::dynamics::TemplatedJacobianNode<dart::dynamics::BodyNode>,
+        dart::dynamics::Frame>(sm, "BodyNode");
+  /////////////////////////////////////////////////////////////////////////////////
+
   DegreeOfFreedom(sm);
 
-  BodyNode(sm);
   Inertia(sm);
 
-  Joint(sm);
+  Joint(sm, jointProps, joint);
   ZeroDofJoint(sm);
   WeldJoint(sm);
   GenericJoint(sm);
@@ -104,20 +178,23 @@ void dart_dynamics(py::module& m)
   PrismaticJoint(sm);
   ScrewJoint(sm);
   UniversalJoint(sm);
-  TranslationalJoint2D(sm);
   PlanarJoint(sm);
+  TranslationalJoint2D(sm);
   EulerJoint(sm);
   EulerFreeJoint(sm);
+  ScapulathoracicJoint(sm);
   CustomJoint(sm);
   BallJoint(sm);
   TranslationalJoint(sm);
   FreeJoint(sm);
 
-  MetaSkeleton(sm);
+  BodyNode(sm, bodyNodeAspectProps, bodyNodeProps, templatedJacobianBodyNode, bodyNode);
+
+  MetaSkeleton(sm, metaSkeleton);
   ReferentialSkeleton(sm);
-  Linkage(sm);
-  Chain(sm);
-  Skeleton(sm);
+  //   Linkage(sm);
+  //   Chain(sm);
+  Skeleton(sm, skeleton);
 }
 
 } // namespace python

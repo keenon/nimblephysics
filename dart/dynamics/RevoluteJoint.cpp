@@ -35,9 +35,10 @@
 #include <string>
 
 #include "dart/common/Console.hpp"
+#include "dart/dynamics/BodyNode.hpp"
 #include "dart/math/Geometry.hpp"
 #include "dart/math/Helpers.hpp"
-#include "dart/dynamics/BodyNode.hpp"
+#include "dart/math/MathTypes.hpp"
 
 namespace dart {
 namespace dynamics {
@@ -52,7 +53,7 @@ RevoluteJoint::~RevoluteJoint()
 void RevoluteJoint::setProperties(const Properties& _properties)
 {
   GenericJoint<math::R1Space>::setProperties(
-        static_cast<const GenericJoint<math::R1Space>::Properties&>(_properties));
+      static_cast<const GenericJoint<math::R1Space>::Properties&>(_properties));
   setProperties(static_cast<const UniqueProperties&>(_properties));
 }
 
@@ -77,7 +78,7 @@ RevoluteJoint::Properties RevoluteJoint::getRevoluteJointProperties() const
 //==============================================================================
 void RevoluteJoint::copy(const RevoluteJoint& _otherJoint)
 {
-  if(this == &_otherJoint)
+  if (this == &_otherJoint)
     return;
 
   setProperties(_otherJoint.getRevoluteJointProperties());
@@ -86,7 +87,7 @@ void RevoluteJoint::copy(const RevoluteJoint& _otherJoint)
 //==============================================================================
 void RevoluteJoint::copy(const RevoluteJoint* _otherJoint)
 {
-  if(nullptr == _otherJoint)
+  if (nullptr == _otherJoint)
     return;
 
   copy(*_otherJoint);
@@ -121,7 +122,7 @@ const std::string& RevoluteJoint::getStaticType()
 //==============================================================================
 void RevoluteJoint::setAxis(const Eigen::Vector3s& _axis)
 {
-  if(_axis == mAspectProperties.mAxis)
+  if (_axis == mAspectProperties.mAxis)
     return;
 
   mAspectProperties.mAxis = _axis.normalized();
@@ -141,14 +142,36 @@ GenericJoint<math::R1Space>::JacobianMatrix
 RevoluteJoint::getRelativeJacobianStatic(
     const GenericJoint<math::R1Space>::Vector& /*positions*/) const
 {
-  GenericJoint<math::R1Space>::JacobianMatrix jacobian
-      = math::AdTAngular(
-        Joint::mAspectProperties.mT_ChildBodyToJoint, getAxis());
+  GenericJoint<math::R1Space>::JacobianMatrix jacobian = math::AdTAngular(
+      Joint::mAspectProperties.mT_ChildBodyToJoint, getAxis());
 
   // Verification
   assert(!math::isNan(jacobian));
 
   return jacobian;
+}
+
+//==============================================================================
+/// Returns the value for q that produces the nearest rotation to
+/// `relativeRotation` passed in.
+Eigen::VectorXs RevoluteJoint::getNearestPositionToDesiredRotation(
+    const Eigen::Matrix3s& relativeRotationGlobal)
+{
+  Eigen::Matrix3s relativeRotation
+      = Joint::mAspectProperties.mT_ParentBodyToJoint.linear().transpose()
+        * relativeRotationGlobal
+        * Joint::mAspectProperties.mT_ChildBodyToJoint.linear();
+  s_t angle
+      = math::getClosestRotationalApproximation(getAxis(), relativeRotation);
+  while (angle < getPositionLowerLimit(0))
+  {
+    angle += 2 * dart::math::constantsd::pi();
+  }
+  while (angle > getPositionUpperLimit(0))
+  {
+    angle -= 2 * dart::math::constantsd::pi();
+  }
+  return Eigen::VectorXs::Ones(1) * angle;
 }
 
 //==============================================================================
@@ -190,7 +213,7 @@ void RevoluteJoint::updateRelativeTransform() const
 //==============================================================================
 void RevoluteJoint::updateRelativeJacobian(bool _mandatory) const
 {
-  if(_mandatory)
+  if (_mandatory)
     mJacobian = getRelativeJacobianStatic(getPositionsStatic());
 }
 
@@ -201,5 +224,5 @@ void RevoluteJoint::updateRelativeJacobianTimeDeriv() const
   assert(mJacobianDeriv == Eigen::Vector6s::Zero());
 }
 
-}  // namespace dynamics
-}  // namespace dart
+} // namespace dynamics
+} // namespace dart

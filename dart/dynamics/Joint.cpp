@@ -35,11 +35,18 @@
 #include <string>
 
 #include "dart/common/Console.hpp"
+#include "dart/dynamics/BallJoint.hpp"
 #include "dart/dynamics/BodyNode.hpp"
+#include "dart/dynamics/ConstantCurveIncompressibleJoint.hpp"
 #include "dart/dynamics/DegreeOfFreedom.hpp"
+#include "dart/dynamics/EllipsoidJoint.hpp"
+#include "dart/dynamics/FreeJoint.hpp"
+#include "dart/dynamics/PrismaticJoint.hpp"
 #include "dart/dynamics/Skeleton.hpp"
-#include "dart/math/Helpers.hpp"
 #include "dart/math/FiniteDifference.hpp"
+#include "dart/math/Geometry.hpp"
+#include "dart/math/Helpers.hpp"
+#include "dart/math/MathTypes.hpp"
 
 namespace dart {
 namespace dynamics {
@@ -102,6 +109,15 @@ Joint::ExtendedProperties::ExtendedProperties(
     mCompositeProperties(std::move(aspectProperties))
 {
   // Do nothing
+}
+
+//==============================================================================
+/// Create a clone of this Joint, or (if this joint cannot be represented in
+/// SDF or MJCF, like CustomJoint's) create a simplified approximation of this
+/// joint.
+Joint* Joint::simplifiedClone() const
+{
+  return clone();
 }
 
 //==============================================================================
@@ -270,6 +286,14 @@ bool Joint::isDynamic() const
 }
 
 //==============================================================================
+/// Return true if this joint has the same upperlimit and lowerlimit on
+/// positions
+bool Joint::isFixed() const
+{
+  return getPositionUpperLimits() == getPositionLowerLimits();
+}
+
+//==============================================================================
 BodyNode* Joint::getChildBodyNode()
 {
   return mChildBodyNode;
@@ -399,25 +423,699 @@ const Eigen::Vector6s& Joint::getRelativePrimaryAcceleration() const
 }
 
 //==============================================================================
+/// Gets the derivative of the spatial Jacobian of the child BodyNode relative
+/// to the parent BodyNode expressed in the child BodyNode frame, with respect
+/// to the scaling of the parent body along a specific axis.
+///
+/// Use axis = -1 for uniform scaling of all the axis.
+math::Jacobian Joint::getRelativeJacobianDerivWrtParentScale(int /*axis*/) const
+{
+  return Eigen::MatrixXs::Zero(6, getNumDofs());
+}
+
+//==============================================================================
+/// This uses finite differencing to compute the changes to the relative
+/// position with respect to changes in the parent body's scale along a
+/// specific axis.
+///
+/// Use axis = -1 for uniform scaling of all the axis.
+Eigen::MatrixXs Joint::finiteDifferenceRelativeJacobianDerivWrtParentScale(
+    int axis)
+{
+  Eigen::MatrixXs result(6, getNumDofs());
+
+  Eigen::Vector3s originalParentScale = getParentScale();
+
+  bool useRidders = true;
+  s_t eps = 1e-3;
+  math::finiteDifference<Eigen::MatrixXs>(
+      [&](/* in*/ s_t eps,
+          /*out*/ Eigen::MatrixXs& perturbed) {
+        Eigen::Vector3s perturbedScale = originalParentScale;
+        if (axis == -1)
+        {
+          perturbedScale += Eigen::Vector3s::Ones() * eps;
+        }
+        else
+        {
+          perturbedScale += Eigen::Vector3s::Unit(axis) * eps;
+        }
+        setParentScale(perturbedScale);
+        perturbed = getRelativeJacobian();
+        return true;
+      },
+      result,
+      eps,
+      useRidders);
+
+  setParentScale(originalParentScale);
+
+  return result;
+}
+
+//==============================================================================
+/// Gets the derivative of the spatial Jacobian of the child BodyNode relative
+/// to the parent BodyNode expressed in the child BodyNode frame, with respect
+/// to the scaling of the child body along a specific axis.
+///
+/// Use axis = -1 for uniform scaling of all the axis.
+math::Jacobian Joint::getRelativeJacobianDerivWrtChildScale(int axis) const
+{
+  math::Jacobian J = getRelativeJacobian();
+
+  /*
+  //--------------------------------------------------------------------------
+  // w' = R*w
+  // v' = p x R*w + R*v
+  //--------------------------------------------------------------------------
+  Eigen::Vector6s res;
+  res.head<3>().noalias() = _T.linear() * _V.head<3>();
+  res.tail<3>().noalias()
+      = _T.linear() * _V.tail<3>() + _T.translation().cross(res.head<3>());
+  */
+
+  Eigen::Vector3s dTrans = Joint::getOriginalTransformFromChildBodyNode();
+  if (axis != -1)
+  {
+    dTrans = dTrans.cwiseProduct(Eigen::Vector3s::Unit(axis));
+  }
+
+  for (int i = 0; i < J.cols(); i++)
+  {
+    J.block<3, 1>(3, i) = dTrans.cross(J.block<3, 1>(0, i));
+    J.block<3, 1>(0, i).setZero();
+  }
+
+  return J;
+}
+
+//==============================================================================
+/// This uses finite differencing to compute the changes to the relative
+/// position with respect to changes in the child body's scale along a
+/// specific axis.
+///
+/// Use axis = -1 for uniform scaling of all the axis.
+Eigen::MatrixXs Joint::finiteDifferenceRelativeJacobianDerivWrtChildScale(
+    int axis)
+{
+  Eigen::MatrixXs result(6, getNumDofs());
+
+  Eigen::Vector3s originalChildScale = getParentScale();
+
+  bool useRidders = true;
+  s_t eps = 1e-3;
+  math::finiteDifference<Eigen::MatrixXs>(
+      [&](/* in*/ s_t eps,
+          /*out*/ Eigen::MatrixXs& perturbed) {
+        Eigen::Vector3s perturbedScale = originalChildScale;
+        if (axis == -1)
+        {
+          perturbedScale += Eigen::Vector3s::Ones() * eps;
+        }
+        else
+        {
+          perturbedScale += Eigen::Vector3s::Unit(axis) * eps;
+        }
+        setChildScale(perturbedScale);
+        perturbed = getRelativeJacobian();
+        return true;
+      },
+      result,
+      eps,
+      useRidders);
+
+  setChildScale(originalChildScale);
+
+  return result;
+}
+
+//==============================================================================
+/// This gets the change in world translation of the child body, with respect
+/// to an axis of parent scaling. Use axis = -1 for uniform scaling of all the
+/// axis.
+Eigen::Vector3s Joint::getWorldTranslationOfChildBodyWrtParentScale(
+    int axis) const
+{
+  const dynamics::BodyNode* parentBody = getParentBodyNode();
+  if (parentBody == nullptr)
+  {
+    return Eigen::Vector3s::Zero();
+  }
+
+  Eigen::Matrix3s R = parentBody->getWorldTransform().linear();
+  Eigen::Vector3s parentOffset = getTransformFromParentBodyNode().translation();
+  if (axis == -1)
+  {
+    return R * parentOffset.cwiseQuotient(getParentScale());
+  }
+  else
+  {
+    return (R.col(axis) * parentOffset(axis)) / getParentScale()(axis);
+  }
+}
+
+//==============================================================================
+/// This gets the change in world translation of the child body, with respect
+/// to an axis of child scaling. Use axis = -1 for uniform scaling of all the
+/// axis.
+Eigen::Vector3s Joint::getWorldTranslationOfChildBodyWrtChildScale(
+    int axis) const
+{
+  Eigen::Matrix3s R = getChildBodyNode()->getWorldTransform().linear();
+  Eigen::Vector3s parentOffset = getTransformFromChildBodyNode().translation();
+  if (axis == -1)
+  {
+    return -R * parentOffset.cwiseQuotient(getChildScale());
+  }
+  else
+  {
+    return -(R.col(axis) * parentOffset(axis)) / getChildScale()(axis);
+  }
+}
+
+//==============================================================================
+Eigen::Vector3s
+Joint::finiteDifferenceWorldTranslationOfChildBodyWrtParentScale(int axis)
+{
+  Eigen::Vector3s originalParentScale = getParentScale();
+
+  Eigen::Vector3s dT;
+  bool useRidders = true;
+  s_t eps = 1e-3;
+  math::finiteDifference<Eigen::Vector3s>(
+      [&](/* in*/ s_t eps,
+          /*out*/ Eigen::Vector3s& perturbed) {
+        Eigen::Vector3s perturbedScale = originalParentScale;
+        if (axis == -1)
+        {
+          perturbedScale += Eigen::Vector3s::Ones() * eps;
+        }
+        else
+        {
+          perturbedScale += Eigen::Vector3s::Unit(axis) * eps;
+        }
+        setParentScale(perturbedScale);
+        updateRelativeTransform();
+        perturbed = getChildBodyNode()->getWorldTransform().translation();
+        return true;
+      },
+      dT,
+      eps,
+      useRidders);
+
+  setParentScale(originalParentScale);
+
+  return dT;
+}
+
+//==============================================================================
+Eigen::Vector3s Joint::finiteDifferenceWorldTranslationOfChildBodyWrtChildScale(
+    int axis)
+{
+  Eigen::Vector3s originalChildScale = getChildScale();
+
+  Eigen::Vector3s dT;
+  bool useRidders = true;
+  s_t eps = 1e-3;
+  math::finiteDifference<Eigen::Vector3s>(
+      [&](/* in*/ s_t eps,
+          /*out*/ Eigen::Vector3s& perturbed) {
+        Eigen::Vector3s perturbedScale = originalChildScale;
+        if (axis == -1)
+        {
+          perturbedScale += Eigen::Vector3s::Ones() * eps;
+        }
+        else
+        {
+          perturbedScale += Eigen::Vector3s::Unit(axis) * eps;
+        }
+        setChildScale(perturbedScale);
+
+        updateRelativeTransform();
+
+        perturbed = getChildBodyNode()->getWorldTransform().translation();
+        return true;
+      },
+      dT,
+      eps,
+      useRidders);
+
+  setChildScale(originalChildScale);
+
+  return dT;
+}
+
+//==============================================================================
+/// This gets the column of "H" for the GEAR paper derivations, which is
+/// defined as: log(T_{parent,self}^{-1} * dT_{parent,self}/dp) where "p" is
+/// the scalar value we are changing.
+///
+/// Use axis = -1 for uniform scaling of all the axis.
+Eigen::Vector6s Joint::getLocalTransformScrewWrtParentScale(int axis) const
+{
+  Eigen::Isometry3s T = getRelativeTransform();
+  Eigen::Vector3s dTrans = Joint::getOriginalTransformFromParentBodyNode();
+  if (axis != -1)
+  {
+    dTrans = dTrans.cwiseProduct(Eigen::Vector3s::Unit(axis));
+  }
+  return math::AdTLinear(T.inverse(), dTrans);
+}
+
+//==============================================================================
+/// This gets the column of "H" for the GEAR paper derivations, which is
+/// defined as: log(T_{parent,self}^{-1} * dT_{parent,self}/dp) where "p" is
+/// the scalar value we are changing.
+///
+/// Use axis = -1 for uniform scaling of all the axis.
+Eigen::Vector6s Joint::finiteDifferenceLocalTransformScrewWrtParentScale(
+    int axis)
+{
+  Eigen::Vector3s originalParentScale = getParentScale();
+  Eigen::Isometry3s originalT = getRelativeTransform();
+
+  Eigen::Vector6s dT;
+  bool useRidders = true;
+  s_t eps = 1e-3;
+  math::finiteDifference<Eigen::Vector6s>(
+      [&](/* in*/ s_t eps,
+          /*out*/ Eigen::Vector6s& perturbed) {
+        Eigen::Vector3s perturbedScale = originalParentScale;
+        if (axis == -1)
+        {
+          perturbedScale += Eigen::Vector3s::Ones() * eps;
+        }
+        else
+        {
+          perturbedScale += Eigen::Vector3s::Unit(axis) * eps;
+        }
+        setParentScale(perturbedScale);
+        perturbed = math::logMap(originalT.inverse() * getRelativeTransform());
+        return true;
+      },
+      dT,
+      eps,
+      useRidders);
+
+  setParentScale(originalParentScale);
+
+  return dT;
+}
+
+//==============================================================================
+/// This gets the column of "H" for the GEAR paper derivations, which is
+/// defined as: log(T_{parent,self}^{-1} * dT_{parent,self}/dp) where "p" is
+/// the scalar value we are changing.
+///
+/// Use axis = -1 for uniform scaling of all the axis.
+Eigen::Vector6s Joint::getLocalTransformScrewWrtChildScale(int axis) const
+{
+  /*
+  mT = Joint::mAspectProperties.mT_ParentBodyToJoint * mQ
+       * Joint::mAspectProperties.mT_ChildBodyToJoint.inverse();
+  */
+  Eigen::Vector3s dTrans = Joint::getOriginalTransformFromChildBodyNode();
+  if (axis != -1)
+  {
+    dTrans = dTrans.cwiseProduct(Eigen::Vector3s::Unit(axis));
+  }
+
+  Eigen::Vector6s result = Eigen::Vector6s::Zero();
+  // Joint::mAspectProperties.mT_ChildBodyToJoint
+  // result = math::AdTLinear(Joint::mAspectProperties.mT_ChildBodyToJoint,
+  // dTrans);
+
+  /*
+  Analytical:
+       0
+       0
+       0
+0.982396
+ 1.02114
+ 0.11545
+ */
+
+  // result = math::AdTLinear(
+  //     getRelativeTransform()
+  //         * Joint::mAspectProperties.mT_ChildBodyToJoint.inverse(),
+  //     -dTrans);
+
+  result.tail<3>() = -dTrans;
+  return result;
+}
+
+//==============================================================================
+/// This gets the column of "H" for the GEAR paper derivations, which is
+/// defined as: log(T_{parent,self}^{-1} * dT_{parent,self}/dp) where "p" is
+/// the scalar value we are changing.
+///
+/// Use axis = -1 for uniform scaling of all the axis.
+Eigen::Vector6s Joint::finiteDifferenceLocalTransformScrewWrtChildScale(
+    int axis)
+{
+  Eigen::Vector3s originalChildScale = getChildScale();
+  Eigen::Isometry3s originalT = getRelativeTransform();
+
+  Eigen::Vector6s dT;
+  bool useRidders = true;
+  s_t eps = 1e-3;
+  math::finiteDifference<Eigen::Vector6s>(
+      [&](/* in*/ s_t eps,
+          /*out*/ Eigen::Vector6s& perturbed) {
+        Eigen::Vector3s perturbedScale = originalChildScale;
+        if (axis == -1)
+        {
+          perturbedScale += Eigen::Vector3s::Ones() * eps;
+        }
+        else
+        {
+          perturbedScale += Eigen::Vector3s::Unit(axis) * eps;
+        }
+        setChildScale(perturbedScale);
+        perturbed = math::logMap(originalT.inverse() * getRelativeTransform());
+        return true;
+      },
+      dT,
+      eps,
+      useRidders);
+
+  setChildScale(originalChildScale);
+
+  return dT;
+}
+
+//==============================================================================
+/// Gets the derivative of the time derivative of the spatial Jacobian of the
+/// child BodyNode relative to the parent BodyNode expressed in the child
+/// BodyNode frame, with respect to the scaling of the parent body along a
+/// specific axis.
+///
+/// Use axis = -1 for uniform scaling of all the axis.
+math::Jacobian Joint::getRelativeJacobianTimeDerivDerivWrtParentScale(
+    int /*axis*/) const
+{
+  return Eigen::MatrixXs::Zero(6, getNumDofs());
+}
+
+//==============================================================================
+/// This uses finite differencing to compute the changes to the time deriv of
+/// the relative Jacobian with respect to changes in the parent body's scale
+/// along a specific axis.
+///
+/// Use axis = -1 for uniform scaling of all the axis.
+Eigen::MatrixXs
+Joint::finiteDifferenceRelativeJacobianTimeDerivDerivWrtParentScale(int axis)
+{
+  Eigen::MatrixXs result(6, getNumDofs());
+
+  Eigen::Vector3s originalParentScale = getParentScale();
+
+  bool useRidders = true;
+  s_t eps = 1e-3;
+  math::finiteDifference<Eigen::MatrixXs>(
+      [&](/* in*/ s_t eps,
+          /*out*/ Eigen::MatrixXs& perturbed) {
+        Eigen::Vector3s perturbedScale = originalParentScale;
+        if (axis == -1)
+        {
+          perturbedScale += Eigen::Vector3s::Ones() * eps;
+        }
+        else
+        {
+          perturbedScale += Eigen::Vector3s::Unit(axis) * eps;
+        }
+        setParentScale(perturbedScale);
+        perturbed = getRelativeJacobianTimeDeriv();
+        return true;
+      },
+      result,
+      eps,
+      useRidders);
+
+  setParentScale(originalParentScale);
+
+  return result;
+}
+
+/// Gets the derivative of the time derivative of the spatial Jacobian of the
+/// child BodyNode relative to the parent BodyNode expressed in the child
+/// BodyNode frame, with respect to the scaling of the child body along a
+/// specific axis.
+///
+/// Use axis = -1 for uniform scaling of all the axis.
+math::Jacobian Joint::getRelativeJacobianTimeDerivDerivWrtChildScale(
+    int axis) const
+{
+  math::Jacobian J = getRelativeJacobianTimeDeriv();
+
+  /*
+  //--------------------------------------------------------------------------
+  // w' = R*w
+  // v' = p x R*w + R*v
+  //--------------------------------------------------------------------------
+  Eigen::Vector6s res;
+  res.head<3>().noalias() = _T.linear() * _V.head<3>();
+  res.tail<3>().noalias()
+      = _T.linear() * _V.tail<3>() + _T.translation().cross(res.head<3>());
+  */
+
+  Eigen::Vector3s dTrans = Joint::getOriginalTransformFromChildBodyNode();
+  if (axis != -1)
+  {
+    dTrans = dTrans.cwiseProduct(Eigen::Vector3s::Unit(axis));
+  }
+
+  for (int i = 0; i < J.cols(); i++)
+  {
+    J.block<3, 1>(3, i) = dTrans.cross(J.block<3, 1>(0, i));
+    J.block<3, 1>(0, i).setZero();
+  }
+
+  return J;
+}
+
+//==============================================================================
+/// This uses finite differencing to compute the changes to the time deriv of
+/// the relative Jacobian with respect to changes in the child body's scale
+/// along a specific axis.
+///
+/// Use axis = -1 for uniform scaling of all the axis.
+Eigen::MatrixXs
+Joint::finiteDifferenceRelativeJacobianTimeDerivDerivWrtChildScale(int axis)
+{
+  Eigen::MatrixXs result(6, getNumDofs());
+
+  Eigen::Vector3s originalChildScale = getParentScale();
+
+  bool useRidders = true;
+  s_t eps = 1e-3;
+  math::finiteDifference<Eigen::MatrixXs>(
+      [&](/* in*/ s_t eps,
+          /*out*/ Eigen::MatrixXs& perturbed) {
+        Eigen::Vector3s perturbedScale = originalChildScale;
+        if (axis == -1)
+        {
+          perturbedScale += Eigen::Vector3s::Ones() * eps;
+        }
+        else
+        {
+          perturbedScale += Eigen::Vector3s::Unit(axis) * eps;
+        }
+        setChildScale(perturbedScale);
+        perturbed = getRelativeJacobianTimeDeriv();
+        return true;
+      },
+      result,
+      eps,
+      useRidders);
+
+  setChildScale(originalChildScale);
+
+  return result;
+}
+
+//==============================================================================
+/// This gets the relative spatial velocity of the joint, with finite
+/// differencing
+Eigen::Vector6s Joint::finiteDifferenceRelativeSpatialVelocity()
+{
+  Eigen::VectorXs pos = getPositions();
+  Eigen::VectorXs vel = getVelocities();
+
+  bool useRidders = true;
+  s_t eps = 1e-2;
+  Eigen::Isometry3s originalT = getRelativeTransform();
+
+  Eigen::Vector6s result;
+  math::finiteDifference<Eigen::Vector6s>(
+      [&](/* in*/ s_t eps,
+          /*out*/ Eigen::Vector6s& perturbed) {
+        setPositions(pos + (vel * eps));
+        perturbed = math::logMap(originalT.inverse() * getRelativeTransform());
+        return true;
+      },
+      result,
+      eps,
+      useRidders);
+  setPositions(pos);
+
+  return result;
+}
+
+//==============================================================================
 Eigen::MatrixXs Joint::finiteDifferenceRelativeJacobian()
 {
   Eigen::MatrixXs result(6, getNumDofs());
 
-  bool useRidders = false;
-  s_t eps = 1e-5;
-  math::finiteDifference(
-    [&](/* in*/ s_t eps,
-        /* in*/ int dof,
-        /*out*/ Eigen::VectorXs& perturbed) {
-      s_t original = getVelocity(dof);
-      setVelocity(dof, original + eps);
-      perturbed = getRelativeSpatialVelocity();
-      setVelocity(dof, original);
-      return true;
-    },
-    result,
-    eps,
-    useRidders);
+  Eigen::VectorXs originalVelocity = getVelocities();
+
+  // Changes in velocity should be linearly related to changes in speed
+  for (int i = 0; i < getNumDofs(); i++)
+  {
+    setVelocities(Eigen::VectorXs::Unit(getNumDofs(), i));
+    result.col(i) = finiteDifferenceRelativeSpatialVelocity();
+  }
+
+  // This should be equivalent
+  // bool useRidders = true;
+  // s_t eps = 1e-3;
+  // math::finiteDifference(
+  //     [&](/* in*/ s_t eps,
+  //         /* in*/ int dof,
+  //         /*out*/ Eigen::VectorXs& perturbed) {
+  //       s_t original = getVelocity(dof);
+  //       setVelocity(dof, original + eps);
+  //       perturbed = finiteDifferenceRelativeSpatialVelocity();
+  //       setVelocity(dof, original);
+  //       return true;
+  //     },
+  //     result,
+  //     eps,
+  //     useRidders);
+
+  setVelocities(originalVelocity);
+
+  return result;
+}
+
+//==============================================================================
+/// This uses finite differencing to compute the relative Jacobian derivative
+/// wrt the position of `dof`
+Eigen::MatrixXs Joint::finiteDifferenceRelativeJacobianDerivWrtPosition(int dof)
+{
+  Eigen::MatrixXs result(6, getNumDofs());
+
+  Eigen::VectorXs pos = getPositions();
+  Eigen::VectorXs vel = getVelocities();
+
+  bool useRidders = true;
+  s_t eps = 1e-3;
+  math::finiteDifference<Eigen::MatrixXs>(
+      [&](/* in*/ s_t eps,
+          /*out*/ Eigen::MatrixXs& perturbed) {
+        Eigen::VectorXs tweaked = pos;
+        tweaked(dof) += eps;
+        setPositions(tweaked);
+        perturbed = getRelativeJacobian();
+        return true;
+      },
+      result,
+      eps,
+      useRidders);
+
+  setPositions(pos);
+
+  return result;
+}
+
+//==============================================================================
+/// This uses finite differencing to compute the relative Jacobian time
+/// derivative
+Eigen::MatrixXs Joint::finiteDifferenceRelativeJacobianTimeDeriv()
+{
+  Eigen::MatrixXs result(6, getNumDofs());
+
+  Eigen::VectorXs pos = getPositions();
+  Eigen::VectorXs vel = getVelocities();
+
+  bool useRidders = true;
+  s_t eps = 1e-3;
+  math::finiteDifference<Eigen::MatrixXs>(
+      [&](/* in*/ s_t eps,
+          /*out*/ Eigen::MatrixXs& perturbed) {
+        Eigen::VectorXs tweaked = pos + eps * vel;
+        setPositions(tweaked);
+        perturbed = getRelativeJacobian();
+        return true;
+      },
+      result,
+      eps,
+      useRidders);
+
+  setPositions(pos);
+
+  return result;
+}
+
+//==============================================================================
+/// This uses finite differencing to compute the relative Jacobian time
+/// derivative, derivative wrt position of `dof`
+Eigen::MatrixXs
+Joint::finiteDifferenceRelativeJacobianTimeDerivDerivWrtPosition(int dof)
+{
+  Eigen::MatrixXs result(6, getNumDofs());
+
+  Eigen::VectorXs pos = getPositions();
+  Eigen::VectorXs vel = getVelocities();
+
+  bool useRidders = true;
+  s_t eps = 1e-3;
+  math::finiteDifference<Eigen::MatrixXs>(
+      [&](/* in*/ s_t eps,
+          /*out*/ Eigen::MatrixXs& perturbed) {
+        Eigen::VectorXs tweaked = pos;
+        tweaked(dof) += eps;
+        setPositions(tweaked);
+        perturbed = getRelativeJacobianTimeDeriv();
+        return true;
+      },
+      result,
+      eps,
+      useRidders);
+
+  setPositions(pos);
+
+  return result;
+}
+
+//==============================================================================
+/// This uses finite differencing to compute the relative Jacobian time
+/// derivative, derivative wrt velocity of `dof`
+Eigen::MatrixXs
+Joint::finiteDifferenceRelativeJacobianTimeDerivDerivWrtVelocity(int dof)
+{
+  Eigen::MatrixXs result(6, getNumDofs());
+
+  Eigen::VectorXs pos = getPositions();
+  Eigen::VectorXs vel = getVelocities();
+
+  bool useRidders = true;
+  s_t eps = 1e-3;
+  math::finiteDifference<Eigen::MatrixXs>(
+      [&](/* in*/ s_t eps,
+          /*out*/ Eigen::MatrixXs& perturbed) {
+        Eigen::VectorXs tweaked = vel;
+        tweaked(dof) += eps;
+        setVelocities(tweaked);
+        perturbed = getRelativeJacobianTimeDeriv();
+        return true;
+      },
+      result,
+      eps,
+      useRidders);
+
+  setVelocities(vel);
+
   return result;
 }
 
@@ -430,18 +1128,18 @@ Eigen::MatrixXs Joint::finiteDifferenceRelativeJacobianInPositionSpace(
 
   s_t eps = useRidders ? 1e-2 : 1e-5;
   math::finiteDifference(
-    [&](/* in*/ s_t eps,
-        /* in*/ int dof,
-        /*out*/ Eigen::VectorXs& perturbed) {
-      s_t original = getPosition(dof);
-      setPosition(dof, original + eps);
-      perturbed = math::logMap(T.inverse() * getRelativeTransform());
-      setPosition(dof, original);
-      return true;
-    },
-    result,
-    eps,
-    useRidders);
+      [&](/* in*/ s_t eps,
+          /* in*/ int dof,
+          /*out*/ Eigen::VectorXs& perturbed) {
+        s_t original = getPosition(dof);
+        setPosition(dof, original + eps);
+        perturbed = math::logMap(T.inverse() * getRelativeTransform());
+        setPosition(dof, original);
+        return true;
+      },
+      result,
+      eps,
+      useRidders);
   return result;
 }
 
@@ -487,6 +1185,9 @@ Eigen::Vector6s Joint::getWorldAxisScrewForVelocity(int dof) const
 Eigen::Vector6s Joint::getScrewAxisGradientForPosition(
     int axisDof, int rotateDof)
 {
+  // TODO: check if this works
+  // getRelativeJacobianDerivWrtPosition(rotateDof).col(axisDof);
+
   // Defaults to Finite Differencing - this is slow, but at least it's
   // approximately correct. Child joints should override with a faster
   // implementation.
@@ -541,6 +1242,124 @@ Eigen::Vector6s Joint::finiteDifferenceScrewAxisGradientForForce(
   setPosition(rotateDof, original);
 
   return (plus - minus) / (2 * EPS);
+}
+
+//==============================================================================
+// Returns the gradient of the screw axis with respect to the scaling axis of
+// the child body
+Eigen::Vector6s Joint::getScrewAxisGradientWrtChildBodyScale(
+    int axisDof, int axis)
+{
+  // if (getType() == ConstantCurveIncompressibleJoint::getStaticType()
+  //     || getType() == EllipsoidJoint::getStaticType())
+  // {
+  //   return getRelativeJacobianDerivWrtChildScale(axis).col(axisDof);
+  // }
+  return finiteDifferenceScrewAxisGradientWrtChildBodyScale(axisDof, axis);
+}
+
+//==============================================================================
+// Returns the gradient of the screw axis with respect to the scaling axis of
+// the parent body
+Eigen::Vector6s Joint::getScrewAxisGradientWrtParentBodyScale(
+    int axisDof, int axis)
+{
+  // if (getType() == ConstantCurveIncompressibleJoint::getStaticType()
+  //     || getType() == EllipsoidJoint::getStaticType())
+  // {
+  //   return getRelativeJacobianDerivWrtParentScale(axis).col(axisDof);
+  // }
+  return finiteDifferenceScrewAxisGradientWrtParentBodyScale(axisDof, axis);
+}
+
+//==============================================================================
+// Returns the gradient of the screw axis with respect to the scaling axis of
+// the child body
+Eigen::Vector6s Joint::finiteDifferenceScrewAxisGradientWrtChildBodyScale(
+    int axisDof, int axis)
+{
+  Eigen::Vector3s originalChildScale = getChildScale();
+
+  Eigen::Isometry3s childT = getChildBodyNode()->getWorldTransform();
+
+  Eigen::Vector6s dT;
+  bool useRidders = true;
+  s_t eps = 1e-3;
+  math::finiteDifference<Eigen::Vector6s>(
+      [&](/* in*/ s_t eps,
+          /*out*/ Eigen::Vector6s& perturbed) {
+        Eigen::Vector3s perturbedScale = originalChildScale;
+        if (axis == -1)
+        {
+          perturbedScale += Eigen::Vector3s::Ones() * eps;
+        }
+        else
+        {
+          perturbedScale += Eigen::Vector3s::Unit(axis) * eps;
+        }
+        setChildScale(perturbedScale);
+        updateRelativeTransform();
+
+        // perturbed = getWorldAxisScrewForPosition(axisDof);
+        // perturbed = math::AdR(
+        //     getChildBodyNode()->getWorldTransform(),
+        //     getRelativeJacobianInPositionSpace().col(axisDof));
+        perturbed = math::AdR(
+            childT, getRelativeJacobianInPositionSpace().col(axisDof));
+        return true;
+      },
+      dT,
+      eps,
+      useRidders);
+
+  setChildScale(originalChildScale);
+
+  return dT;
+}
+
+//==============================================================================
+// Returns the gradient of the screw axis with respect to the scaling axis of
+// the parent body
+Eigen::Vector6s Joint::finiteDifferenceScrewAxisGradientWrtParentBodyScale(
+    int axisDof, int axis)
+{
+  Eigen::Vector3s originalParentScale = getParentScale();
+
+  Eigen::Isometry3s childT = getChildBodyNode()->getWorldTransform();
+
+  Eigen::Vector6s dT;
+  bool useRidders = true;
+  s_t eps = 1e-3;
+  math::finiteDifference<Eigen::Vector6s>(
+      [&](/* in*/ s_t eps,
+          /*out*/ Eigen::Vector6s& perturbed) {
+        Eigen::Vector3s perturbedScale = originalParentScale;
+        if (axis == -1)
+        {
+          perturbedScale += Eigen::Vector3s::Ones() * eps;
+        }
+        else
+        {
+          perturbedScale += Eigen::Vector3s::Unit(axis) * eps;
+        }
+        setParentScale(perturbedScale);
+        updateRelativeTransform();
+
+        // perturbed = getWorldAxisScrewForPosition(axisDof);
+        // perturbed = math::AdR(
+        //     getChildBodyNode()->getWorldTransform(),
+        //     getRelativeJacobianInPositionSpace().col(axisDof));
+        perturbed = math::AdR(
+            childT, getRelativeJacobianInPositionSpace().col(axisDof));
+        return true;
+      },
+      dT,
+      eps,
+      useRidders);
+
+  setParentScale(originalParentScale);
+
+  return dT;
 }
 
 //==============================================================================
@@ -634,8 +1453,11 @@ void Joint::setTransformFromParentBodyNode(const Eigen::Isometry3s& _T)
 {
   assert(math::verifyTransform(_T));
   mAspectProperties.mT_ParentBodyToJoint = _T;
-  mAspectProperties.mParentScale = Eigen::Vector3s::Ones();
   mAspectProperties.mOriginalParentTranslation = _T.translation();
+  mAspectProperties.mT_ParentBodyToJoint.translation()
+      = mAspectProperties.mT_ParentBodyToJoint.translation().cwiseProduct(
+          mAspectProperties.mParentScale);
+  // mAspectProperties.mParentScale = Eigen::Vector3s::Ones();
   notifyPositionUpdated();
 }
 
@@ -644,8 +1466,11 @@ void Joint::setTransformFromChildBodyNode(const Eigen::Isometry3s& _T)
 {
   assert(math::verifyTransform(_T));
   mAspectProperties.mT_ChildBodyToJoint = _T;
-  mAspectProperties.mChildScale = Eigen::Vector3s::Ones();
   mAspectProperties.mOriginalChildTranslation = _T.translation();
+  mAspectProperties.mT_ChildBodyToJoint.translation()
+      = mAspectProperties.mT_ChildBodyToJoint.translation().cwiseProduct(
+          mAspectProperties.mChildScale);
+  // mAspectProperties.mChildScale = Eigen::Vector3s::Ones();
   updateRelativeJacobian();
   notifyPositionUpdated();
 }
@@ -660,6 +1485,20 @@ const Eigen::Isometry3s& Joint::getTransformFromParentBodyNode() const
 const Eigen::Isometry3s& Joint::getTransformFromChildBodyNode() const
 {
   return mAspectProperties.mT_ChildBodyToJoint;
+}
+
+//==============================================================================
+/// Get the unscaled transformation from parent body node to this joint
+const Eigen::Vector3s& Joint::getOriginalTransformFromParentBodyNode() const
+{
+  return mAspectProperties.mOriginalParentTranslation;
+}
+
+//==============================================================================
+/// Get the unscaled transformation from child body node to this joint
+const Eigen::Vector3s& Joint::getOriginalTransformFromChildBodyNode() const
+{
+  return mAspectProperties.mOriginalChildTranslation;
 }
 
 //==============================================================================
@@ -683,9 +1522,11 @@ void Joint::copyTransformsFrom(const dynamics::Joint* other)
 /// Set the scale of the child body
 void Joint::setChildScale(Eigen::Vector3s scale)
 {
+  if (mAspectProperties.mChildScale == scale) return;
   mAspectProperties.mChildScale = scale;
   mAspectProperties.mT_ChildBodyToJoint.translation()
       = mAspectProperties.mOriginalChildTranslation.cwiseProduct(scale);
+  mNeedTransformUpdate = true;
   updateRelativeJacobian();
   notifyPositionUpdated();
 }
@@ -694,9 +1535,12 @@ void Joint::setChildScale(Eigen::Vector3s scale)
 /// Set the scale of the parent body
 void Joint::setParentScale(Eigen::Vector3s scale)
 {
+  if (mAspectProperties.mParentScale == scale) return;
   mAspectProperties.mParentScale = scale;
   mAspectProperties.mT_ParentBodyToJoint.translation()
       = mAspectProperties.mOriginalParentTranslation.cwiseProduct(scale);
+  mNeedTransformUpdate = true;
+  updateRelativeJacobian();
   notifyPositionUpdated();
 }
 

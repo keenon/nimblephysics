@@ -2,13 +2,24 @@ import NimbleStandalone from "./NimbleStandalone";
 import NimbleStandaloneReact from "./NimbleStandaloneReact";
 import React, { useState } from 'react';
 import ReactDOM from 'react-dom';
-import previewJson from './data/preview.json';
+import rawURL from '!!file-loader!./data/movement2.bin';
+// import rawURL from '!!file-loader!./data/movement2.bin.gz';
+// import rawBinary from '!!arraybuffer-loader!./data/spring_spine_3_35cm_0N.bin';
+// import rawBinary from '!!arraybuffer-loader!./data/sprint_zero_residuals.bin';
+// import rawBinary from '!!arraybuffer-loader!./data/constant_curve.bin';
+// import rawBinary from '!!arraybuffer-loader!./data/sprint_with_spine.bin';
+// import rawBinary from '!!arraybuffer-loader!./data/sprint_3.1cm_44N.bin';
+// import rawBinary from '!!arraybuffer-loader!./data/walk_1.2cm_1.4N.bin';
+// import rawBinary from '!!arraybuffer-loader!./data/marker_trace.bin';
 
 const ReactTestBed = () => {
   const [show, setShow] = useState(true);
   const [loading, setLoading] = useState(false);
   const [loaded, setLoaded] = useState(true);
   const [loadingProgress, setLoadingProgress] = useState(0.0);
+  const [frame, setFrame] = useState(0);
+  const [playing, setPlaying] = useState(false);
+  const [backgroundColor, setBackgroundColor] = useState(false);
 
   let children = [];
   children.push(React.createElement("button", {
@@ -17,6 +28,22 @@ const ReactTestBed = () => {
     },
     key: 'show'
   }, show ? "Hide" : "Show"));
+
+  children.push(React.createElement("button", {
+    onClick: () => {
+      setPlaying(!playing);
+    },
+    key: 'play'
+  }, playing ? "Pause" : "Play"));
+
+  children.push(React.createElement("input", {
+    type: 'number',
+    value: frame,
+    onChange: (e) => {
+      setFrame(parseInt(e.target.value));
+    },
+    key: 'frame'
+  }));
 
   if (show) {
     children.push(React.createElement("button", {
@@ -31,6 +58,12 @@ const ReactTestBed = () => {
       },
       key: 'loaded'
     }, loaded ? "Set Not Loaded" : "Set Loaded"));
+    children.push(React.createElement("button", {
+      onClick: () => {
+        setBackgroundColor(!backgroundColor);
+      },
+      key: 'bg'
+    }, backgroundColor ? "Set Not BG" : "Set BG"));
     if (loading) {
       children.push(React.createElement("input", {
         type: 'range',
@@ -46,14 +79,22 @@ const ReactTestBed = () => {
     }
 
     children.push(React.createElement(NimbleStandaloneReact, {
-      loading,
-      loadingProgress,
-      recording: loaded ? previewJson : null,
+      loadUrl: rawURL,
       style: {
-        width: "800px",
-        height: "500px"
+        width: "1600px",
+        height: "850px"
       },
-      key: 'gui'
+      key: 'gui',
+      playing: playing,
+      defaultPlaybackSpeed: 1.0,
+      onPlayPause: (play) => {
+        setPlaying(play);
+      },
+      frame: frame,
+      onFrameChange: (frame) => {
+        setFrame(frame);
+      },
+      backgroundColor: backgroundColor ? 'red' : 'white',
     }));
   }
 

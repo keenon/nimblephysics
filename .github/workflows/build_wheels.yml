@@ -2,11 +2,9 @@ name: Build and Publish Wheels
 
 on:
   workflow_dispatch:
-  release:
-    types: [published]
 jobs:
-  build-linux:
-    name: Linux Python ${{ matrix.python-version }} - Build Wheels
+  build-linux-x86_64:
+    name: Linux Python x86_64 ${{ matrix.python-version }} - Build Wheels
     runs-on: ubuntu-latest
     container: keenon/diffdart:base
     strategy:
@@ -38,7 +36,7 @@ jobs:
             PYTHON_VERSION_CODE: cp39-cp39
             PYTHON_VERSION_NUMBER: 3.9
             PYTHON: /opt/python/cp39-cp39/bin/python3.9
-            PATH_PATH: /opt/python/cp39-cp39/bin/
+            PYTHON_PATH: /opt/python/cp39-cp39/bin/
             PYTHON_INCLUDE: /opt/python/cp39-cp39/include/python3.9/
             PYTHON_LIB: /opt/python/cp39-cp39/lib/python3.9
     steps:
@@ -54,8 +52,8 @@ jobs:
           echo "VERSION=${{ env.VERSION }}"
           echo "PYTHON_VERSION_CODE=${{ matrix.PYTHON_VERSION_CODE }}"
           echo "PYTHON_VERSION_NUMBER=${{ matrix.PYTHON_VERSION_NUMBER }}"
-      - name: Install pytest, wheel and auditwheel
-        run: ${{ matrix.PYTHON }} -m pip install pytest wheel auditwheel
+      - name: Install pytest, wheel, auditwheel, pybind11-stubgen, numpy and torch
+        run: ${{ matrix.PYTHON }} -m pip install pytest wheel auditwheel==5.1.2 pybind11-stubgen numpy torch
       - name: Install Pybind11 for this Python version
         run: |
           git clone https://github.com/pybind/pybind11.git
@@ -85,6 +83,100 @@ jobs:
         with:
           name: nimblephysics-${{ env.VERSION }}-${{ matrix.PYTHON_VERSION_CODE }}-manylinux_2_17_x86_64.manylinux2014_x86_64.whl
           path: wheelhouse/nimblephysics-${{ env.VERSION }}-${{ matrix.PYTHON_VERSION_CODE }}-manylinux_2_17_x86_64.manylinux2014_x86_64.whl
+  build-linux-aarch64:
+    name: Linux Python aarch64 ${{ matrix.python-version }} - Build Wheels
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.6", "3.7", "3.8", "3.9"]
+        include:
+          - python-version: 3.6
+            PYTHON_VERSION_CODE: cp36-cp36m
+            PYTHON_VERSION_NUMBER: 3.6
+            PYTHON: /opt/python/cp36-cp36m/bin/python3.6
+            PYTHON_PATH: /opt/python/cp36-cp36m/bin/
+            PYTHON_INCLUDE: /opt/python/cp36-cp36m/include/python3.6m/
+            PYTHON_LIB: /opt/python/cp36-cp36m/lib/python3.6
+          - python-version: 3.7
+            PYTHON_VERSION_CODE: cp37-cp37m
+            PYTHON_VERSION_NUMBER: 3.7
+            PYTHON: /opt/python/cp37-cp37m/bin/python3.7
+            PYTHON_PATH: /opt/python/cp37-cp37m/bin/
+            PYTHON_INCLUDE: /opt/python/cp37-cp37m/include/python3.7m/
+            PYTHON_LIB: /opt/python/cp37-cp37m/lib/python3.7
+          - python-version: 3.8
+            PYTHON_VERSION_CODE: cp38-cp38
+            PYTHON_VERSION_NUMBER: 3.8
+            PYTHON: /opt/python/cp38-cp38/bin/python3.8
+            PYTHON_PATH: /opt/python/cp38-cp38/bin/
+            PYTHON_INCLUDE: /opt/python/cp38-cp38/include/python3.8/
+            PYTHON_LIB: /opt/python/cp38-cp38/lib/python3.8
+          - python-version: 3.9
+            PYTHON_VERSION_CODE: cp39-cp39
+            PYTHON_VERSION_NUMBER: 3.9
+            PYTHON: /opt/python/cp39-cp39/bin/python3.9
+            PYTHON_PATH: /opt/python/cp39-cp39/bin/
+            PYTHON_INCLUDE: /opt/python/cp39-cp39/include/python3.9/
+            PYTHON_LIB: /opt/python/cp39-cp39/lib/python3.9
+    steps:
+      - name: Install QEMU deps
+        run: |
+          sudo apt-get update -q -y
+          sudo apt-get -qq install -y qemu qemu-user-static
+          docker run --rm --privileged multiarch/qemu-user-static --reset -p yes --credential yes
+      - name: Check out the repo
+        uses: actions/checkout@v2
+      - name: Set variables
+        run: |
+          VER=$(cat ./VERSION.txt)
+          echo "VERSION=$VER"
+          echo "VERSION=$VER" >> $GITHUB_ENV
+      - name: Test environment
+        run: |
+          echo "VERSION=${{ env.VERSION }}"
+          echo "PYTHON_VERSION_CODE=${{ matrix.PYTHON_VERSION_CODE }}"
+          echo "PYTHON_VERSION_NUMBER=${{ matrix.PYTHON_VERSION_NUMBER }}"
+      - name: Run docker build
+        run: |
+          docker run --rm --tty -v $(pwd):/nimblephysics \
+          -e PYTHON=${{ matrix.PYTHON }} \
+          -e PYTHON_VERSION_CODE=${{ matrix.PYTHON_VERSION_CODE }} \
+          -e PYTHON_INCLUDE=${{ matrix.PYTHON_INCLUDE }} \
+          -e PYTHON_LIB=${{ matrix.PYTHON_LIB }} \
+          -e PYTHON_VERSION_NUMBER=${{ matrix.PYTHON_VERSION_NUMBER }} \
+          -e PYTHON_PATH=${{ matrix.PYTHON_PATH }} \
+          keenon/diffdart:base_aarch64 \
+          /bin/bash -c '\
+          cd /nimblephysics;\
+          VER=$(cat ./VERSION.txt);\
+          PATH="${PYTHON_PATH}:${PATH}";\
+          CPATH="${PYTHON_INCLUDE}";\
+          echo "VER=$VER";\
+          echo "PYTHON=$PYTHON";\
+          echo "PYTHON_VERSION_CODE=$PYTHON_VERSION_CODE";\
+          echo "PYTHON_INCLUDE=$PYTHON_INCLUDE";\
+          echo "PYTHON_LIB=$PYTHON_LIB";\
+          echo "PYTHON_VERSION_NUMBER=$PYTHON_VERSION_NUMBER";\
+          echo "PYTHON_PATH=$PYTHON_PATH";\
+          echo "PATH=$PATH";\
+          echo "CPATH=$CPATH";\
+          ${PYTHON} -m pip install pytest wheel auditwheel;\
+          cd /;\
+          git clone https://github.com/pybind/pybind11.git;\
+          pushd pybind11;\
+          mkdir build;\
+          pushd build;\
+          cmake -DPYTHON_LIBRARY=$PYTHON_LIB -DPYTHON_INCLUDE_DIR=$PYTHON_INCLUDE -DPYTHON_EXECUTABLE=$PYTHON ..;\
+          make install -j4;\
+          cd /nimblephysics;\
+          ${PYTHON} setup.py sdist bdist_wheel;\
+          ${PYTHON} -m auditwheel repair dist/nimblephysics-${VER}-${PYTHON_VERSION_CODE}-linux_aarch64.whl;\
+          '
+      - name: Publish artifact
+        uses: actions/upload-artifact@v2
+        with:
+          name: nimblephysics-${{ env.VERSION }}-${{ matrix.PYTHON_VERSION_CODE }}-manylinux_2_17_aarch64.manylinux2014_aarch64.whl
+          path: wheelhouse/nimblephysics-${{ env.VERSION }}-${{ matrix.PYTHON_VERSION_CODE }}-manylinux_2_17_aarch64.manylinux2014_aarch64.whl
   build-mac:
     name: Mac OSX Python ${{ matrix.python-version }} - Build Wheels
     runs-on: macos-10.15
@@ -137,7 +229,7 @@ jobs:
   publish:
     name: Publish to PyPI
     runs-on: ubuntu-latest
-    needs: [build-linux, build-mac]
+    needs: [build-linux-x86_64, build-linux-aarch64, build-mac]
     steps:
       - name: Download artifacts
         uses: actions/download-artifact@v2

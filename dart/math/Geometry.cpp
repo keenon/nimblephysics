@@ -38,11 +38,13 @@
 #include <cmath>
 #include <iomanip>
 #include <iostream>
+#include <limits>
 #include <vector>
 
 #include "dart/common/Console.hpp"
 #include "dart/math/FiniteDifference.hpp"
 #include "dart/math/Helpers.hpp"
+#include "dart/math/MathTypes.hpp"
 
 #define DART_EPSILON 1e-6
 
@@ -632,6 +634,7 @@ Eigen::Vector3s expMapGradient(const Eigen::Vector3s& pos, int _qi)
 
   Eigen::MatrixXs original = expMapRot(pos);
 
+  // TODO: maybe we can handle this with dLogMap?
   s_t EPS = 1e-7;
   Eigen::Vector3s perturbed = pos;
   perturbed(_qi) += EPS;
@@ -643,11 +646,35 @@ Eigen::Vector3s expMapGradient(const Eigen::Vector3s& pos, int _qi)
   return (plus - minus) / (2 * EPS);
 }
 
+Eigen::Matrix3s expMapMagGradient(const Eigen::Vector3s& screw)
+{
+  return makeSkewSymmetric(screw);
+}
+
+Eigen::Matrix3s finiteDifferenceExpMapMagGradient(
+    const Eigen::Vector3s& screw, bool useRidders)
+{
+  s_t eps = useRidders ? 1e-3 : 1e-7;
+  Eigen::Matrix3s result;
+  math::finiteDifference<Eigen::Matrix3s>(
+      [&](/* in*/ s_t eps,
+          /*out*/ Eigen::Matrix3s& perturbed) {
+        perturbed = expMapRot(screw * eps);
+        return true;
+      },
+      result,
+      eps,
+      useRidders);
+  return result;
+}
+
 Eigen::Vector3s expMapNestedGradient(
     const Eigen::Vector3s& original, const Eigen::Vector3s& screw)
 {
-  // TODO: replace me with an analytical formula
-  return finiteDifferenceExpMapNestedGradient(original, screw);
+  Eigen::MatrixXs R = expMapRot(original);
+  Eigen::MatrixXs dR = makeSkewSymmetric(screw) * R;
+
+  return dLogMap(R, dR);
 }
 
 Eigen::Vector3s finiteDifferenceExpMapNestedGradient(
@@ -697,38 +724,158 @@ Eigen::Vector3s logMap(const Eigen::Matrix3s& _R)
   // v = beta*p + gamma*w + 1 / 2*cross(p, w)
   //    , beta = t*(1 + cos(t)) / (2*sin(t)), gamma = <w, p>*(1 - beta) / t^2
   //--------------------------------------------------------------------------
-  //  s_t theta =
-  //      std::acos(
-  //        max(
-  //          std::min(0.5 * (_R(0, 0) + _R(1, 1) + _R(2, 2) - 1.0), 1.0),
-  //          -1.0));
+  s_t theta
+      = acos(max(min(0.5 * (_R(0, 0) + _R(1, 1) + _R(2, 2) - 1.0), 1.0), -1.0));
 
-  //  if (theta > constantsd::pi() - DART_EPSILON) {
-  //    s_t delta = 0.5 + 0.125*(constantsd::pi() - theta)*(constantsd::pi()
-  //    - theta);
+  if (theta > constantsd::pi() - DART_EPSILON)
+  {
+    s_t delta
+        = 0.5 + 0.125 * (constantsd::pi() - theta) * (constantsd::pi() - theta);
 
-  //    return Eigen::Vector3s(
-  //          _R(2, 1) > _R(1, 2) ? theta*sqrt(1.0 + (_R(0, 0) - 1.0)*delta) :
-  //                             -theta*sqrt(1.0 + (_R(0, 0) - 1.0)*delta),
-  //          _R(0, 2) > _R(2, 0) ? theta*sqrt(1.0 + (_R(1, 1) - 1.0)*delta) :
-  //                             -theta*sqrt(1.0 + (_R(1, 1) - 1.0)*delta),
-  //          _R(1, 0) > _R(0, 1) ? theta*sqrt(1.0 + (_R(2, 2) - 1.0)*delta) :
-  //                             -theta*sqrt(1.0 + (_R(2, 2) - 1.0)*delta));
-  //  } else {
-  //    s_t alpha = 0.0;
+    return Eigen::Vector3s(
+        _R(2, 1) > _R(1, 2) ? theta * sqrt(1.0 + (_R(0, 0) - 1.0) * delta)
+                            : -theta * sqrt(1.0 + (_R(0, 0) - 1.0) * delta),
+        _R(0, 2) > _R(2, 0) ? theta * sqrt(1.0 + (_R(1, 1) - 1.0) * delta)
+                            : -theta * sqrt(1.0 + (_R(1, 1) - 1.0) * delta),
+        _R(1, 0) > _R(0, 1) ? theta * sqrt(1.0 + (_R(2, 2) - 1.0) * delta)
+                            : -theta * sqrt(1.0 + (_R(2, 2) - 1.0) * delta));
+  }
+  else
+  {
+    s_t alpha = 0.0;
 
-  //    if (theta > DART_EPSILON)
-  //      alpha = 0.5*theta / sin(theta);
-  //    else
-  //      alpha = 0.5 + constantsd::one_div_12()*theta*theta;
+    if (theta > DART_EPSILON)
+      alpha = 0.5 * theta / sin(theta);
+    else
+      alpha = 0.5 + (1.0 / 12.0) * theta * theta;
 
-  //    return Eigen::Vector3s(alpha*(_R(2, 1) - _R(1, 2)),
-  //                           alpha*(_R(0, 2) - _R(2, 0)),
-  //                           alpha*(_R(1, 0) - _R(0, 1)));
-  //  }
+    return Eigen::Vector3s(
+        alpha * (_R(2, 1) - _R(1, 2)),
+        alpha * (_R(0, 2) - _R(2, 0)),
+        alpha * (_R(1, 0) - _R(0, 1)));
+  }
 
-  Eigen::AngleAxis_s aa(_R);
-  return aa.angle() * aa.axis();
+  // Eigen::AngleAxis_s aa(_R);
+  // return aa.angle() * aa.axis();
+}
+
+/// \brief Log mapping
+/// \note This gets the value of d/dt logMap(R), given R and d/dt R
+Eigen::Vector3s dLogMap(const Eigen::Matrix3s& _R, const Eigen::Matrix3s& dR)
+{
+  (void)dR;
+  //--------------------------------------------------------------------------
+  // T = (R, p) = exp([w, v]), t = ||w||
+  // v = beta*p + gamma*w + 1 / 2*cross(p, w)
+  //    , beta = t*(1 + cos(t)) / (2*sin(t)), gamma = <w, p>*(1 - beta) / t^2
+  //--------------------------------------------------------------------------
+  s_t diagSum = 0.5 * (_R(0, 0) + _R(1, 1) + _R(2, 2) - 1.0);
+  s_t d_diagSum = 0.5 * (dR(0, 0) + dR(1, 1) + dR(2, 2));
+  s_t d_theta = 0.0;
+  if (diagSum >= 1.0)
+  {
+    diagSum = 1.0;
+    d_theta = 0.0;
+  }
+  else if (diagSum <= -1.0)
+  {
+    diagSum = -1.0;
+    d_theta = 0.0;
+  }
+  else
+  {
+    d_theta = -d_diagSum / sqrt(1 - diagSum * diagSum);
+  }
+  s_t theta = acos(diagSum);
+
+  if (theta > constantsd::pi() - DART_EPSILON)
+  {
+    s_t delta
+        = 0.5 + 0.125 * (constantsd::pi() - theta) * (constantsd::pi() - theta);
+    s_t d_delta = 0.25 * (constantsd::pi() - theta) * -d_theta;
+
+    // return Eigen::Vector3s(
+    //     _R(2, 1) > _R(1, 2) ? theta * sqrt(1.0 + (_R(0, 0) - 1.0) * delta)
+    //                         : -theta * sqrt(1.0 + (_R(0, 0) - 1.0) * delta),
+    //     _R(0, 2) > _R(2, 0) ? theta * sqrt(1.0 + (_R(1, 1) - 1.0) * delta)
+    //                         : -theta * sqrt(1.0 + (_R(1, 1) - 1.0) * delta),
+    //     _R(1, 0) > _R(0, 1) ? theta * sqrt(1.0 + (_R(2, 2) - 1.0) * delta)
+    //                         : -theta * sqrt(1.0 + (_R(2, 2) - 1.0) * delta));
+
+    s_t elem1 = theta * sqrt(1.0 + delta * _R(0, 0) - delta);
+    (void)elem1;
+    s_t d_elem1 = d_theta * sqrt(1.0 + delta * _R(0, 0) - delta)
+                  + theta * 0.5 / sqrt(1.0 + delta * _R(0, 0) - delta)
+                        * (d_delta * _R(0, 0) + delta * dR(0, 0) - d_delta);
+    s_t elem2 = theta * sqrt(1.0 + (_R(1, 1) - 1.0) * delta);
+    (void)elem2;
+    s_t d_elem2 = d_theta * sqrt(1.0 + delta * _R(1, 1) - delta)
+                  + theta * 0.5 / sqrt(1.0 + delta * _R(1, 1) - delta)
+                        * (d_delta * _R(1, 1) + delta * dR(1, 1) - d_delta);
+    s_t elem3 = theta * sqrt(1.0 + (_R(2, 2) - 1.0) * delta);
+    (void)elem3;
+    s_t d_elem3 = d_theta * sqrt(1.0 + delta * _R(2, 2) - delta)
+                  + theta * 0.5 / sqrt(1.0 + delta * _R(2, 2) - delta)
+                        * (d_delta * _R(2, 2) + delta * dR(2, 2) - d_delta);
+
+    return Eigen::Vector3s(
+        _R(2, 1) > _R(1, 2) ? d_elem1 : -d_elem1,
+        _R(0, 2) > _R(2, 0) ? d_elem2 : -d_elem2,
+        _R(1, 0) > _R(0, 1) ? d_elem3 : -d_elem3);
+  }
+  else
+  {
+    s_t alpha = 0.0;
+    s_t d_alpha = 0.0;
+
+    if (theta > DART_EPSILON)
+    {
+      alpha = 0.5 * theta / sin(theta);
+      s_t csc = 1.0 / sin(theta);
+      // s_t cot = 1.0 / tan(theta);
+      s_t cot
+          = cos(theta) / sin(theta); // -> alternative form to 1.0 / tan(theta),
+                                     // perhaps more numerically stable
+      d_alpha = 0.5 * (d_theta * csc - theta * cot * csc * d_theta);
+      // d_alpha = 0.5 * d_theta / cos(theta) * theta / sin(d_theta);
+    }
+    else
+    {
+      alpha = 0.5 + (1.0 / 12.0) * theta * theta;
+      d_alpha = (2.0 / 12.0) * theta * d_theta;
+    }
+
+    /*
+    return Eigen::Vector3s(
+        alpha * (_R(2, 1) - _R(1, 2)),
+        alpha * (_R(0, 2) - _R(2, 0)),
+        alpha * (_R(1, 0) - _R(0, 1)));
+    */
+
+    return Eigen::Vector3s(
+        d_alpha * (_R(2, 1) - _R(1, 2)) + alpha * (dR(2, 1) - dR(1, 2)),
+        d_alpha * (_R(0, 2) - _R(2, 0)) + alpha * (dR(0, 2) - dR(2, 0)),
+        d_alpha * (_R(1, 0) - _R(0, 1)) + alpha * (dR(1, 0) - dR(0, 1)));
+  }
+}
+
+Eigen::Vector3s finiteDifferenceDLogMap(
+    const Eigen::Matrix3s& R, const Eigen::Matrix3s& dR, bool useRidders)
+{
+  Eigen::Vector3s result;
+
+  s_t eps = useRidders ? 1e-3 : 1e-7;
+  math::finiteDifference<Eigen::Vector3s>(
+      [&](/* in*/ s_t eps,
+          /*out*/ Eigen::Vector3s& perturbed) {
+        perturbed = logMap(R + dR * eps);
+        return true;
+      },
+      result,
+      eps,
+      useRidders);
+
+  return result;
 }
 
 Eigen::Vector6s logMap(const Eigen::Isometry3s& _T)
@@ -738,8 +885,8 @@ Eigen::Vector6s logMap(const Eigen::Isometry3s& _T)
   // v = beta*p + gamma*w + 1 / 2*cross(p, w)
   //    , beta = t*(1 + cos(t)) / (2*sin(t)), gamma = <w, p>*(1 - beta) / t^2
   //--------------------------------------------------------------------------
-  s_t theta = acos(
-      max(std::min(0.5 * (_T(0, 0) + _T(1, 1) + _T(2, 2) - 1.0), 1.0), -1.0));
+  s_t theta
+      = acos(max(min(0.5 * (_T(0, 0) + _T(1, 1) + _T(2, 2) - 1.0), 1.0), -1.0));
   s_t beta;
   s_t gamma;
   Eigen::Vector6s ret;
@@ -838,6 +985,41 @@ Eigen::Vector3s gradientWrtTheta(
   {
     // This means we don't rotate, so it's pure linear motion
     return v;
+  }
+}
+
+/// This takes a screw axis and a point, and gives us the direction that the
+/// point will move if we increase theta by an infinitesimal amount.
+Eigen::Vector3s gradientWrtThetaSecondGrad(
+    const Eigen::Vector6s& _S,
+    const Eigen::Vector6s& d_S,
+    const Eigen::Vector3s& point,
+    const Eigen::Vector3s& dPoint,
+    s_t theta)
+{
+
+  const Eigen::Vector3s& w = _S.head<3>();
+  const Eigen::Vector3s& dw = d_S.head<3>();
+  const Eigen::Vector3s& v = _S.tail<3>();
+  const Eigen::Vector3s& dv = d_S.tail<3>();
+
+  s_t normW = w.norm();
+  if (normW > DART_EPSILON)
+  {
+    const s_t cos_t = cos(theta);
+    const s_t sin_t = sin(theta);
+    const Eigen::Vector3s wp = w.cross(point);
+    const Eigen::Vector3s dwp = dw.cross(point) + w.cross(dPoint);
+    const Eigen::Vector3s dwwp = dw.cross(wp) + w.cross(dwp);
+    const Eigen::Vector3s wv = w.cross(v);
+    const Eigen::Vector3s dwv = dw.cross(v) + w.cross(dv);
+    const Eigen::Vector3s dwwv = dw.cross(wv) + w.cross(dwv);
+    return cos_t * (dwp - dwwv) + sin_t * (dwwp + dwv) + dv + dwwv;
+  }
+  else
+  {
+    // This means we don't rotate, so it's pure linear motion
+    return dv;
   }
 }
 
@@ -1381,7 +1563,8 @@ Eigen::Vector6s dAdInvR(const Eigen::Isometry3s& _T, const Eigen::Vector6s& _F)
 Eigen::Vector3s attemptToClampEulerAnglesToBounds(
     const Eigen::Vector3s& angle,
     const Eigen::Vector3s& upperBounds,
-    const Eigen::Vector3s& lowerBounds)
+    const Eigen::Vector3s& lowerBounds,
+    dynamics::detail::AxisOrder axisOrder)
 {
   Eigen::Vector3s clampedAngle = angle;
   bool allClamped = true;
@@ -1439,9 +1622,112 @@ Eigen::Vector3s attemptToClampEulerAnglesToBounds(
     return clampedAngle;
   }
 
+  // If we're rotating by PI/2 (90 degrees) mod PI (180 degrees), then the first
+  // and 3rd axis are colinear.
+  s_t secondAngle = angle(1);
+  s_t secondSign = 1.0;
+  while (secondAngle > M_PI / 2)
+  {
+    secondAngle -= M_PI;
+    secondSign = -secondSign;
+  }
+  while (secondAngle < -M_PI / 2)
+  {
+    secondAngle += M_PI;
+    secondSign = -secondSign;
+  }
+  if (abs((double)secondAngle - (M_PI / 2)) < 1e-4)
+  {
+    if (axisOrder == dynamics::detail::AxisOrder::ZYX
+        || axisOrder == dynamics::detail::AxisOrder::ZYX)
+    {
+      secondSign = -secondSign;
+    }
+
+    // We can now say that angle(0) + angle(2) = clampedAngle(0) +
+    // secondSign*clampedAngle(2)
+
+    s_t c = angle(0) + angle(2);
+    clampedAngle = angle;
+    clampedAngle(0) = c / 2;
+    clampedAngle(2) = secondSign * c / 2;
+
+    // Try to clamp all the angles in the alternate formulation too
+    allClamped = true;
+    for (int i = 0; i < 3; i++)
+    {
+      while (clampedAngle(i) > upperBounds(i))
+      {
+        clampedAngle(i) -= M_PI * 2;
+      }
+      while (clampedAngle(i) < lowerBounds(i))
+      {
+        clampedAngle(i) += M_PI * 2;
+      }
+      // Check if we successfully got this index in-bounds
+      if (clampedAngle(i) > upperBounds(i) || clampedAngle(i) < lowerBounds(i))
+      {
+        allClamped = false;
+        break;
+      }
+    }
+    // If we succeeded, return our attempt
+    if (allClamped)
+    {
+      return clampedAngle;
+    }
+  }
+
   // If we still weren't able to clamp this, the angle probably isn't
   // reachable from the given bounds.
   return angle;
+}
+
+/// This will find an equivalent set of euler angles that is closest in joint
+/// space to `previousAngle`
+Eigen::Vector3s roundEulerAnglesToNearest(
+    const Eigen::Vector3s& angle,
+    const Eigen::Vector3s& previousAngle,
+    dynamics::detail::AxisOrder axisOrder)
+{
+  (void)axisOrder;
+
+  Eigen::Vector3s closestAngle = angle;
+
+  // Check if we can add/subtract 2PI from any combination of angles to get a
+  // closer value
+  Eigen::Vector3s roundedAngle = angle;
+  for (int i = 0; i < 3; i++)
+  {
+    s_t diff = angle(i) - previousAngle(i);
+    s_t diffMultipleOf2Pi = round(diff / (2 * M_PI)) * 2 * M_PI;
+    s_t smallestDiff = diff - diffMultipleOf2Pi;
+    roundedAngle(i) = previousAngle(i) + smallestDiff;
+  }
+  if ((roundedAngle - previousAngle).norm()
+      < (closestAngle - previousAngle).norm())
+  {
+    closestAngle = roundedAngle;
+  }
+
+  // Try the equivalent strategy, where we flip the first axis, then recover
+  // with 2nd and 3nd rotations
+  roundedAngle
+      = Eigen::Vector3s(M_PI + angle(0), M_PI - angle(1), M_PI + angle(2));
+  for (int i = 0; i < 3; i++)
+  {
+    s_t diff = angle(i) - previousAngle(i);
+    s_t diffMultipleOf2Pi = round(diff / (2 * M_PI)) * 2 * M_PI;
+    s_t smallestDiff = diff - diffMultipleOf2Pi;
+    roundedAngle(i) = previousAngle(i) + smallestDiff;
+  }
+  if ((roundedAngle - previousAngle).norm()
+      < (closestAngle - previousAngle).norm())
+  {
+    closestAngle = roundedAngle;
+  }
+
+  return closestAngle;
 }
 
 // Reference:
@@ -1899,7 +2185,7 @@ Eigen::Matrix3s eulerXZYToMatrixGrad(const Eigen::Vector3s& _angle, int index)
     ret(1, 2) = -cy * (cx) + (-sx) * sy * sz;
     ret(2, 2) = (-sx) * cy + (cx)*sy * sz;
   }
-  if (index == 1)
+  else if (index == 1)
   {
     ret(0, 0) = cy * (-sz);
     ret(1, 0) = cx * cy * (cz);
@@ -1913,7 +2199,7 @@ Eigen::Matrix3s eulerXZYToMatrixGrad(const Eigen::Vector3s& _angle, int index)
     ret(1, 2) = cx * sy * (cz);
     ret(2, 2) = sx * sy * (cz);
   }
-  if (index == 2)
+  else if (index == 2)
   {
     ret(0, 0) = (-sy) * cz;
     ret(1, 0) = sx * (cy) + cx * (-sy) * sz;
@@ -1926,6 +2212,10 @@ Eigen::Matrix3s eulerXZYToMatrixGrad(const Eigen::Vector3s& _angle, int index)
     ret(0, 2) = cz * (cy);
     ret(1, 2) = -(-sy) * sx + cx * (cy)*sz;
     ret(2, 2) = cx * (-sy) + sx * (cy)*sz;
+  }
+  else
+  {
+    assert(false);
   }
 
   return ret;
@@ -3331,6 +3621,140 @@ bool verifyTransform(const Eigen::Isometry3s& _T)
          && abs(_T.linear().determinant() - 1.0) <= DART_EPSILON;
 }
 
+/// This projects a global wrench to a [CoP, tau, f] vector
+Eigen::Vector9s projectWrenchToCoP(
+    Eigen::Vector6s worldWrench, s_t groundHeight, int verticalAxis)
+{
+  // To get COP, solve for k and p, where we know the y-coordinate of p in
+  // advance:
+  //
+  // k * worldF = worldTau - worldF.cross(p);
+  // k * worldF + crossF * p_unknown = worldTau - worldF.cross(p_known);
+  // [worldF, crossF] * [k, p_unknown] = worldTau - worldF.cross(p_known);
+  Eigen::Vector3s worldTau = worldWrench.head<3>();
+  Eigen::Vector3s worldF = worldWrench.tail<3>();
+
+  Eigen::Matrix3s crossF = math::makeSkewSymmetric(worldF);
+  assert(!crossF.hasNaN());
+  Eigen::Vector3s rightSide
+      = worldTau + crossF.col(verticalAxis) * groundHeight;
+  assert(!rightSide.hasNaN());
+  Eigen::Matrix3s leftSide = -crossF;
+  leftSide.col(verticalAxis) = worldF;
+  assert(!leftSide.hasNaN());
+  Eigen::Vector3s p
+      = leftSide.completeOrthogonalDecomposition().solve(rightSide);
+  assert(!p.hasNaN());
+  s_t k = p(verticalAxis);
+  p(verticalAxis) = groundHeight;
+  Eigen::Vector3s expectedTau = worldF * k;
+  Eigen::Vector3s cop = p;
+
+#ifndef NDEBUG
+  Eigen::Vector3s recoveredTau
+      = worldWrench.head<3>() + worldWrench.tail<3>().cross(cop);
+  if ((recoveredTau - expectedTau).norm() > 1e-8)
+  {
+    std::cout << "World wrench: " << std::endl << worldWrench << std::endl;
+    std::cout << "Recovered tau doesn't match expected tau ("
+              << (recoveredTau - expectedTau).norm() << ")!" << std::endl;
+    std::cout << "Expected tau: " << std::endl << expectedTau << std::endl;
+    std::cout << "Recovered tau: " << std::endl << recoveredTau << std::endl;
+    assert((recoveredTau - expectedTau).norm() <= 1e-8);
+  }
+#endif
+
+  Eigen::Vector9s result;
+  result.segment<3>(0) = cop;
+  result.segment<3>(3) = expectedTau;
+  result.segment<3>(6) = worldF;
+
+  return result;
+}
+
+/// This gets the relationship between changes in the world wrench and the
+/// resulting [CoP, tau, f] vector
+Eigen::Matrix<s_t, 9, 6> getProjectWrenchToCoPJacobian(
+    Eigen::Vector6s worldWrench, s_t groundHeight, int verticalAxis)
+{
+  Eigen::Vector3s worldTau = worldWrench.head<3>();
+  Eigen::Vector3s worldF = worldWrench.tail<3>();
+
+  Eigen::Matrix3s crossF = math::makeSkewSymmetric(worldF);
+  Eigen::Vector3s rightSide
+      = worldTau + crossF.col(verticalAxis) * groundHeight;
+  Eigen::Matrix3s leftSide = -crossF;
+  leftSide.col(verticalAxis) = worldF;
+  auto leftSideFactored = leftSide.completeOrthogonalDecomposition();
+  Eigen::Vector3s p = leftSideFactored.solve(rightSide);
+  s_t k = p(verticalAxis);
+
+  Eigen::Matrix<s_t, 9, 6> J = Eigen::Matrix<s_t, 9, 6>::Zero();
+  for (int i = 0; i < 6; i++)
+  {
+    if (i < 3)
+    {
+      Eigen::Vector3s dRightSide = Eigen::Vector3s::Unit(i);
+      Eigen::Vector3s dp = leftSideFactored.solve(dRightSide);
+
+      s_t dk = dp(verticalAxis);
+      dp(verticalAxis) = 0;
+      Eigen::Vector3s dExpectedTau = worldF * dk;
+      Eigen::Vector3s dCop = dp;
+      J.block<3, 1>(0, i) = dCop;
+      J.block<3, 1>(3, i) = dExpectedTau;
+    }
+    else
+    {
+      Eigen::Vector3s dF = Eigen::Vector3s::Unit(i - 3);
+      Eigen::Matrix3s dCrossF = math::makeSkewSymmetric(dF);
+      Eigen::Vector3s dRightSide = dCrossF.col(verticalAxis) * groundHeight;
+      Eigen::Matrix3s dLeftSide = -dCrossF;
+      dLeftSide.col(verticalAxis) = dF;
+
+      // d(A^{-1}) = -1 * A^{-1} * dA * A^{-1}
+      Eigen::Vector3s dp = -(leftSideFactored.solve(
+                               dLeftSide * leftSideFactored.solve(rightSide)))
+                           + leftSideFactored.solve(dRightSide);
+      s_t dk = dp(verticalAxis);
+      dp(verticalAxis) = 0;
+      Eigen::Vector3s dExpectedTau = worldF * dk + dF * k;
+      Eigen::Vector3s dCop = dp;
+      J.block<3, 1>(0, i) = dCop;
+      J.block<3, 1>(3, i) = dExpectedTau;
+      J.block<3, 1>(6, i) = dF;
+    }
+  }
+  return J;
+}
+
+/// This gets the relationship between changes in the world wrench and the
+/// resulting [CoP, tau, f] vector
+Eigen::Matrix<s_t, 9, 6> finiteDifferenceProjectWrenchToCoPJacobian(
+    Eigen::Vector6s worldWrench, s_t groundHeight, int verticalAxis)
+{
+  Eigen::Matrix<s_t, 9, 6> J = Eigen::Matrix<s_t, 9, 6>::Zero();
+
+  Eigen::MatrixXs result = Eigen::MatrixXs::Zero(9, 6);
+  const bool useRidders = true;
+  s_t eps = useRidders ? 1e-3 : 1e-6;
+  math::finiteDifference(
+      [&](/* in*/ s_t eps,
+          /* in*/ int dof,
+          /*out*/ Eigen::VectorXs& perturbed) {
+        Eigen::Vector6s tweaked = worldWrench;
+        tweaked(dof) += eps;
+        perturbed = projectWrenchToCoP(tweaked, groundHeight, verticalAxis);
+        return true;
+      },
+      result,
+      eps,
+      useRidders);
+  J = result;
+
+  return J;
+}
+
 Eigen::Vector3s fromSkewSymmetric(const Eigen::Matrix3s& _m)
 {
 #ifndef NDEBUG
@@ -3345,6 +3769,92 @@ Eigen::Vector3s fromSkewSymmetric(const Eigen::Matrix3s& _m)
   Eigen::Vector3s ret;
   ret << _m(2, 1), _m(0, 2), _m(1, 0);
   return ret;
+}
+
+/// This checks whether a 2D shape contains a point. This assumes that shape was
+/// sorted using sortConvex2DShape().
+///
+/// Source:
+/// https://demonstrations.wolfram.com/AnEfficientTestForAPointToBeInAConvexPolygon/
+/// A better source:
+/// https://inginious.org/course/competitive-programming/geometry-pointinconvex
+bool convex2DShapeContains(
+    const Eigen::Vector3s& point,
+    const std::vector<Eigen::Vector3s>& shape,
+    const Eigen::Vector3s& origin,
+    const Eigen::Vector3s& basis2dX,
+    const Eigen::Vector3s& basis2dY)
+{
+  Eigen::Vector2s point2d = pointInPlane(point, origin, basis2dX, basis2dY);
+
+  int side = 0;
+  for (int i = 0; i < shape.size(); i++)
+  {
+    Eigen::Vector2s a = pointInPlane(shape[i], origin, basis2dX, basis2dY);
+    Eigen::Vector2s b = pointInPlane(
+        shape[(i + 1) % shape.size()], origin, basis2dX, basis2dY);
+    int thisSide = crossProduct2D(point2d - a, b - a) > 0 ? 1 : -1;
+    if (i == 0)
+      side = thisSide;
+    else if (thisSide == 0)
+      continue;
+    else if (side == 0 && thisSide != 0)
+      side = thisSide;
+    else if (side != thisSide && side != 0)
+      return false;
+  }
+
+  return true;
+}
+
+/// This is necessary preparation for rapidly checking if another point is
+/// contained within the convex shape. This sorts the shape by angle from the
+/// center, and trims out any points that lie inside the convex polygon.
+void prepareConvex2DShape(
+    std::vector<Eigen::Vector3s>& shape,
+    const Eigen::Vector3s& origin,
+    const Eigen::Vector3s& basis2dX,
+    const Eigen::Vector3s& basis2dY)
+{
+  // Sort the shape in clockwise order around some internal point (choose the
+  // average).
+  Eigen::Vector2s avg = Eigen::Vector2s::Zero();
+  for (Eigen::Vector3s pt : shape)
+  {
+    avg += pointInPlane(pt, origin, basis2dX, basis2dY);
+  }
+  avg /= shape.size();
+  std::sort(
+      shape.begin(),
+      shape.end(),
+      [&avg, &origin, &basis2dX, &basis2dY](
+          Eigen::Vector3s& a, Eigen::Vector3s& b) {
+        return angle2D(avg, pointInPlane(a, origin, basis2dX, basis2dY))
+               < angle2D(avg, pointInPlane(b, origin, basis2dX, basis2dY));
+      });
+}
+
+s_t angle2D(const Eigen::Vector2s& from, const Eigen::Vector2s& to)
+{
+  return atan2(to(1) - from(1), to(0) - from(0));
+}
+
+/// This transforms a 3D point down to a 2D point in the given 3D plane
+Eigen::Vector2s pointInPlane(
+    const Eigen::Vector3s& point,
+    const Eigen::Vector3s& origin,
+    const Eigen::Vector3s& basis2dX,
+    const Eigen::Vector3s& basis2dY)
+{
+  return Eigen::Vector2s(
+      (point - origin).dot(basis2dX), (point - origin).dot(basis2dY));
+}
+
+// This implements the "2D cross product" as redefined here:
+// https://stackoverflow.com/a/565282/13177487
+inline s_t crossProduct2D(const Eigen::Vector2s& v, const Eigen::Vector2s& w)
+{
+  return v(0) * w(1) - v(1) * w(0);
 }
 
 Eigen::Matrix3s makeSkewSymmetric(const Eigen::Vector3s& _v)
@@ -3932,6 +4442,526 @@ Eigen::Vector3s closestPointOnLineGradient(
   s_t dRelative = dGoalOffset - dOffset;
   return pointOnLineGradient + relative * lineDirectionGradient
          + dRelative * lineDirection;
+}
+
+//==============================================================================
+/// This computes and returns the distance to the closest point on a line
+/// segment
+s_t distanceToSegment(
+    const Eigen::Vector3s& segmentPointA,
+    const Eigen::Vector3s& segmentPointB,
+    const Eigen::Vector3s& goalPoint)
+{
+  // From A to B
+  Eigen::Vector3s dir = (segmentPointB - segmentPointA).normalized();
+
+  s_t onDir = dir.dot(goalPoint);
+  s_t aOnDir = dir.dot(segmentPointA);
+  s_t bOnDir = dir.dot(segmentPointB);
+  assert(aOnDir <= bOnDir);
+  if (onDir < aOnDir)
+  {
+    return (segmentPointA - goalPoint).norm();
+  }
+  else if (onDir > bOnDir)
+  {
+    return (segmentPointB - goalPoint).norm();
+  }
+  else
+  {
+    Eigen::Vector3s closestPoint = segmentPointA + dir * (onDir - aOnDir);
+    return (closestPoint - goalPoint).norm();
+  }
+}
+
+//==============================================================================
+/// This gets the closest approximation to `desiredRotation` that we can get,
+/// rotating around `axis`
+s_t getClosestRotationalApproximation(
+    const Eigen::Vector3s& axis, const Eigen::Matrix3s& desiredRotation)
+{
+  // We can treat this like a 2D rotation, by establishing a basis around the
+  // rotational axis, and then doing all our work projected onto the
+  // orthogonal plane.
+  Eigen::Vector3s arbitraryFirstAxis = Eigen::Vector3s::UnitZ();
+  // If we're too close to parallel, pick another axis
+  if (axis.dot(arbitraryFirstAxis) > 0.99
+      || axis.dot(arbitraryFirstAxis) < -0.99)
+  {
+    arbitraryFirstAxis = Eigen::Vector3s::UnitX();
+  }
+
+  // Get an orthogonal plane to the rotation axis
+  Eigen::Vector3s x = axis.cross(arbitraryFirstAxis);
+  Eigen::Vector3s y = axis.cross(x);
+
+  // A basis where the `axis` as always the Z axis
+  Eigen::Matrix3s R_bw = Eigen::Matrix3s::Zero();
+  R_bw.col(0) = x;
+  R_bw.col(1) = y;
+  R_bw.col(2) = axis;
+
+  if (R_bw.determinant() < 0)
+  {
+    R_bw.col(2) *= -1;
+  }
+
+  // Get our desired rotation in the coordinate space of the `axis` basis
+  Eigen::Matrix3s R_b = R_bw.transpose() * desiredRotation * R_bw;
+
+  // Now the top left corner of R_b is our rotation matrix in 2D, about the
+  // `axis` basis
+  Eigen::Matrix2s twoDimensionalRotation = R_b.block<2, 2>(0, 0);
+  Eigen::JacobiSVD<Eigen::Matrix2s> svd(
+      twoDimensionalRotation, Eigen::ComputeFullU | Eigen::ComputeFullV);
+  Eigen::Matrix2s U = svd.matrixU();
+  Eigen::Matrix2s V = svd.matrixV();
+  Eigen::Matrix2s normalizedTwoDimensional = U * V.transpose();
+  if (normalizedTwoDimensional.determinant() < 0)
+  {
+    normalizedTwoDimensional.col(1) *= -1;
+  }
+  s_t angle
+      = atan2(normalizedTwoDimensional(1, 0), normalizedTwoDimensional(0, 0));
+
+  // And now, perform gradient descent using a finite-differenced gradient!
+
+  s_t cost = (desiredRotation - math::expMapRot(axis * angle)).norm();
+  const s_t eps = 1e-3;
+  s_t stepSize = 1e-2;
+  for (int iter = 0; iter < 100; iter++)
+  {
+    s_t plusCost
+        = (desiredRotation - math::expMapRot(axis * (angle + eps))).norm();
+    s_t minusCost
+        = (desiredRotation - math::expMapRot(axis * (angle - eps))).norm();
+    s_t grad = (plusCost - minusCost) / (2 * eps);
+
+    while (stepSize > 1e-12)
+    {
+      s_t proposedAngle = angle - grad * stepSize;
+      s_t proposedCost
+          = (desiredRotation - math::expMapRot(axis * proposedAngle)).norm();
+      if (proposedCost < cost)
+      {
+        cost = proposedCost;
+        angle = proposedAngle;
+        stepSize *= 1.2;
+        break;
+      }
+      stepSize *= 0.5;
+    }
+  }
+
+  return angle;
+}
+
+//==============================================================================
+/// This will rotate and translate a point cloud to match the first N points
+/// as closely as possible to the passed in matrix
+Eigen::MatrixXs mapPointCloudToData(
+    const Eigen::MatrixXs& pointCloud,
+    std::vector<Eigen::Vector3s> firstNPoints)
+{
+  Eigen::Matrix<s_t, 3, Eigen::Dynamic> targetPointCloud
+      = Eigen::Matrix<s_t, 3, Eigen::Dynamic>::Zero(3, firstNPoints.size());
+  for (int i = 0; i < firstNPoints.size(); i++)
+  {
+    targetPointCloud.col(i) = firstNPoints[i];
+  }
+  Eigen::Matrix<s_t, 3, Eigen::Dynamic> sourcePointCloud
+      = pointCloud.block(0, 0, 3, firstNPoints.size());
+
+  assert(sourcePointCloud.cols() == targetPointCloud.cols());
+
+  // Compute the centroids of the source and target points
+  Eigen::Vector3s sourceCentroid = sourcePointCloud.rowwise().mean();
+  Eigen::Vector3s targetCentroid = targetPointCloud.rowwise().mean();
+
+#ifndef NDEBUG
+  Eigen::Vector3s sourceAvg = Eigen::Vector3s::Zero();
+  Eigen::Vector3s targetAvg = Eigen::Vector3s::Zero();
+  for (int i = 0; i < sourcePointCloud.cols(); i++)
+  {
+    sourceAvg += sourcePointCloud.col(i);
+    targetAvg += targetPointCloud.col(i);
+  }
+  sourceAvg /= sourcePointCloud.cols();
+  targetAvg /= targetPointCloud.cols();
+  assert((sourceAvg - sourceCentroid).norm() < 1e-12);
+  assert((targetAvg - targetCentroid).norm() < 1e-12);
+#endif
+
+  // Compute the centered source and target points
+  Eigen::Matrix<s_t, 3, Eigen::Dynamic> centeredSourcePoints
+      = sourcePointCloud.colwise() - sourceCentroid;
+  Eigen::Matrix<s_t, 3, Eigen::Dynamic> centeredTargetPoints
+      = targetPointCloud.colwise() - targetCentroid;
+
+#ifndef NDEBUG
+  assert(std::abs(centeredSourcePoints.rowwise().mean().norm()) < 1e-8);
+  assert(std::abs(centeredTargetPoints.rowwise().mean().norm()) < 1e-8);
+  for (int i = 0; i < sourcePointCloud.cols(); i++)
+  {
+    Eigen::Vector3s expectedCenteredSourcePoints
+        = sourcePointCloud.col(i) - sourceAvg;
+    assert(
+        (centeredSourcePoints.col(i) - expectedCenteredSourcePoints).norm()
+        < 1e-12);
+    Eigen::Vector3s expectedCenteredTargetPoints
+        = targetPointCloud.col(i) - targetAvg;
+    assert(
+        (centeredTargetPoints.col(i) - expectedCenteredTargetPoints).norm()
+        < 1e-12);
+  }
+#endif
+
+  // Compute the covariance matrix
+  Eigen::Matrix3s covarianceMatrix
+      = centeredTargetPoints * centeredSourcePoints.transpose();
+
+  // Compute the singular value decomposition of the covariance matrix
+  Eigen::JacobiSVD<Eigen::Matrix3s> svd(
+      covarianceMatrix, Eigen::ComputeFullU | Eigen::ComputeFullV);
+  Eigen::Matrix3s U = svd.matrixU();
+  Eigen::Matrix3s V = svd.matrixV();
+
+  // Compute the rotation matrix and translation vector
+  Eigen::Matrix3s R = U * V.transpose();
+  // Normally, we would want to check the determinant of R here, to ensure that
+  // we're only doing right-handed rotations. HOWEVER, because we're using a
+  // point cloud, we may actually have to flip the data along an axis to get it
+  // to match up, so we skip the determinant check.
+
+  // Transform the source point cloud to the target point cloud
+  Eigen::MatrixXs transformed = Eigen::MatrixXs::Zero(3, pointCloud.cols());
+  for (int i = 0; i < pointCloud.cols(); i++)
+  {
+    transformed.col(i)
+        = R * (pointCloud.col(i).head<3>() - sourceCentroid) + targetCentroid;
+  }
+  return transformed;
+}
+
+//==============================================================================
+/// This will give the world transform necessary to apply to the local points
+/// (worldT * p[i] for all localPoints) to get the local points to match the
+/// world points as closely as possible.
+Eigen::Isometry3s getPointCloudToPointCloudTransform(
+    std::vector<Eigen::Vector3s> localPoints,
+    std::vector<Eigen::Vector3s> worldPoints,
+    std::vector<s_t> weights)
+{
+  assert(localPoints.size() > 0);
+  assert(worldPoints.size() > 0);
+  assert(localPoints.size() == worldPoints.size());
+
+  // Compute the centroids of the local and world points
+  Eigen::Vector3s localCentroid = Eigen::Vector3s::Zero();
+  s_t sumWeights = 0.0;
+  for (int i = 0; i < localPoints.size(); i++)
+  {
+    Eigen::Vector3s& point = localPoints[i];
+    sumWeights += weights[i];
+    localCentroid += point * weights[i];
+  }
+  localCentroid /= sumWeights;
+  Eigen::Vector3s worldCentroid = Eigen::Vector3s::Zero();
+  for (int i = 0; i < worldPoints.size(); i++)
+  {
+    Eigen::Vector3s& point = worldPoints[i];
+    worldCentroid += point * weights[i];
+  }
+  worldCentroid /= sumWeights;
+
+  // Compute the centered local and world points
+  std::vector<Eigen::Vector3s> centeredLocalPoints;
+  std::vector<Eigen::Vector3s> centeredWorldPoints;
+  for (int i = 0; i < localPoints.size(); i++)
+  {
+    centeredLocalPoints.push_back(localPoints[i] - localCentroid);
+    centeredWorldPoints.push_back(worldPoints[i] - worldCentroid);
+  }
+
+  // Compute the covariance matrix
+  Eigen::Matrix3s covarianceMatrix = Eigen::Matrix3s::Zero();
+  for (int i = 0; i < localPoints.size(); i++)
+  {
+    covarianceMatrix += weights[i] * centeredWorldPoints[i]
+                        * centeredLocalPoints[i].transpose();
+  }
+
+  // Compute the singular value decomposition of the covariance matrix
+  Eigen::JacobiSVD<Eigen::Matrix3s> svd(
+      covarianceMatrix, Eigen::ComputeFullU | Eigen::ComputeFullV);
+  Eigen::Matrix3s U = svd.matrixU();
+  Eigen::Matrix3s V = svd.matrixV();
+
+  // Compute the rotation matrix and translation vector
+  Eigen::Matrix3s R = U * V.transpose();
+  if (R.determinant() < 0)
+  {
+    Eigen::Matrix3s scales = Eigen::Matrix3s::Identity();
+    scales(2, 2) = -1;
+    R = U * scales * V.transpose();
+  }
+  Eigen::Vector3s translation = worldCentroid - R * localCentroid;
+
+  Eigen::Isometry3s transform = Eigen::Isometry3s::Identity();
+  transform.linear() = R;
+  transform.translation() = translation;
+  return transform;
+}
+
+//==============================================================================
+/// This will give the world transform necessary to apply to the local points
+/// (worldT * p[i] for all localPoints) to get the local points to match the
+/// world points as closely as possible. This does not require any mapping
+/// between the vertices, and instead just iteratively builds a correspondance.
+Eigen::Isometry3s iterativeClosestPoint(
+    std::vector<Eigen::Vector3s> localPoints,
+    std::vector<Eigen::Vector3s> worldPoints,
+    Eigen::Isometry3s transform,
+    bool verbose)
+{
+  Eigen::Isometry3s T = transform;
+  s_t lastAvgError = std::numeric_limits<s_t>::infinity();
+  for (int i = 0; i < 10; i++)
+  {
+    // If the meshes don't match and the world is missing detail (for example,
+    // if we're aligning skeleton meshes and localPoints have arms, and the
+    // worldPoints does not), then we want to make sure that we're not using the
+    // localPoints arms to match to the worldPoints torso. So we need to make
+    // sure that we're only matching points that are close to each other.
+
+    std::vector<Eigen::Vector3s> localPointsToMatch;
+    std::vector<Eigen::Vector3s> worldPointsToMatch;
+    std::vector<s_t> weights;
+
+    s_t totalDist = 0.0;
+    for (int j = 0; j < localPoints.size(); j++)
+    {
+      Eigen::Vector3s& localPoint = localPoints[j];
+      Eigen::Vector3s worldPointGuess = T * localPoint;
+      s_t bestDistance = std::numeric_limits<double>::infinity();
+      Eigen::Vector3s bestWorldPoint = Eigen::Vector3s::Zero();
+
+      for (int k = 0; k < worldPoints.size(); k++)
+      {
+        Eigen::Vector3s& worldPoint = worldPoints[k];
+        s_t dist = (worldPoint - worldPointGuess).squaredNorm();
+        if (dist < bestDistance)
+        {
+          bestDistance = dist;
+          bestWorldPoint = worldPoint;
+        }
+      }
+
+      if (bestDistance < 0.05)
+      {
+        localPointsToMatch.push_back(localPoint);
+        worldPointsToMatch.push_back(bestWorldPoint);
+        weights.push_back(1.0);
+        totalDist += bestDistance;
+      }
+    }
+
+    s_t avgError = (totalDist / localPointsToMatch.size());
+    if (verbose)
+    {
+      std::cout << "ICP Iteration " << i << " with "
+                << localPointsToMatch.size() << " points matched, avg dist "
+                << avgError << std::endl;
+    }
+
+    if (avgError >= lastAvgError)
+    {
+      // We're either not getting better, or we're getting worse, so terminate
+      break;
+    }
+    lastAvgError = avgError;
+
+    Eigen::Isometry3s newT = getPointCloudToPointCloudTransform(
+        localPointsToMatch, worldPointsToMatch, weights);
+    T = newT;
+  }
+  return T;
+}
+
+//==============================================================================
+// Comparison function for sorting points lexicographically
+bool comparePoints2D(const Eigen::Vector2s& a, const Eigen::Vector2s& b)
+{
+  if (a.x() != b.x())
+    return a.x() < b.x();
+  else
+    return a.y() < b.y();
+}
+
+//==============================================================================
+// Cross product of OA and OB vectors
+s_t cross2D(
+    const Eigen::Vector2s& O,
+    const Eigen::Vector2s& A,
+    const Eigen::Vector2s& B)
+{
+  return (A - O).x() * (B - O).y() - (A - O).y() * (B - O).x();
+}
+
+//==============================================================================
+// Convex hull algorithm: Andrew's monotone chain algorithm
+std::vector<Eigen::Vector2s> convexHull2D(std::vector<Eigen::Vector2s>& P)
+{
+  int n = P.size(), k = 0;
+  if (n == 1)
+    return P;
+
+  std::vector<Eigen::Vector2s> H(2 * n);
+
+  // Sort points lexicographically
+  std::sort(P.begin(), P.end(), comparePoints2D);
+
+  // Build the lower hull
+  for (int i = 0; i < n; ++i)
+  {
+    while (k >= 2 && cross2D(H[k - 2], H[k - 1], P[i]) <= 0)
+      --k;
+    H[k++] = P[i];
+  }
+
+  // Build the upper hull
+  for (int i = n - 2, t = k + 1; i >= 0; --i)
+  {
+    while (k >= t && cross2D(H[k - 2], H[k - 1], P[i]) <= 0)
+      --k;
+    H[k++] = P[i];
+  }
+
+  H.resize(k - 1); // Remove the last point (same as the first)
+  return H;
+}
+
+//==============================================================================
+// Check if a point is inside a convex polygon (assumes the polygon is already
+// sorted by convex hull)
+bool isPointInsideConvexPolygon2D(
+    const Eigen::Vector2s& P, const std::vector<Eigen::Vector2s>& polygon)
+{
+  int n = polygon.size();
+  if (n == 0)
+    return false;
+
+  double sign = 0;
+
+  for (int i = 0; i < n; ++i)
+  {
+    const Eigen::Vector2s& A = polygon[i];
+    const Eigen::Vector2s& B = polygon[(i + 1) % n];
+    double cross_product = cross2D(A, B, P);
+    if (cross_product == 0)
+      continue; // Point is on the line
+
+    if (sign == 0)
+      sign = cross_product > 0 ? 1 : -1;
+    else if ((cross_product > 0 && sign < 0) || (cross_product < 0 && sign > 0))
+      return false;
+  }
+
+  return true;
+}
+
+//==============================================================================
+// Compute the distance from a point to a line segment
+s_t distancePointToSegment2D(
+    const Eigen::Vector2s& P,
+    const Eigen::Vector2s& A,
+    const Eigen::Vector2s& B)
+{
+  Eigen::Vector2s AP = P - A;
+  Eigen::Vector2s AB = B - A;
+  double ab2 = AB.dot(AB);
+  double t = AP.dot(AB) / ab2;
+  if (t < 0.0)
+    t = 0.0;
+  else if (t > 1.0)
+    t = 1.0;
+  Eigen::Vector2s projection = A + t * AB;
+  return (P - projection).norm();
+}
+
+//==============================================================================
+// Compute the distance from a point to the convex hull
+s_t distancePointToConvexHull2D(
+    const Eigen::Vector2s& P, std::vector<Eigen::Vector2s>& points)
+{
+  if (points.size() == 1)
+  {
+    return (P - points[0]).norm();
+  }
+  else if (points.size() == 2)
+  {
+    return distancePointToSegment2D(P, points[0], points[1]);
+  }
+
+  // Compute the convex hull
+  std::vector<Eigen::Vector2s> hull = convexHull2D(points);
+
+  // Check if the point is inside the convex hull
+  if (isPointInsideConvexPolygon2D(P, hull))
+    return 0.0;
+
+  // Compute the minimal distance from P to the edges of the convex hull
+  double min_distance = std::numeric_limits<double>::max();
+  int n = hull.size();
+
+  for (int i = 0; i < n; ++i)
+  {
+    const Eigen::Vector2s& A = hull[i];
+    const Eigen::Vector2s& B = hull[(i + 1) % n];
+    double distance = distancePointToSegment2D(P, A, B);
+    if (distance < min_distance)
+      min_distance = distance;
+  }
+
+  return min_distance;
+}
+
+//==============================================================================
+/// Compute the distance from a point to the convex hull projected to a plane
+s_t distancePointToConvexHullProjectedTo2D(
+    const Eigen::Vector3s& P,
+    std::vector<Eigen::Vector3s>& points,
+    Eigen::Vector3s up)
+{
+  // Get a 2D basis that is orthogonal to the up vector
+  if (up.norm() == 0)
+  {
+    up = Eigen::Vector3s::UnitY();
+  }
+  else
+  {
+    up.normalize();
+  }
+  Eigen::Vector3s x = up.cross(Eigen::Vector3s::UnitZ());
+  if (x.norm() == 0)
+  {
+    x = up.cross(Eigen::Vector3s::UnitX());
+  }
+  Eigen::Vector3s y = up.cross(x);
+
+  // Project all the centers into 2D space
+  std::vector<Eigen::Vector2s> centers2D;
+  for (Eigen::Vector3s center : points)
+  {
+    Eigen::Vector2s center2D;
+    center2D << center.dot(x), center.dot(y);
+    centers2D.push_back(center2D);
+  }
+  Eigen::Vector2s point2D;
+  point2D << P.dot(x), P.dot(y);
+
+  // Now we can use the geometry library to compute the convex hull
+  return math::distancePointToConvexHull2D(point2D, centers2D);
 }
 
 BoundingBox::BoundingBox() : mMin(0, 0, 0), mMax(0, 0, 0)

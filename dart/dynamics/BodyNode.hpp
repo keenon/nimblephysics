@@ -209,6 +209,11 @@ public:
       s_t _Ixz = 0.0,
       s_t _Iyz = 0.0);
 
+  void setMomentVector(Eigen::Vector6s moment);
+
+  /// This sets the inertia vector, in the "box dims and euler angles" format
+  void setDimsAndEulersVector(Eigen::Vector6s dimsAndEulers);
+
   /// Return moment of inertia defined around the center of mass
   void getMomentOfInertia(
       s_t& _Ixx, s_t& _Iyy, s_t& _Izz, s_t& _Ixy, s_t& _Ixz, s_t& _Iyz) const;
@@ -717,6 +722,9 @@ public:
   const std::vector<DegreeOfFreedom*>& getDependentDofs() override;
 
   // Documentation inherited
+  const std::vector<DegreeOfFreedom*> getChainDofs() override;
+
+  // Documentation inherited
   const std::vector<const DegreeOfFreedom*>& getDependentDofs() const override;
 
   // Documentation inherited
@@ -1103,7 +1111,7 @@ protected:
       Eigen::VectorXs& _g, const Eigen::Vector3s& _gravity);
 
   ///
-  virtual void updateCombinedVector();
+  virtual void updateCombinedVector(bool includeExplicitAcc = false);
   virtual void aggregateCombinedVector(
       Eigen::VectorXs& _Cg, const Eigen::Vector3s& _gravity);
 
@@ -1147,7 +1155,8 @@ protected:
   void computeJacobianOfMBackward(
       neural::WithRespectTo* wrt, Eigen::MatrixXs& dCg);
 
-  void computeJacobianOfCForward(neural::WithRespectTo* wrt);
+  void computeJacobianOfCForward(
+      neural::WithRespectTo* wrt, bool includeExplicitAcc = false);
   void computeJacobianOfCBackward(
       neural::WithRespectTo* wrt,
       Eigen::MatrixXs& dCg,
@@ -1160,7 +1169,7 @@ protected:
 public:
   /// This checks the intermediate analytical results of
   /// computeJacobianOfCForward() against the finite differencing equivalents.
-  void debugJacobianOfCForward(neural::WithRespectTo* wrt);
+  bool debugJacobianOfCForward(neural::WithRespectTo* wrt);
   /// This computes the Jacobian of spatial velocity with respect to wrt
   Eigen::MatrixXs finiteDifferenceJacobianOfSpatialVelocity(
       neural::WithRespectTo* wrt, bool useRidders = true);
@@ -1170,7 +1179,7 @@ public:
       neural::WithRespectTo* wrt, bool useRidders = true);
   /// This checks the intermediate analytical results of
   /// computeJacobianOfCBackword() against the finite differencing equivalents.
-  void debugJacobianOfCBackward(neural::WithRespectTo* wrt);
+  bool debugJacobianOfCBackward(neural::WithRespectTo* wrt);
   /// This computes the Jacobian of gravity force (mFgravity) with respect to
   /// wrt
   Eigen::MatrixXs finiteDifferenceJacobianOfGravityForce(
@@ -1219,6 +1228,15 @@ public:
   /// equivalents.
   void debugJacobianOfMinvXForward(
       neural::WithRespectTo* wrt, Eigen::VectorXs x);
+
+  //----------------------------------------------------------------------------
+  /// \{ \name Recursive algorithms geometric approximations
+  //----------------------------------------------------------------------------
+
+  /// Compute the distance between a point and the convex hull formed by the
+  /// body node and all of its children, in world space.
+  s_t distanceFrom2DConvexHullWithChildren(
+      Eigen::Vector3s point, Eigen::Vector3s up = Eigen::Vector3s::UnitY());
 
   // protected:
 public:
@@ -1279,7 +1297,8 @@ public:
   Eigen::Vector3s mScaleLowerBound;
   Eigen::Vector3s mScaleUpperBound;
 
-  /// This beta describe linear relationship that used for SSID itself could be further optimized later
+  /// This beta describe linear relationship that used for SSID itself could be
+  /// further optimized later
   Eigen::Vector3s mBeta;
 
   //--------------------------------------------------------------------------

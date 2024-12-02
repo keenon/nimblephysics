@@ -150,6 +150,16 @@ PrismaticJoint::getRelativeJacobianStatic(
 }
 
 //==============================================================================
+/// Returns the value for q that produces the nearest rotation to
+/// `relativeRotation` passed in.
+Eigen::VectorXs PrismaticJoint::getNearestPositionToDesiredRotation(
+    const Eigen::Matrix3s& relativeRotation)
+{
+  (void)relativeRotation;
+  return getPositions();
+}
+
+//==============================================================================
 PrismaticJoint::PrismaticJoint(const Properties& properties)
   : detail::PrismaticJointBase(properties)
 {

@@ -44,7 +44,6 @@ namespace dynamics {
 class TranslationalJoint : public GenericJoint<math::R3Space>
 {
 public:
-
   friend class Skeleton;
 
   using Base = GenericJoint<math::R3Space>;
@@ -53,8 +52,7 @@ public:
   {
     DART_DEFINE_ALIGNED_SHARED_OBJECT_CREATOR(Properties)
 
-    Properties(const Base::Properties& _properties =
-        Base::Properties());
+    Properties(const Base::Properties& _properties = Base::Properties());
 
     virtual ~Properties() = default;
   };
@@ -79,8 +77,12 @@ public:
   Eigen::Matrix<s_t, 6, 3> getRelativeJacobianStatic(
       const Eigen::Vector3s& _positions) const override;
 
-protected:
+  /// Returns the value for q that produces the nearest rotation to
+  /// `relativeRotation` passed in.
+  Eigen::VectorXs getNearestPositionToDesiredRotation(
+      const Eigen::Matrix3s& relativeRotation) override;
 
+protected:
   /// Constructor called by Skeleton class
   TranslationalJoint(const Properties& properties);
 
@@ -102,8 +104,7 @@ protected:
   void updateRelativeJacobianTimeDeriv() const override;
 };
 
-}  // namespace dynamics
-}  // namespace dart
+} // namespace dynamics
+} // namespace dart
 
-#endif  // DART_DYNAMICS_TRANSLATIONALJOINT_HPP_
-
+#endif // DART_DYNAMICS_TRANSLATIONALJOINT_HPP_

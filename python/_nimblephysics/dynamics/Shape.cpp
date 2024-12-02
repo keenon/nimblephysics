@@ -30,6 +30,8 @@
  *   POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <memory>
+
 #include <dart/dynamics/ArrowShape.hpp>
 #include <dart/dynamics/BoxShape.hpp>
 #include <dart/dynamics/CapsuleShape.hpp>
@@ -41,10 +43,11 @@
 #include <dart/dynamics/MultiSphereConvexHullShape.hpp>
 #include <dart/dynamics/PlaneShape.hpp>
 #include <dart/dynamics/Shape.hpp>
-#include <dart/dynamics/SoftBodyNode.hpp>
 #include <dart/dynamics/SoftMeshShape.hpp>
 #include <dart/dynamics/SphereShape.hpp>
+#include <pybind11/eigen.h>
 #include <pybind11/pybind11.h>
+#include <pybind11/stl.h>
 
 #include "eigen_geometry_pybind.h"
 #include "eigen_pybind.h"
@@ -56,10 +59,34 @@ namespace python {
 
 void Shape(py::module& m)
 {
-  ::py::class_<
+  auto shape = ::py::
+      class_<dart::dynamics::Shape, std::shared_ptr<dart::dynamics::Shape>>(
+          m, "Shape");
+
+  auto meshShape = ::py::class_<
+      dart::dynamics::MeshShape,
       dart::dynamics::Shape,
-      dart::common::Subject,
-      std::shared_ptr<dart::dynamics::Shape>>(m, "Shape")
+      std::shared_ptr<dart::dynamics::MeshShape>>(m, "MeshShape");
+
+  ::py::enum_<dart::dynamics::Shape::DataVariance>(m, "DataVariance")
+      .value("STATIC", dart::dynamics::Shape::DataVariance::STATIC)
+      .value(
+          "DYNAMIC_PRIMITIVE",
+          dart::dynamics::Shape::DataVariance::DYNAMIC_PRIMITIVE)
+      .value(
+          "DYNAMIC_COLOR", dart::dynamics::Shape::DataVariance::DYNAMIC_COLOR)
+      .value(
+          "DYNAMIC_VERTICES",
+          dart::dynamics::Shape::DataVariance::DYNAMIC_VERTICES)
+      .value(
+          "DYNAMIC_ELEMENTS",
+          dart::dynamics::Shape::DataVariance::DYNAMIC_ELEMENTS)
+      .value("DYNAMIC", dart::dynamics::Shape::DataVariance::DYNAMIC)
+      .value(
+          "DYNAMIC_TRANSFORM",
+          dart::dynamics::Shape::DataVariance::DYNAMIC_TRANSFORM);
+
+  shape
       .def(
           "getType",
           +[](const dart::dynamics::Shape* self) -> const std::string& {
@@ -136,6 +163,11 @@ void Shape(py::module& m)
           "refreshData",
           +[](dart::dynamics::Shape* self) { self->refreshData(); })
       .def(
+          "asMeshShape",
+          +[](dart::dynamics::Shape* self) {
+            return dynamic_cast<dart::dynamics::MeshShape*>(self);
+          })
+      .def(
           "notifyAlphaUpdated",
           +[](dart::dynamics::Shape* self, s_t alpha) {
             self->notifyAlphaUpdated(alpha);
@@ -148,12 +180,9 @@ void Shape(py::module& m)
           },
           ::py::arg("color"))
       .def(
-          "incrementVersion",
-          +[](dart::dynamics::Shape* self) -> std::size_t {
+          "incrementVersion", +[](dart::dynamics::Shape* self) -> std::size_t {
             return self->incrementVersion();
-          })
-      .def_readonly(
-          "onVersionChanged", &dart::dynamics::Shape::onVersionChanged);
+          });
 
   ::py::class_<
       dart::dynamics::BoxShape,
@@ -265,9 +294,12 @@ void Shape(py::module& m)
           ::py::arg("mass"));
 
   ::py::class_<
-      dart::dynamics::MeshShape,
-      dart::dynamics::Shape,
-      std::shared_ptr<dart::dynamics::MeshShape>>(m, "MeshShape")
+      dart::dynamics::SharedMeshWrapper,
+      std::shared_ptr<dart::dynamics::SharedMeshWrapper>>(
+      m, "SharedMeshWrapper");
+  // TODO: Add Python bindings for raw ASSIMP meshes
+
+  meshShape
       .def(
           ::py::init<
               const Eigen::Vector3s&,
@@ -395,6 +427,7 @@ void Shape(py::module& m)
             return self->getScale();
           },
           ::py::return_value_policy::reference_internal)
+      /*
       .def(
           "setColorMode",
           +[](dart::dynamics::MeshShape* self,
@@ -419,6 +452,7 @@ void Shape(py::module& m)
           +[](const dart::dynamics::MeshShape* self) -> int {
             return self->getColorIndex();
           })
+      */
       .def(
           "getDisplayList",
           +[](const dart::dynamics::MeshShape* self) -> int {
@@ -451,6 +485,57 @@ void Shape(py::module& m)
       .value("COLOR_INDEX", dart::dynamics::MeshShape::ColorMode::COLOR_INDEX)
       .value("SHAPE_COLOR", dart::dynamics::MeshShape::ColorMode::SHAPE_COLOR)
       .export_values();
+
+  ::py::class_<dart::dynamics::ArrowShape::Properties>(
+      m, "ArrowShapeProperties")
+      .def(::py::init<>())
+      .def(::py::init<s_t>(), ::py::arg("radius"))
+      .def(
+          ::py::init<s_t, s_t>(),
+          ::py::arg("radius"),
+          ::py::arg("headRadiusScale"))
+      .def(
+          ::py::init<s_t, s_t, s_t>(),
+          ::py::arg("radius"),
+          ::py::arg("headRadiusScale"),
+          ::py::arg("headLengthScale"))
+      .def(
+          ::py::init<s_t, s_t, s_t, s_t>(),
+          ::py::arg("radius"),
+          ::py::arg("headRadiusScale"),
+          ::py::arg("headLengthScale"),
+          ::py::arg("minHeadLength"))
+      .def(
+          ::py::init<s_t, s_t, s_t, s_t, s_t>(),
+          ::py::arg("radius"),
+          ::py::arg("headRadiusScale"),
+          ::py::arg("headLengthScale"),
+          ::py::arg("minHeadLength"),
+          ::py::arg("maxHeadLength"))
+      .def(
+          ::py::init<s_t, s_t, s_t, s_t, s_t, bool>(),
+          ::py::arg("radius"),
+          ::py::arg("headRadiusScale"),
+          ::py::arg("headLengthScale"),
+          ::py::arg("minHeadLength"),
+          ::py::arg("maxHeadLength"),
+          ::py::arg("s_tArrow"))
+      .def_readwrite(
+          "mRadius", &dart::dynamics::ArrowShape::Properties::mRadius)
+      .def_readwrite(
+          "mHeadRadiusScale",
+          &dart::dynamics::ArrowShape::Properties::mHeadRadiusScale)
+      .def_readwrite(
+          "mHeadLengthScale",
+          &dart::dynamics::ArrowShape::Properties::mHeadLengthScale)
+      .def_readwrite(
+          "mMinHeadLength",
+          &dart::dynamics::ArrowShape::Properties::mMinHeadLength)
+      .def_readwrite(
+          "mMaxHeadLength",
+          &dart::dynamics::ArrowShape::Properties::mMaxHeadLength)
+      .def_readwrite(
+          "ms_tArrow", &dart::dynamics::ArrowShape::Properties::ms_tArrow);
 
   ::py::class_<
       dart::dynamics::ArrowShape,
@@ -540,57 +625,6 @@ void Shape(py::module& m)
           ::py::arg("tail"),
           ::py::arg("head"),
           ::py::arg("properties"));
-
-  ::py::class_<dart::dynamics::ArrowShape::Properties>(
-      m, "ArrowShapeProperties")
-      .def(::py::init<>())
-      .def(::py::init<s_t>(), ::py::arg("radius"))
-      .def(
-          ::py::init<s_t, s_t>(),
-          ::py::arg("radius"),
-          ::py::arg("headRadiusScale"))
-      .def(
-          ::py::init<s_t, s_t, s_t>(),
-          ::py::arg("radius"),
-          ::py::arg("headRadiusScale"),
-          ::py::arg("headLengthScale"))
-      .def(
-          ::py::init<s_t, s_t, s_t, s_t>(),
-          ::py::arg("radius"),
-          ::py::arg("headRadiusScale"),
-          ::py::arg("headLengthScale"),
-          ::py::arg("minHeadLength"))
-      .def(
-          ::py::init<s_t, s_t, s_t, s_t, s_t>(),
-          ::py::arg("radius"),
-          ::py::arg("headRadiusScale"),
-          ::py::arg("headLengthScale"),
-          ::py::arg("minHeadLength"),
-          ::py::arg("maxHeadLength"))
-      .def(
-          ::py::init<s_t, s_t, s_t, s_t, s_t, bool>(),
-          ::py::arg("radius"),
-          ::py::arg("headRadiusScale"),
-          ::py::arg("headLengthScale"),
-          ::py::arg("minHeadLength"),
-          ::py::arg("maxHeadLength"),
-          ::py::arg("s_tArrow"))
-      .def_readwrite(
-          "mRadius", &dart::dynamics::ArrowShape::Properties::mRadius)
-      .def_readwrite(
-          "mHeadRadiusScale",
-          &dart::dynamics::ArrowShape::Properties::mHeadRadiusScale)
-      .def_readwrite(
-          "mHeadLengthScale",
-          &dart::dynamics::ArrowShape::Properties::mHeadLengthScale)
-      .def_readwrite(
-          "mMinHeadLength",
-          &dart::dynamics::ArrowShape::Properties::mMinHeadLength)
-      .def_readwrite(
-          "mMaxHeadLength",
-          &dart::dynamics::ArrowShape::Properties::mMaxHeadLength)
-      .def_readwrite(
-          "ms_tArrow", &dart::dynamics::ArrowShape::Properties::ms_tArrow);
 
   ::py::class_<
       dart::dynamics::PlaneShape,
@@ -841,34 +875,6 @@ void Shape(py::module& m)
           ::py::arg("radius"),
           ::py::arg("height"),
           ::py::arg("mass"));
-
-  ::py::class_<
-      dart::dynamics::SoftMeshShape,
-      dart::dynamics::Shape,
-      std::shared_ptr<dart::dynamics::SoftMeshShape>>(m, "SoftMeshShape")
-      .def(
-          ::py::init<dart::dynamics::SoftBodyNode*>(),
-          ::py::arg("softBodyNode"))
-      .def(
-          "getType",
-          +[](const dart::dynamics::SoftMeshShape* self) -> const std::string& {
-            return self->getType();
-          },
-          ::py::return_value_policy::reference_internal)
-      .def(
-          "update",
-          +[](dart::dynamics::SoftMeshShape* self) { self->update(); })
-      .def(
-          "computeInertia",
-          +[](const dart::dynamics::SoftMeshShape* self, s_t mass)
-              -> Eigen::Matrix3s { return self->computeInertia(mass); },
-          ::py::arg("mass"))
-      .def_static(
-          "getStaticType",
-          +[]() -> const std::string& {
-            return dart::dynamics::SoftMeshShape::getStaticType();
-          },
-          ::py::return_value_policy::reference_internal);
 
   ::py::class_<
       dart::dynamics::EllipsoidShape,

@@ -8,6 +8,7 @@
 
 #include <Eigen/Dense>
 
+#include "dart/biomechanics/Anthropometrics.hpp"
 #include "dart/biomechanics/LilypadSolver.hpp"
 #include "dart/dynamics/BodyNode.hpp"
 #include "dart/dynamics/Shape.hpp"
@@ -26,9 +27,14 @@ public:
       std::shared_ptr<dynamics::Skeleton> skel,
       dynamics::MarkerMap markers,
       Eigen::MatrixXs poses,
-      std::vector<std::map<std::string, Eigen::Vector3s>> observations);
+      std::vector<std::map<std::string, Eigen::Vector3s>> observations,
+      std::shared_ptr<Anthropometrics> anthropometrics = nullptr);
 
   void printReport(int limitTimesteps = -1);
+
+  void saveCSVMarkerErrorReport(const std::string& path);
+
+  std::vector<std::pair<std::string, s_t>> getSortedMarkerRMSE();
 
   std::vector<std::string> worstMarkers;
   std::vector<Eigen::Vector3s> worstMarkerErrors;
@@ -40,6 +46,11 @@ public:
   s_t averageRootMeanSquaredError;
   s_t averageSumSquaredError;
   s_t averageMaxError;
+  s_t anthroPDF;
+  std::vector<std::string> markerNames;
+  std::map<std::string, int> numMarkerObservations;
+  std::map<std::string, s_t> rmseMarkerErrors;
+  std::vector<std::map<std::string, s_t>> markerErrorTimesteps;
 };
 
 } // namespace biomechanics

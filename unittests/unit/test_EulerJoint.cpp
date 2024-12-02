@@ -24,12 +24,14 @@ TEST(EulerJoint, JacobianXYZ)
   flips.push_back(Eigen::Vector3s(1.0, 1.0, -1.0));
   flips.push_back(Eigen::Vector3s::Ones() * -1);
 
-  for (Eigen::Vector3s& flip : flips) {
+  for (Eigen::Vector3s& flip : flips)
+  {
     std::cout << "Testing flip " << flip << std::endl;
     eulerJoint->setFlipAxisMap(flip);
     for (int i = 0; i < 100; i++)
     {
-      eulerJoint->setPositions(Eigen::VectorXs::Random(eulerJoint->getNumDofs()));
+      eulerJoint->setPositions(
+          Eigen::VectorXs::Random(eulerJoint->getNumDofs()));
       eulerJoint->setVelocities(
           Eigen::VectorXs::Random(eulerJoint->getNumDofs()));
       Eigen::MatrixXs jac = eulerJoint->getRelativeJacobian();
@@ -88,12 +90,14 @@ TEST(EulerJoint, JacobianZYX)
   flips.push_back(Eigen::Vector3s(1.0, 1.0, -1.0));
   flips.push_back(Eigen::Vector3s::Ones() * -1);
 
-  for (Eigen::Vector3s& flip : flips) {
+  for (Eigen::Vector3s& flip : flips)
+  {
     std::cout << "Testing flip " << flip << std::endl;
     eulerJoint->setFlipAxisMap(flip);
     for (int i = 0; i < 100; i++)
     {
-      eulerJoint->setPositions(Eigen::VectorXs::Random(eulerJoint->getNumDofs()));
+      eulerJoint->setPositions(
+          Eigen::VectorXs::Random(eulerJoint->getNumDofs()));
       eulerJoint->setVelocities(
           Eigen::VectorXs::Random(eulerJoint->getNumDofs()));
       Eigen::MatrixXs jac = eulerJoint->getRelativeJacobian();
@@ -134,7 +138,8 @@ TEST(EulerJoint, JacobianZYX)
 
       for (int j = 0; j < 3; j++)
       {
-        Eigen::MatrixXs dJdP = eulerJoint->getRelativeJacobianDeriv(j);
+        Eigen::MatrixXs dJdP
+            = eulerJoint->getRelativeJacobianDerivWrtPosition(j);
         Eigen::MatrixXs dJdP_fd
             = EulerJoint::finiteDifferenceRelativeJacobianStaticDerivWrtPos(
                 eulerJoint->getPositions(),
@@ -179,7 +184,8 @@ TEST(EulerJoint, JacobianZYX)
           std::cout << "Euler ZYX dJac/dP dq FD: " << std::endl
                     << dJdP_dq_fd << std::endl;
           std::cout << "Index = " << j << std::endl;
-          std::cout << "Diff: " << std::endl << dJdP_dq - dJdP_dq_fd << std::endl;
+          std::cout << "Diff: " << std::endl
+                    << dJdP_dq - dJdP_dq_fd << std::endl;
           EXPECT_TRUE(equals(dJdP_dq, dJdP_dq_fd, 1e-7));
           return;
         }
@@ -233,13 +239,15 @@ TEST(EulerJoint, JacobianXZY)
   flips.push_back(Eigen::Vector3s(1.0, 1.0, -1.0));
   flips.push_back(Eigen::Vector3s::Ones() * -1);
 
-  for (Eigen::Vector3s& flip : flips) {
+  for (Eigen::Vector3s& flip : flips)
+  {
     std::cout << "Testing flip " << flip << std::endl;
     eulerJoint->setFlipAxisMap(flip);
     eulerJoint->setAxisOrder(EulerJoint::AxisOrder::XZY);
     for (int i = 0; i < 100; i++)
     {
-      eulerJoint->setPositions(Eigen::VectorXs::Random(eulerJoint->getNumDofs()));
+      eulerJoint->setPositions(
+          Eigen::VectorXs::Random(eulerJoint->getNumDofs()));
       eulerJoint->setVelocities(
           Eigen::VectorXs::Random(eulerJoint->getNumDofs()));
       Eigen::MatrixXs jac = eulerJoint->getRelativeJacobian();
@@ -259,19 +267,19 @@ TEST(EulerJoint, JacobianXZY)
         std::cout << "c2: " << cos(eulerJoint->getPosition(2)) << std::endl;
         std::cout << "s1*s2: "
                   << sin(eulerJoint->getPosition(1))
-                        * sin(eulerJoint->getPosition(2))
+                         * sin(eulerJoint->getPosition(2))
                   << std::endl;
         std::cout << "s1*c2: "
                   << sin(eulerJoint->getPosition(1))
-                        * cos(eulerJoint->getPosition(2))
+                         * cos(eulerJoint->getPosition(2))
                   << std::endl;
         std::cout << "c1*s2: "
                   << cos(eulerJoint->getPosition(1))
-                        * sin(eulerJoint->getPosition(2))
+                         * sin(eulerJoint->getPosition(2))
                   << std::endl;
         std::cout << "c1*c2: "
                   << cos(eulerJoint->getPosition(1))
-                        * cos(eulerJoint->getPosition(2))
+                         * cos(eulerJoint->getPosition(2))
                   << std::endl;
         std::cout << "Diff: " << std::endl << jac - jac_fd << std::endl;
         EXPECT_TRUE(equals(jac, jac_fd, 1e-8));
@@ -302,7 +310,8 @@ TEST(EulerJoint, JacobianXZY)
 
       for (int j = 0; j < 3; j++)
       {
-        Eigen::MatrixXs dJdP = eulerJoint->getRelativeJacobianDeriv(j);
+        Eigen::MatrixXs dJdP
+            = eulerJoint->getRelativeJacobianDerivWrtPosition(j);
         Eigen::MatrixXs dJdP_fd
             = EulerJoint::finiteDifferenceRelativeJacobianStaticDerivWrtPos(
                 eulerJoint->getPositions(),
@@ -326,19 +335,19 @@ TEST(EulerJoint, JacobianXZY)
           std::cout << "c2: " << cos(eulerJoint->getPosition(2)) << std::endl;
           std::cout << "s1*s2: "
                     << sin(eulerJoint->getPosition(1))
-                          * sin(eulerJoint->getPosition(2))
+                           * sin(eulerJoint->getPosition(2))
                     << std::endl;
           std::cout << "s1*c2: "
                     << sin(eulerJoint->getPosition(1))
-                          * cos(eulerJoint->getPosition(2))
+                           * cos(eulerJoint->getPosition(2))
                     << std::endl;
           std::cout << "c1*s2: "
                     << cos(eulerJoint->getPosition(1))
-                          * sin(eulerJoint->getPosition(2))
+                           * sin(eulerJoint->getPosition(2))
                     << std::endl;
           std::cout << "c1*c2: "
                     << cos(eulerJoint->getPosition(1))
-                          * cos(eulerJoint->getPosition(2))
+                           * cos(eulerJoint->getPosition(2))
                     << std::endl;
           std::cout << "Diff: " << std::endl << dJdP - dJdP_fd << std::endl;
           EXPECT_TRUE(equals(dJdP, dJdP_fd, 1e-8));
@@ -370,7 +379,8 @@ TEST(EulerJoint, JacobianXZY)
           std::cout << "Euler XZY dJac/dP dq FD: " << std::endl
                     << dJdP_dq_fd << std::endl;
           std::cout << "Index = " << j << std::endl;
-          std::cout << "Diff: " << std::endl << dJdP_dq - dJdP_dq_fd << std::endl;
+          std::cout << "Diff: " << std::endl
+                    << dJdP_dq - dJdP_dq_fd << std::endl;
           EXPECT_TRUE(equals(dJdP_dq, dJdP_dq_fd, 1e-7));
           return;
         }
@@ -424,13 +434,15 @@ TEST(EulerJoint, JacobianZXY)
   flips.push_back(Eigen::Vector3s(1.0, 1.0, -1.0));
   flips.push_back(Eigen::Vector3s::Ones() * -1);
 
-  for (Eigen::Vector3s& flip : flips) {
+  for (Eigen::Vector3s& flip : flips)
+  {
     std::cout << "Testing flip " << flip << std::endl;
     eulerJoint->setFlipAxisMap(flip);
     eulerJoint->setAxisOrder(EulerJoint::AxisOrder::ZXY);
     for (int i = 0; i < 100; i++)
     {
-      eulerJoint->setPositions(Eigen::VectorXs::Random(eulerJoint->getNumDofs()));
+      eulerJoint->setPositions(
+          Eigen::VectorXs::Random(eulerJoint->getNumDofs()));
       eulerJoint->setVelocities(
           Eigen::VectorXs::Random(eulerJoint->getNumDofs()));
       Eigen::MatrixXs jac = eulerJoint->getRelativeJacobian();
@@ -450,19 +462,19 @@ TEST(EulerJoint, JacobianZXY)
         std::cout << "c2: " << cos(eulerJoint->getPosition(2)) << std::endl;
         std::cout << "s1*s2: "
                   << sin(eulerJoint->getPosition(1))
-                        * sin(eulerJoint->getPosition(2))
+                         * sin(eulerJoint->getPosition(2))
                   << std::endl;
         std::cout << "s1*c2: "
                   << sin(eulerJoint->getPosition(1))
-                        * cos(eulerJoint->getPosition(2))
+                         * cos(eulerJoint->getPosition(2))
                   << std::endl;
         std::cout << "c1*s2: "
                   << cos(eulerJoint->getPosition(1))
-                        * sin(eulerJoint->getPosition(2))
+                         * sin(eulerJoint->getPosition(2))
                   << std::endl;
         std::cout << "c1*c2: "
                   << cos(eulerJoint->getPosition(1))
-                        * cos(eulerJoint->getPosition(2))
+                         * cos(eulerJoint->getPosition(2))
                   << std::endl;
         std::cout << "Diff: " << std::endl << jac - jac_fd << std::endl;
         EXPECT_TRUE(equals(jac, jac_fd, 1e-8));
@@ -493,7 +505,8 @@ TEST(EulerJoint, JacobianZXY)
 
       for (int j = 0; j < 3; j++)
       {
-        Eigen::MatrixXs dJdP = eulerJoint->getRelativeJacobianDeriv(j);
+        Eigen::MatrixXs dJdP
+            = eulerJoint->getRelativeJacobianDerivWrtPosition(j);
         Eigen::MatrixXs dJdP_fd
             = EulerJoint::finiteDifferenceRelativeJacobianStaticDerivWrtPos(
                 eulerJoint->getPositions(),
@@ -517,19 +530,19 @@ TEST(EulerJoint, JacobianZXY)
           std::cout << "c2: " << cos(eulerJoint->getPosition(2)) << std::endl;
           std::cout << "s1*s2: "
                     << sin(eulerJoint->getPosition(1))
-                          * sin(eulerJoint->getPosition(2))
+                           * sin(eulerJoint->getPosition(2))
                     << std::endl;
           std::cout << "s1*c2: "
                     << sin(eulerJoint->getPosition(1))
-                          * cos(eulerJoint->getPosition(2))
+                           * cos(eulerJoint->getPosition(2))
                     << std::endl;
           std::cout << "c1*s2: "
                     << cos(eulerJoint->getPosition(1))
-                          * sin(eulerJoint->getPosition(2))
+                           * sin(eulerJoint->getPosition(2))
                     << std::endl;
           std::cout << "c1*c2: "
                     << cos(eulerJoint->getPosition(1))
-                          * cos(eulerJoint->getPosition(2))
+                           * cos(eulerJoint->getPosition(2))
                     << std::endl;
           std::cout << "Diff: " << std::endl << dJdP - dJdP_fd << std::endl;
           EXPECT_TRUE(equals(dJdP, dJdP_fd, 1e-8));
@@ -560,7 +573,8 @@ TEST(EulerJoint, JacobianZXY)
           std::cout << "Euler ZXY dJac/dP dq FD: " << std::endl
                     << dJdP_dq_fd << std::endl;
           std::cout << "Index = " << j << std::endl;
-          std::cout << "Diff: " << std::endl << dJdP_dq - dJdP_dq_fd << std::endl;
+          std::cout << "Diff: " << std::endl
+                    << dJdP_dq - dJdP_dq_fd << std::endl;
           EXPECT_TRUE(equals(dJdP_dq, dJdP_dq_fd, 1e-7));
           return;
         }

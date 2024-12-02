@@ -51,18 +51,15 @@ void RevoluteJoint(py::module& m)
 
   ::py::class_<
       dart::dynamics::RevoluteJoint::Properties,
-      dart::dynamics::GenericJoint<math::R1Space>::Properties,
       dart::dynamics::RevoluteJoint::UniqueProperties>(
       m, "RevoluteJointProperties")
       .def(::py::init<>())
       .def(
-          ::py::init<const dart::dynamics::GenericJoint<
-              dart::math::R1Space>::Properties&>(),
+          ::py::init<const dart::dynamics::RevoluteJoint::Properties&>(),
           ::py::arg("genericJointProperties"))
       .def(
           ::py::init<
-              const dart::dynamics::GenericJoint<
-                  dart::math::R1Space>::Properties&,
+              const dart::dynamics::RevoluteJoint::Properties&,
               const dart::dynamics::RevoluteJoint::UniqueProperties&>(),
           ::py::arg("genericJointProperties"),
           ::py::arg("uniqueProperties"))
@@ -74,8 +71,8 @@ void RevoluteJoint(py::module& m)
 
   ::py::class_<
       dart::dynamics::RevoluteJoint,
-      dart::dynamics::detail::RevoluteJointBase,
-      std::shared_ptr<dart::dynamics::RevoluteJoint>>(m, "RevoluteJoint")
+      dart::dynamics::detail::RevoluteJointBase>(m, "RevoluteJoint")
+      /*
       .def(
           "hasRevoluteJointAspect",
           +[](const dart::dynamics::RevoluteJoint* self) -> bool {
@@ -107,6 +104,7 @@ void RevoluteJoint(py::module& m)
                       dart::math::RealVectorSpace<1>>>::Aspect> {
             return self->releaseRevoluteJointAspect();
           })
+      */
       .def(
           "setProperties",
           +[](dart::dynamics::RevoluteJoint* self,
@@ -119,16 +117,6 @@ void RevoluteJoint(py::module& m)
           +[](dart::dynamics::RevoluteJoint* self,
               const dart::dynamics::RevoluteJoint::UniqueProperties&
                   _properties) { self->setProperties(_properties); },
-          ::py::arg("properties"))
-      .def(
-          "setAspectProperties",
-          +[](dart::dynamics::RevoluteJoint* self,
-              const dart::common::EmbedPropertiesOnTopOf<
-                  dart::dynamics::RevoluteJoint,
-                  dart::dynamics::detail::RevoluteJointUniqueProperties,
-                  dart::dynamics::GenericJoint<
-                      dart::math::RealVectorSpace<1>>>::AspectProperties&
-                  properties) { self->setAspectProperties(properties); },
           ::py::arg("properties"))
       .def(
           "getRevoluteJointProperties",

@@ -8,9 +8,6 @@ const DEV_SERVER_SERVE_EMBEDDED_DEV_CODE = true;
 
 module.exports = {
   entry: {
-    live: "./src/live.ts",
-    embedded: "./src/embedded.ts",
-    embedded_dev: "./src/embedded_dev.ts",
     NimbleStandaloneReact: "./src/NimbleStandaloneReact.ts",
     NimbleStandalone: "./src/NimbleStandalone.ts",
     NimbleRemote: "./src/NimbleRemote.ts"

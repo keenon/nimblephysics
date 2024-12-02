@@ -5,6 +5,7 @@
 #include "dart/dynamics/EulerJoint.hpp"
 #include "dart/math/FiniteDifference.hpp"
 #include "dart/math/LinearFunction.hpp"
+#include "dart/math/MathTypes.hpp"
 
 namespace dart {
 namespace dynamics {
@@ -74,13 +75,104 @@ EulerJoint::AxisOrder EulerFreeJoint::getAxisOrder() const
 }
 
 //==============================================================================
+/// Returns the axis of rotation for DOF `index`, depending on the AxisOrder
+Eigen::Vector3s EulerFreeJoint::getAxis(int index) const
+{
+  if (getAxisOrder() == EulerJoint::AxisOrder::XYZ)
+  {
+    if (index == 0)
+    {
+      return Eigen::Vector3s::UnitX() * getFlipAxisMap()(0);
+    }
+    if (index == 1)
+    {
+      return Eigen::Vector3s::UnitY() * getFlipAxisMap()(1);
+    }
+    if (index == 2)
+    {
+      return Eigen::Vector3s::UnitZ() * getFlipAxisMap()(2);
+    }
+  }
+  if (getAxisOrder() == EulerJoint::AxisOrder::XZY)
+  {
+    if (index == 0)
+    {
+      return Eigen::Vector3s::UnitX() * getFlipAxisMap()(0);
+    }
+    if (index == 1)
+    {
+      return Eigen::Vector3s::UnitZ() * getFlipAxisMap()(1);
+    }
+    if (index == 2)
+    {
+      return Eigen::Vector3s::UnitY() * getFlipAxisMap()(2);
+    }
+  }
+  if (getAxisOrder() == EulerJoint::AxisOrder::ZXY)
+  {
+    if (index == 0)
+    {
+      return Eigen::Vector3s::UnitZ() * getFlipAxisMap()(0);
+    }
+    if (index == 1)
+    {
+      return Eigen::Vector3s::UnitX() * getFlipAxisMap()(1);
+    }
+    if (index == 2)
+    {
+      return Eigen::Vector3s::UnitY() * getFlipAxisMap()(2);
+    }
+  }
+  if (getAxisOrder() == EulerJoint::AxisOrder::ZYX)
+  {
+    if (index == 0)
+    {
+      return Eigen::Vector3s::UnitZ() * getFlipAxisMap()(0);
+    }
+    if (index == 1)
+    {
+      return Eigen::Vector3s::UnitY() * getFlipAxisMap()(1);
+    }
+    if (index == 2)
+    {
+      return Eigen::Vector3s::UnitX() * getFlipAxisMap()(2);
+    }
+  }
+  if (index == 3)
+  {
+    return Eigen::Vector3s::UnitX();
+  }
+  if (index == 4)
+  {
+    return Eigen::Vector3s::UnitY();
+  }
+  if (index == 5)
+  {
+    return Eigen::Vector3s::UnitZ();
+  }
+  std::cout << "ERROR: EulerFreeJoint is being asked for an axis that is out "
+               "of bounds!"
+            << std::endl;
+  assert(false);
+  return Eigen::Vector3s::UnitX();
+}
+
+//==============================================================================
 dart::dynamics::Joint* EulerFreeJoint::clone() const
 {
   EulerFreeJoint* joint = new EulerFreeJoint(this->getJointProperties());
+  for (int i = 0; i < getNumDofs(); i++)
+  {
+    joint->setDofName(i, getDofName(i));
+  }
   joint->setName(getName());
   joint->copyTransformsFrom(this);
   joint->setFlipAxisMap(mFlipAxisMap);
   joint->setAxisOrder(mAxisOrder);
+  joint->setPositionUpperLimits(getPositionUpperLimits());
+  joint->setPositionLowerLimits(getPositionLowerLimits());
+  joint->setVelocityUpperLimits(getVelocityUpperLimits());
+  joint->setVelocityLowerLimits(getVelocityLowerLimits());
   return joint;
 }
 
@@ -153,7 +245,8 @@ Eigen::Matrix6s EulerFreeJoint::getRelativeJacobianStatic(
 }
 
 //==============================================================================
-math::Jacobian EulerFreeJoint::getRelativeJacobianDeriv(std::size_t index) const
+Eigen::Matrix6s EulerFreeJoint::getRelativeJacobianDerivWrtPositionStatic(
+    std::size_t index) const
 {
   return computeRelativeJacobianStaticDerivWrtPos(
       getPositionsStatic(),
@@ -209,6 +302,22 @@ math::Jacobian EulerFreeJoint::getRelativeJacobianTimeDerivDerivWrtVelocity(
       getAxisOrder(),
       getFlipAxisMap(),
       Joint::mAspectProperties.mT_ChildBodyToJoint);
+}
+
+//==============================================================================
+/// Returns the value for q that produces the nearest rotation to
+/// `relativeRotation` passed in.
+Eigen::VectorXs EulerFreeJoint::getNearestPositionToDesiredRotation(
+    const Eigen::Matrix3s& relativeRotationGlobal)
+{
+  Eigen::Matrix3s relativeRotation
+      = Joint::mAspectProperties.mT_ParentBodyToJoint.linear().transpose()
+        * relativeRotationGlobal
+        * Joint::mAspectProperties.mT_ChildBodyToJoint.linear();
+  Eigen::Vector6s pos = getPositions();
+  pos.head<3>() = EulerJoint::convertToPositions(
+      relativeRotation, getAxisOrder(), getFlipAxisMap());
+  return pos;
 }
 
 //==============================================================================

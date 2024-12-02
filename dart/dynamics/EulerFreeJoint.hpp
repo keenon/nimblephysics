@@ -77,6 +77,9 @@ public:
   /// Return the axis order
   EulerJoint::AxisOrder getAxisOrder() const;
 
+  /// Returns the axis of rotation for DOF `index`, depending on the AxisOrder
+  Eigen::Vector3s getAxis(int index) const;
+
   dart::dynamics::Joint* clone() const override;
 
   void updateDegreeOfFreedomNames() override;
@@ -87,7 +90,8 @@ public:
   JacobianMatrix getRelativeJacobianStatic(
       const Eigen::Vector6s& position) const override;
 
-  math::Jacobian getRelativeJacobianDeriv(std::size_t index) const override;
+  JacobianMatrix getRelativeJacobianDerivWrtPositionStatic(
+      std::size_t index) const override;
 
   void updateRelativeJacobian(bool) const override;
 
@@ -100,6 +104,11 @@ public:
   /// Computes derivative of time derivative of Jacobian w.r.t. velocity.
   math::Jacobian getRelativeJacobianTimeDerivDerivWrtVelocity(
       std::size_t index) const override;
+
+  /// Returns the value for q that produces the nearest rotation to
+  /// `relativeRotation` passed in.
+  Eigen::VectorXs getNearestPositionToDesiredRotation(
+      const Eigen::Matrix3s& relativeRotation) override;
 
   ////////////////////////////////////////////////////////////////////////////
   // Public static helper methods, which are used here and in CustomJoint
@@ -123,7 +132,8 @@ public:
       std::size_t index,
       EulerJoint::AxisOrder axisOrder,
       const Eigen::Vector3s& flipAxisMap,
-      const Eigen::Isometry3s& childBodyToJoint, bool useRidders = true);
+      const Eigen::Isometry3s& childBodyToJoint,
+      bool useRidders = true);
 
   static Eigen::Matrix6s computeRelativeJacobianTimeDerivStatic(
       const Eigen::Vector6s& positions,
@@ -172,7 +182,6 @@ public:
       const Eigen::Vector3s& flipAxisMap,
       const Eigen::Isometry3s& childBodyToJoint,
       bool useRidders = true);
-
 
 protected:
   EulerJoint::AxisOrder mAxisOrder;

@@ -6,6 +6,8 @@ ENV PKG_CONFIG_PATH="${PKG_CONFIG_PATH}:/usr/local/lib64/pkgconfig/"
 
 # Upgrade to the latest CMake version
 
+RUN yum update
+
 RUN yum install -y wget
 
 RUN yum install -y openssl-devel
@@ -65,12 +67,15 @@ RUN git clone https://github.com/assimp/assimp.git && \
 # Install LAPACK
 RUN yum install -y lapack-devel
 
+ENV FCFLAGS="-w -fallow-argument-mismatch -O2"
+ENV FFLAGS="-w -fallow-argument-mismatch -O2"
+
 # Install MUMPS
 RUN git clone https://github.com/coin-or-tools/ThirdParty-Mumps.git && \
     pushd ThirdParty-Mumps && \
     ./get.Mumps && \
-    ./configure && \
-    make -j14 && \
+    ./configure --with-precision=double && \
+    make && \
     make install && \
     popd && \
     rm -rf ThirdParty-Mumps
@@ -187,6 +192,7 @@ RUN git clone https://github.com/ros/console_bridge.git && \
 # Install urdfdom
 RUN git clone https://github.com/ros/urdfdom.git && \
     pushd urdfdom && \
+    git checkout 3.0.0 && \
     mkdir build && \
     pushd build && \
     cmake .. -DCMAKE_POSITION_INDEPENDENT_CODE=ON && \
@@ -218,9 +224,9 @@ RUN pushd grpc && \
     mkdir -p cmake/build && \
     pushd cmake/build && \
     cmake -DgRPC_INSTALL=ON \
-          -DgRPC_BUILD_TESTS=OFF \
-          -DCMAKE_POSITION_INDEPENDENT_CODE=ON \
-          ../.. && \
+    -DgRPC_BUILD_TESTS=OFF \
+    -DCMAKE_POSITION_INDEPENDENT_CODE=ON \
+    ../.. && \
     make -j3 && \
     make install && \
     popd && \
@@ -238,6 +244,18 @@ RUN pushd benchmark && \
     popd && \
     popd
 RUN rm -rf benchmark
+
+# Install ezc3d
+RUN git clone https://github.com/pyomeca/ezc3d.git
+RUN pushd ezc3d && \
+    git checkout Release_1.4.7 && \
+    mkdir build && \
+    pushd build && \
+    cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_POSITION_INDEPENDENT_CODE=ON .. && \
+    make install && \
+    popd && \
+    popd
+RUN rm -rf ezc3d
 
 # RUN ls /usr/local/lib64 | grep assimp
 # RUN ls /usr/local/lib | grep assimp

@@ -41,6 +41,7 @@
 #include <ctime>
 #include <iomanip>
 #include <iostream>
+#include <limits>
 #include <random>
 
 // External Libraries
@@ -141,12 +142,14 @@ inline s_t acotanh(s_t _X)
   return log((_X + 1) / (_X - 1)) / 2;
 }
 
+/*
 #ifndef DART_USE_ARBITRARY_PRECISION
 inline s_t round(s_t _x)
 {
   return floor(_x + 0.5);
 }
 #endif
+*/
 
 inline s_t round2(s_t _x)
 {
@@ -381,6 +384,174 @@ constexpr double operator"" _deg(unsigned long long int angle)
 #endif
 
 } // namespace suffixes
+
+inline std::vector<int> evenlySpacedTimesteps(int totalSteps, int maxSteps)
+{
+  std::vector<int> timesteps;
+  // 1. Select the random indices we'll be using for this problem
+  if (maxSteps >= totalSteps)
+  {
+    for (int i = 0; i < totalSteps; i++)
+    {
+      timesteps.push_back(i);
+    }
+  }
+  else
+  {
+    double stride = (double)totalSteps / maxSteps;
+
+    for (int i = 0; i < maxSteps; i++)
+    {
+      int index = (int)round(stride * ((double)i + 0.5));
+      if (index > totalSteps - 1)
+        index = totalSteps - 1;
+      if (index < 0)
+        index = 0;
+
+      timesteps.push_back(index);
+    }
+  }
+
+  return timesteps;
+}
+
+struct MappingBlock
+{
+  std::vector<int> indices;
+  int min;
+  int max;
+
+  MappingBlock()
+  {
+    this->max = 0;
+    this->min = 0;
+  }
+
+  MappingBlock(int i)
+  {
+    indices.push_back(i);
+    this->max = i;
+    this->min = i;
+  };
+
+  int distanceIfMerged(MappingBlock& other)
+  {
+    int min = (this->min < other.min) ? this->min : other.min;
+    int max = (this->max > other.max) ? this->max : other.max;
+    return max - min;
+  };
+
+  MappingBlock merge(MappingBlock& other)
+  {
+    MappingBlock newBlock;
+    for (int i : indices)
+    {
+      newBlock.indices.push_back(i);
+    }
+    for (int i : other.indices)
+    {
+      newBlock.indices.push_back(i);
+    }
+    newBlock.min = (this->min < other.min) ? this->min : other.min;
+    newBlock.max = (this->max > other.max) ? this->max : other.max;
+    return newBlock;
+  }
+
+  bool has(int index)
+  {
+    if (index < this->min)
+    {
+      return false;
+    }
+    if (index > this->max)
+    {
+      return false;
+    }
+    for (int i : indices)
+    {
+      if (index == i)
+        return true;
+    }
+    return false;
+  }
+};
+
+// This merges the indices into a set of blocks in such a way that the
+// "spread" (distance between minimum and maximum entry) of any individual
+// block is minimized.
+inline std::vector<int> getConsolidatedMapping(
+    std::vector<int> indices, int maxBlocks)
+{
+  if (indices.size() <= maxBlocks)
+  {
+    std::vector<int> mapping;
+    for (int i = 0; i < indices.size(); i++)
+    {
+      mapping.push_back(i);
+    }
+    return mapping;
+  }
+
+  std::vector<MappingBlock> blocks;
+  for (int i : indices)
+  {
+    blocks.emplace_back(i);
+  }
+
+  while (blocks.size() > maxBlocks)
+  {
+    // Go through every pair of blocks, find the pair of blocks that, if merged,
+    // would result in the smallest total size block.
+
+    int minSizeBlock = std::numeric_limits<int>::max();
+    int minA = 0;
+    int minB = 0;
+    for (int a = 0; a < blocks.size(); a++)
+    {
+      for (int b = a + 1; b < blocks.size(); b++)
+      {
+        int mergedSize = blocks[a].distanceIfMerged(blocks[b]);
+        if (mergedSize < minSizeBlock)
+        {
+          minSizeBlock = mergedSize;
+          minA = a;
+          minB = b;
+        }
+      }
+    }
+
+    MappingBlock merged = blocks[minA].merge(blocks[minB]);
+
+    std::vector<MappingBlock> newBlocks;
+    for (int j = 0; j < blocks.size(); j++)
+    {
+      if (j != minA && j != minB)
+      {
+        newBlocks.push_back(blocks[j]);
+      }
+    }
+    newBlocks.push_back(merged);
+
+    blocks = newBlocks;
+  }
+
+  std::vector<int> mapping;
+  for (int i = 0; i < indices.size(); i++)
+  {
+    int mapIndex = 0;
+    for (int j = 0; j < blocks.size(); j++)
+    {
+      if (blocks[j].has(indices[i]))
+      {
+        mapIndex = j;
+        break;
+      }
+    }
+    mapping.push_back(mapIndex);
+  }
+
+  return mapping;
+}
 
 } // namespace math
 

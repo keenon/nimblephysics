@@ -52,13 +52,17 @@ typedef mpfr::mpreal s_t;
 #else
 typedef double s_t;
 using std::abs;
+using std::acos;
+using std::asin;
 using std::ceil;
 using std::cos;
 using std::floor;
 using std::isfinite;
 using std::isnan;
 using std::max;
+using std::min;
 using std::pow;
+using std::round;
 using std::sin;
 #endif
 
@@ -70,6 +74,7 @@ namespace Eigen {
 using Vector9s = Matrix<s_t, 9, 1>;
 using Vector6s = Matrix<s_t, 6, 1>;
 using Matrix6s = Matrix<s_t, 6, 6>;
+using Vector6d = Matrix<double, 6, 1>;
 
 typedef Matrix<s_t, Dynamic, Dynamic> MatrixXs;
 typedef Matrix<s_t, Dynamic, 1> VectorXs;
@@ -79,6 +84,7 @@ typedef Matrix<s_t, 3, 1> Vector3s;
 typedef Matrix<s_t, 4, 1> Vector4s;
 typedef Matrix<s_t, 5, 1> Vector5s;
 typedef Matrix<s_t, 6, 1> Vector6s;
+typedef Matrix<s_t, 7, 1> Vector7s;
 typedef Matrix<s_t, 2, 2> Matrix2s;
 typedef Matrix<s_t, 3, 3> Matrix3s;
 typedef Matrix<s_t, 4, 4> Matrix4s;

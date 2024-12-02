@@ -165,8 +165,7 @@ TEST(FreeJointGradients, INTEGRATE_POSITIONS_EXPLICIT)
 #endif
 
 //==============================================================================
-Eigen::Vector6s integratePos(
-    Eigen::Vector6s pos, Eigen::Vector6s vel, s_t dt)
+Eigen::Vector6s integratePos(Eigen::Vector6s pos, Eigen::Vector6s vel, s_t dt)
 {
   const Eigen::Isometry3s mQ = FreeJoint::convertToTransform(pos);
   const Eigen::Isometry3s Qnext = mQ * FreeJoint::convertToTransform(vel * dt);
@@ -269,6 +268,57 @@ TEST(FreeJointGradients, ROTATION_JOINT_JAC)
   // Just check these don't crash
   rotatePosPosJacFD(pos, vel, dt);
   rotateVelPosJacFD(pos, vel, dt);
+}
+#endif
+
+/*
+//==============================================================================
+Eigen::Matrix6s FreeJoint::getRelativeJacobianInPositionSpaceStatic(
+    const Eigen::Vector6s& positions) const
+{
+  const Eigen::Vector6s& q = positions;
+  Eigen::Matrix6s J;
+
+  J.topLeftCorner<3, 3>().noalias() = math::expMapJac(q.head<3>()).transpose();
+  J.bottomLeftCorner<3, 3>().setZero();
+  J.topRightCorner<3, 3>().setZero();
+  J.bottomRightCorner<3, 3>().noalias()
+      = math::expMapRot(q.head<3>()).transpose();
+
+  Eigen::Matrix6s result
+      = math::AdTJacFixed(Joint::mAspectProperties.mT_ChildBodyToJoint, J);
+
+#ifndef NDEBUG
+  const s_t threshold = 1e-5;
+  Eigen::Matrix6s fd = const_cast<FreeJoint*>(this)
+                           ->finiteDifferenceRelativeJacobianInPositionSpace();
+  if (((fd - result).cwiseAbs().array() > threshold).any())
+  {
+    std::cout << "FreeJoint position Jacobian wrong!" << std::endl;
+    std::cout << "Position:" << std::endl << getPositions() << std::endl;
+    std::cout << "Analytical:" << std::endl << result << std::endl;
+    std::cout << "Brute Force:" << std::endl << fd << std::endl;
+    std::cout << "Diff:" << std::endl << result - fd << std::endl;
+    assert(false);
+  }
+#endif
+
+  return result;
+}
+*/
+
+//==============================================================================
+#ifdef ALL_TESTS
+TEST(FreeJointGradients, POSITION_JACOBIAN)
+{
+  Eigen::Vector6s pos;
+  pos << 0.0388429, -0.290587, -0.058277, -2.08471, 1.00021, -0.51007;
+
+  std::shared_ptr<dynamics::Skeleton> box = dynamics::Skeleton::create("box");
+  auto pair = box->createJointAndBodyNodePair<dynamics::FreeJoint>();
+  dynamics::FreeJoint* joint = pair.first;
+  joint->setPositions(pos);
+  joint->getRelativeJacobianInPositionSpaceStatic(pos);
 }
 #endif
 

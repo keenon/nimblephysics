@@ -32,11 +32,13 @@
 
 #include "dart/dynamics/UniversalJoint.hpp"
 
+#include <limits>
 #include <string>
 
+#include "dart/math/FiniteDifference.hpp"
 #include "dart/math/Geometry.hpp"
 #include "dart/math/Helpers.hpp"
-#include "dart/math/FiniteDifference.hpp"
+#include "dart/math/MathTypes.hpp"
 
 namespace dart {
 namespace dynamics {
@@ -273,7 +275,8 @@ void UniversalJoint::updateRelativeJacobianTimeDeriv() const
 }
 
 //==============================================================================
-math::Jacobian UniversalJoint::getRelativeJacobianDeriv(size_t index) const
+Eigen::Matrix<s_t, 6, 2>
+UniversalJoint::getRelativeJacobianDerivWrtPositionStatic(size_t index) const
 {
   Eigen::Matrix<s_t, 6, 2> J = Eigen::Matrix<s_t, 6, 2>::Zero();
 
@@ -325,7 +328,8 @@ math::Jacobian UniversalJoint::getRelativeJacobianTimeDerivDerivWrtPosition(
 
   Eigen::Vector6s V1
       = getRelativeJacobianStatic(_positions).col(1) * _velocities[1];
-  Eigen::Vector6s dV1 = getRelativeJacobianDeriv(index).col(1) * _velocities[1];
+  Eigen::Vector6s dV1
+      = getRelativeJacobianDerivWrtPosition(index).col(1) * _velocities[1];
 
   Eigen::Matrix3s R = math::expMapRot(-getAxis2() * _positions[1]);
 
@@ -400,14 +404,14 @@ UniversalJoint::finiteDifferenceRelativeJacobianTimeDerivStatic(
 
   s_t eps = useRidders ? 1e-3 : 1e-7;
   math::finiteDifference<Eigen::Matrix<s_t, 6, 2>>(
-    [&](/* in*/ s_t eps,
-        /*out*/ Eigen::Matrix<s_t, 6, 2>& perturbed) {
-      perturbed = getRelativeJacobianStatic(positions + eps * velocities);
-      return true;
-    },
-    result,
-    eps,
-    useRidders);
+      [&](/* in*/ s_t eps,
+          /*out*/ Eigen::Matrix<s_t, 6, 2>& perturbed) {
+        perturbed = getRelativeJacobianStatic(positions + eps * velocities);
+        return true;
+      },
+      result,
+      eps,
+      useRidders);
 
   return result;
 }
@@ -421,15 +425,15 @@ UniversalJoint::finiteDifferenceRelativeJacobianDerivWrtPos(
 
   s_t eps = useRidders ? 1e-3 : 1e-7;
   math::finiteDifference<Eigen::Matrix<s_t, 6, 2>>(
-    [&](/* in*/ s_t eps,
-        /*out*/ Eigen::Matrix<s_t, 6, 2>& perturbed) {
-      perturbed = getRelativeJacobianStatic(
-          positions + eps * Eigen::Vector2s::Unit(index));
-      return true;
-    },
-    result,
-    eps,
-    useRidders);
+      [&](/* in*/ s_t eps,
+          /*out*/ Eigen::Matrix<s_t, 6, 2>& perturbed) {
+        perturbed = getRelativeJacobianStatic(
+            positions + eps * Eigen::Vector2s::Unit(index));
+        return true;
+      },
+      result,
+      eps,
+      useRidders);
 
   return result;
 }
@@ -446,15 +450,15 @@ UniversalJoint::finiteDifferenceRelativeJacobianTimeDerivDerivWrtPosition(
 
   s_t eps = useRidders ? 1e-3 : 1e-7;
   math::finiteDifference<Eigen::Matrix<s_t, 6, 2>>(
-    [&](/* in*/ s_t eps,
-        /*out*/ Eigen::Matrix<s_t, 6, 2>& perturbed) {
-      perturbed = getRelativeJacobianTimeDerivStatic(
-          positions + eps * Eigen::Vector2s::Unit(index), velocities);
-      return true;
-    },
-    result,
-    eps,
-    useRidders);
+      [&](/* in*/ s_t eps,
+          /*out*/ Eigen::Matrix<s_t, 6, 2>& perturbed) {
+        perturbed = getRelativeJacobianTimeDerivStatic(
+            positions + eps * Eigen::Vector2s::Unit(index), velocities);
+        return true;
+      },
+      result,
+      eps,
+      useRidders);
 
   return result;
 }
@@ -471,17 +475,68 @@ UniversalJoint::finiteDifferenceRelativeJacobianTimeDerivDerivWrtVelocity(
 
   s_t eps = useRidders ? 1e-3 : 1e-7;
   math::finiteDifference<Eigen::Matrix<s_t, 6, 2>>(
-    [&](/* in*/ s_t eps,
-        /*out*/ Eigen::Matrix<s_t, 6, 2>& perturbed) {
-      perturbed = getRelativeJacobianTimeDerivStatic(
-          positions, velocities + eps * Eigen::Vector2s::Unit(index));
-      return true;
-    },
-    result,
-    eps,
-    useRidders);
+      [&](/* in*/ s_t eps,
+          /*out*/ Eigen::Matrix<s_t, 6, 2>& perturbed) {
+        perturbed = getRelativeJacobianTimeDerivStatic(
+            positions, velocities + eps * Eigen::Vector2s::Unit(index));
+        return true;
+      },
+      result,
+      eps,
+      useRidders);
 
   return result;
+}
+
+//==============================================================================
+/// Returns the value for q that produces the nearest rotation to
+/// `relativeRotation` passed in.
+Eigen::VectorXs UniversalJoint::getNearestPositionToDesiredRotation(
+    const Eigen::Matrix3s& relativeRotationGlobal)
+{
+  Eigen::Matrix3s relativeRotation
+      = Joint::mAspectProperties.mT_ParentBodyToJoint.linear().transpose()
+        * relativeRotationGlobal
+        * Joint::mAspectProperties.mT_ChildBodyToJoint.linear();
+
+  // mT = Joint::mAspectProperties.mT_ParentBodyToJoint
+  //      * Eigen::AngleAxis_s(positions[0], getAxis1())
+  //      * Eigen::AngleAxis_s(positions[1], getAxis2())
+  //      * Joint::mAspectProperties.mT_ChildBodyToJoint.inverse();
+
+  s_t ang1 = 0.0;
+  s_t ang2 = 0.0;
+  Eigen::Matrix3s remainingRotation = relativeRotation;
+
+  s_t lastDist = std::numeric_limits<s_t>::infinity();
+  for (int i = 0; i < 50; i++)
+  {
+    Eigen::Matrix3s rot1 = math::expMapRot(ang1 * getAxis1());
+    remainingRotation = rot1.inverse() * relativeRotation;
+    ang2 = math::getClosestRotationalApproximation(
+        getAxis2(), remainingRotation);
+    Eigen::Matrix3s rot2 = math::expMapRot(ang2 * getAxis2());
+    remainingRotation = relativeRotation * rot2.inverse();
+    ang1 = math::getClosestRotationalApproximation(
+        getAxis1(), remainingRotation);
+
+    Eigen::Matrix3s R = math::expMapRot(ang1 * getAxis1())
+                        * math::expMapRot(ang2 * getAxis2());
+    s_t dist = (R - relativeRotation).squaredNorm();
+    s_t improvement = lastDist - dist;
+    lastDist = dist;
+
+    // #ifndef NDEBUG
+    //     std::cout << "Improvement[" << i << "]: " << improvement <<
+    //     std::endl;
+    // #endif
+
+    if (improvement == 0)
+    {
+      break;
+    }
+  }
+  return Eigen::Vector2s(ang1, ang2);
 }
 
 } // namespace dynamics

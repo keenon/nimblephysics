@@ -37,6 +37,7 @@
 #include "dart/common/Console.hpp"
 #include "dart/dynamics/DegreeOfFreedom.hpp"
 #include "dart/math/Geometry.hpp"
+#include "dart/math/MathTypes.hpp"
 
 namespace dart {
 namespace dynamics {
@@ -136,6 +137,77 @@ EulerJoint::AxisOrder EulerJoint::getAxisOrder() const
 }
 
 //==============================================================================
+/// Returns the axis of rotation for DOF `index`, depending on the AxisOrder
+Eigen::Vector3s EulerJoint::getAxis(int index) const
+{
+  if (getAxisOrder() == AxisOrder::XYZ)
+  {
+    if (index == 0)
+    {
+      return Eigen::Vector3s::UnitX() * getFlipAxisMap()(0);
+    }
+    if (index == 1)
+    {
+      return Eigen::Vector3s::UnitY() * getFlipAxisMap()(1);
+    }
+    if (index == 2)
+    {
+      return Eigen::Vector3s::UnitZ() * getFlipAxisMap()(2);
+    }
+  }
+  if (getAxisOrder() == AxisOrder::XZY)
+  {
+    if (index == 0)
+    {
+      return Eigen::Vector3s::UnitX() * getFlipAxisMap()(0);
+    }
+    if (index == 1)
+    {
+      return Eigen::Vector3s::UnitZ() * getFlipAxisMap()(1);
+    }
+    if (index == 2)
+    {
+      return Eigen::Vector3s::UnitY() * getFlipAxisMap()(2);
+    }
+  }
+  if (getAxisOrder() == AxisOrder::ZXY)
+  {
+    if (index == 0)
+    {
+      return Eigen::Vector3s::UnitZ() * getFlipAxisMap()(0);
+    }
+    if (index == 1)
+    {
+      return Eigen::Vector3s::UnitX() * getFlipAxisMap()(1);
+    }
+    if (index == 2)
+    {
+      return Eigen::Vector3s::UnitY() * getFlipAxisMap()(2);
+    }
+  }
+  if (getAxisOrder() == AxisOrder::ZYX)
+  {
+    if (index == 0)
+    {
+      return Eigen::Vector3s::UnitZ() * getFlipAxisMap()(0);
+    }
+    if (index == 1)
+    {
+      return Eigen::Vector3s::UnitY() * getFlipAxisMap()(1);
+    }
+    if (index == 2)
+    {
+      return Eigen::Vector3s::UnitX() * getFlipAxisMap()(2);
+    }
+  }
+  std::cout
+      << "ERROR: EulerJoint is being asked for an axis that is out of bounds!"
+      << std::endl;
+  assert(false);
+  return Eigen::Vector3s::UnitX();
+}
+
+//==============================================================================
 /// This takes a vector of 1's and -1's to indicate which entries to flip, if
 /// any
 void EulerJoint::setFlipAxisMap(Eigen::Vector3s map)
@@ -195,6 +267,19 @@ Eigen::Matrix3s EulerJoint::convertToRotation(
     const Eigen::Vector3s& _positions) const
 {
   return convertToRotation(_positions, getAxisOrder(), getFlipAxisMap());
+}
+
+//==============================================================================
+/// Returns the value for q that produces the nearest rotation to
+/// `relativeRotation` passed in.
+Eigen::VectorXs EulerJoint::getNearestPositionToDesiredRotation(
+    const Eigen::Matrix3s& relativeRotationGlobal)
+{
+  Eigen::Matrix3s relativeRotation
+      = Joint::mAspectProperties.mT_ParentBodyToJoint.linear().transpose()
+        * relativeRotationGlobal
+        * Joint::mAspectProperties.mT_ChildBodyToJoint.linear();
+  return convertToPositions(relativeRotation);
 }
 
 //==============================================================================
@@ -327,6 +412,14 @@ Eigen::Matrix<s_t, 6, 3> EulerJoint::computeRelativeJacobianStatic(
   J.col(1) = math::AdT(childBodyToJoint, J1) * flipAxisMap(1);
   J.col(2) = math::AdT(childBodyToJoint, J2) * flipAxisMap(2);
 
+#ifndef NDEBUG
+  if (math::isNan(J))
+  {
+    std::cout << "Got EulerJoint with NaN jacobian: " << std::endl
+              << J << std::endl;
+  }
+#endif
+
   assert(!math::isNan(J));
 
 #ifndef NDEBUG
@@ -336,7 +429,7 @@ Eigen::Matrix<s_t, 6, 3> EulerJoint::computeRelativeJacobianStatic(
   s_t det = luJTJ.determinant();
   if (det < 1e-8)
   {
-    std::cout << "ill-conditioned Jacobian in joint."
+    std::cout << "ill-conditioned Jacobian in joint"
               << " The determinant of the Jacobian is (" << det << ")."
               << std::endl;
     std::cout << "rank is (" << luJTJ.rank() << ")." << std::endl;
@@ -627,7 +720,8 @@ EulerJoint::finiteDifferenceRelativeJacobianStaticDerivWrtPos(
 }
 
 //==============================================================================
-math::Jacobian EulerJoint::getRelativeJacobianDeriv(std::size_t index) const
+Eigen::Matrix<s_t, 6, 3> EulerJoint::getRelativeJacobianDerivWrtPositionStatic(
+    std::size_t index) const
 {
   return computeRelativeJacobianDerivWrtPos(
       index,

@@ -42,6 +42,8 @@ namespace python {
 
 void ConstraintBase(py::module& m)
 {
+  ::py::class_<dart::constraint::ConstraintInfo>(m, "ConstraintInfo");
+
   ::py::class_<
       dart::constraint::ConstraintBase,
       std::shared_ptr<dart::constraint::ConstraintBase> >(m, "ConstraintBase")
@@ -84,7 +86,7 @@ void ConstraintBase(py::module& m)
           +[](dart::constraint::ConstraintBase* self, s_t* lambda) {
             self->applyImpulse(lambda);
           },
-          ::py::arg("lambda"))
+          ::py::arg("impulse"))
       .def(
           "isActive",
           +[](const dart::constraint::ConstraintBase* self) -> bool {

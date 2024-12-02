@@ -45,6 +45,18 @@ namespace python {
 
 void BatchGaitInverseDynamics(py::module& m)
 {
+  ::py::class_<dart::biomechanics::ContactRegimeSection>(
+      m, "ContactRegimeSection")
+      .def_readwrite(
+          "groundContactBodies",
+          &dart::biomechanics::ContactRegimeSection::groundContactBodies)
+      .def_readwrite(
+          "startTime", &dart::biomechanics::ContactRegimeSection::startTime)
+      .def_readwrite(
+          "endTime", &dart::biomechanics::ContactRegimeSection::endTime)
+      .def_readwrite(
+          "wrenches", &dart::biomechanics::ContactRegimeSection::wrenches);
+
   ::py::class_<
       dart::biomechanics::BatchGaitInverseDynamics,
       std::shared_ptr<dart::biomechanics::BatchGaitInverseDynamics>>(

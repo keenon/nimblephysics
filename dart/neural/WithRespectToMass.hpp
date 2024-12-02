@@ -52,6 +52,9 @@ class WithRespectToMass : public WithRespectTo
 public:
   WithRespectToMass();
 
+  /// A printable name for this WRT object
+  std::string name() override;
+
   /// This registers that we'd like to keep track of this node's mass in this
   /// way in this differentiation
   WrtMassBodyNodyEntry& registerNode(

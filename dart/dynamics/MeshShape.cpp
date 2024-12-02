@@ -192,7 +192,9 @@ MeshShape::MeshShape(
     mDontFreeMesh(dontFreeMesh)
 {
   setMesh(
-      resourceRetriever ? loadMesh(path, resourceRetriever) : loadMesh(path), path, std::move(resourceRetriever));
+      resourceRetriever ? loadMesh(path, resourceRetriever) : loadMesh(path),
+      path,
+      std::move(resourceRetriever));
   setScale(scale);
 }
 
@@ -297,7 +299,7 @@ void MeshShape::setMesh(
   if (resourceRetriever)
     mMeshPath = resourceRetriever->getFilePath(uri);
   else
-    mMeshPath.clear();
+    mMeshPath = uri.getFilesystemPath();
 
   mResourceRetriever = std::move(resourceRetriever);
 

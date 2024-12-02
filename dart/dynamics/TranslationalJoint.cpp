@@ -61,6 +61,15 @@ Eigen::Matrix<s_t, 6, 3> TranslationalJoint::getRelativeJacobianStatic(
   return getRelativeJacobianStatic();
 }
 
+/// Returns the value for q that produces the nearest rotation to
+/// `relativeRotation` passed in.
+Eigen::VectorXs TranslationalJoint::getNearestPositionToDesiredRotation(
+    const Eigen::Matrix3s& relativeRotation)
+{
+  (void)relativeRotation;
+  return getPositions();
+}
+
 //==============================================================================
 TranslationalJoint::Properties
 TranslationalJoint::getTranslationalJointProperties() const

@@ -386,6 +386,8 @@ s_t MetaSkeleton::getPosition(std::size_t _index) const
 //==============================================================================
 void MetaSkeleton::setPositions(const Eigen::VectorXs& _positions)
 {
+  if (getPositions() == _positions) return;
+
   setAllValuesFromVector<&DegreeOfFreedom::setPosition>(
         this, _positions, "setPositions", "_positions");
 }
@@ -523,6 +525,8 @@ s_t MetaSkeleton::getVelocity(std::size_t _index) const
 //==============================================================================
 void MetaSkeleton::setVelocities(const Eigen::VectorXs& _velocities)
 {
+  if (getVelocities() == _velocities) return;
+
   setAllValuesFromVector<&DegreeOfFreedom::setVelocity>(
         this, _velocities, "setVelocities", "_velocities");
 }

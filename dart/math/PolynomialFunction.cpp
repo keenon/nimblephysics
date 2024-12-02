@@ -38,5 +38,12 @@ s_t PolynomialFunction::calcDerivative(int order, s_t x) const
   return sum;
 }
 
+std::shared_ptr<CustomFunction> PolynomialFunction::offsetBy(s_t y) const
+{
+  std::vector<s_t> newCoeffs = mCoeffs;
+  newCoeffs[0] += y;
+  return std::make_shared<PolynomialFunction>(newCoeffs);
+}
+
 } // namespace math
 } // namespace dart

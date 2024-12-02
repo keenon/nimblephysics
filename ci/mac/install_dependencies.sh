@@ -13,7 +13,8 @@ brew reinstall gcc
 export FC=$(which gfortran)
 echo "FC=$FC"
 
-export MACOSX_DEPLOYMENT_TARGET="10.9"
+export MACOSX_DEPLOYMENT_TARGET="15.0"
+export CMAKE_FLAGS="-DCMAKE_OSX_ARCHITECTURES=x86_64"
 
 export PYTHON3=$(which python3)
 echo "Python3=${PYTHON3}"
@@ -36,7 +37,8 @@ brew install eigen
 brew install openssl@1.1
 if [ -d "/usr/local/opt/openssl@1.1/lib/pkgconfig/" ]; then
       # x86 Macs
-      cp /usr/local/opt/openssl@1.1/lib/pkgconfig/*.pc /usr/local/lib/pkgconfig/
+      # If this fails, we skip it
+      cp /usr/local/opt/openssl@1.1/lib/pkgconfig/*.pc /usr/local/lib/pkgconfig/ || :
 else
       # ARM64 Macs
       # TODO: unsudo this command
@@ -50,7 +52,7 @@ pushd libccd
 git checkout v2.1
 mkdir build
 pushd build
-cmake .. -DENABLE_DOUBLE_PRECISION=ON
+cmake .. -DENABLE_DOUBLE_PRECISION=ON -DCMAKE_OSX_DEPLOYMENT_TARGET="10.15"
 sudo make install -j
 popd
 popd
@@ -75,16 +77,19 @@ brew install lapack
 git clone https://github.com/coin-or-tools/ThirdParty-Mumps.git
 pushd ThirdParty-Mumps
 ./get.Mumps
-./configure
+./configure # CFLAGS="-arch x86_64 -arch arm64" FCFLAGS="-arch x86_64 -arch arm64" LDFLAGS="-arch x86_64 -arch arm64" 
 # make # Don't build mumps in parallel, that seems to have a race-condition on the Azure CI Mac's?
 sudo make install
 popd
 sudo rm -rf ThirdParty-Mumps
 
+# NOTE: on local arm64 M1 mac, I've had to do the following when I get linker errors during "delocate"
+# ln -s /opt/homebrew/Cellar/gcc/11.2.0_3/lib/gcc/11/libgcc_s.1.1.dylib /opt/homebrew/Cellar/gcc/11.2.0_3/lib/gcc/11/libgcc_s.1.dylib 
+
 # Install IPOPT
 git clone https://github.com/coin-or/Ipopt.git
 pushd Ipopt
-./configure --with-mumps --disable-java
+./configure --with-mumps --disable-java # CFLAGS="-arch x86_64 -arch arm64" FCFLAGS="-arch x86_64 -arch arm64" LDFLAGS="-arch x86_64 -arch arm64"
 sudo make install -j
 popd
 sudo rm -rf Ipopt
@@ -93,10 +98,10 @@ sudo ln -s /usr/local/include/coin-or /usr/local/include/coin
 # Install pybind11
 git clone https://github.com/pybind/pybind11.git
 pushd pybind11
-git checkout v2.7.0
+git checkout v2.11.1
 mkdir build
 pushd build
-cmake .. -DPYTHON_EXECUTABLE:FILEPATH=$(which python3)
+cmake .. -DPYTHON_EXECUTABLE:FILEPATH=$(which python3) $CMAKE_FLAGS
 sudo make install -j
 popd
 popd
@@ -133,7 +138,7 @@ pushd tinyxml2
 git checkout 8.0.0
 mkdir build
 pushd build
-cmake ..
+cmake .. $CMAKE_FLAGS
 sudo make install -j
 popd
 popd
@@ -155,18 +160,20 @@ git clone https://github.com/robotology-dependencies/tinyxml.git
 pushd tinyxml
 mkdir build
 pushd build
-cmake ..
+cmake .. $CMAKE_FLAGS
 sudo make install -j
 popd
 popd
 sudo rm -rf tinyxml
+file /usr/local/lib/libtinyxml.2.6.2.dylib
+lipo -info /usr/local/lib/libtinyxml.2.6.2.dylib
 
 # Install urdfdom_headers
 git clone https://github.com/ros/urdfdom_headers.git
 pushd urdfdom_headers
 mkdir build
 pushd build
-cmake ..
+cmake .. $CMAKE_FLAGS
 sudo make install -j
 popd
 popd
@@ -177,7 +184,7 @@ git clone https://github.com/ros/console_bridge.git
 pushd console_bridge
 mkdir build
 pushd build
-cmake ..
+cmake .. $CMAKE_FLAGS
 sudo make install -j
 popd
 popd
@@ -186,13 +193,36 @@ sudo rm -rf console_bridge
 # Install urdfdom
 git clone https://github.com/ros/urdfdom.git
 pushd urdfdom
+git checkout 3.0.0
 mkdir build
 pushd build
-cmake ..
+cmake .. $CMAKE_FLAGS
 sudo make install -j
 popd
 popd
 sudo rm -rf urdfdom
+file /usr/local/lib/liburdfdom_sensor.3.0.dylib
+lipo -info /usr/local/lib/liburdfdom_sensor.3.0.dylib
+
+echo "Fixing path on liburdfdom_sensor.dylib"
+otool -L /usr/local/lib/liburdfdom_sensor.dylib
+sudo install_name_tool -change libtinyxml.2.6.2.dylib /usr/local/lib/libtinyxml.2.6.2.dylib /usr/local/lib/liburdfdom_sensor.dylib
+otool -L /usr/local/lib/liburdfdom_sensor.dylib
+
+echo "Fixing path on liburdfdom_model.dylib"
+otool -L /usr/local/lib/liburdfdom_model.dylib
+sudo install_name_tool -change libtinyxml.2.6.2.dylib /usr/local/lib/libtinyxml.2.6.2.dylib /usr/local/lib/liburdfdom_model.dylib
+otool -L /usr/local/lib/liburdfdom_model.dylib
+
+echo "Fixing path on liburdfdom_world.dylib"
+otool -L /usr/local/lib/liburdfdom_world.dylib
+sudo install_name_tool -change libtinyxml.2.6.2.dylib /usr/local/lib/libtinyxml.2.6.2.dylib /usr/local/lib/liburdfdom_world.dylib
+otool -L /usr/local/lib/liburdfdom_world.dylib
+
+echo "Fixing path on liburdfdom_model_state.dylib"
+otool -L /usr/local/lib/liburdfdom_model_state.dylib
+sudo install_name_tool -change libtinyxml.2.6.2.dylib /usr/local/lib/libtinyxml.2.6.2.dylib /usr/local/lib/liburdfdom_model_state.dylib
+otool -L /usr/local/lib/liburdfdom_model_state.dylib
 
 # Install protobuf
 PROTOBUF_VERSION="3.14.0"
@@ -219,7 +249,9 @@ mkdir -p cmake/build
 pushd cmake/build
 cmake -DgRPC_INSTALL=ON \
       -DgRPC_BUILD_TESTS=OFF \
+      -DCMAKE_OSX_DEPLOYMENT_TARGET="10.15" \
       -DCMAKE_CXX_FLAGS="-fvisibility=hidden" \
+      $CMAKE_FLAGS \
       ../..
 sudo make install -j
 popd
@@ -230,13 +262,29 @@ sudo rm -rf grpc
 git clone https://github.com/google/benchmark.git
 git clone https://github.com/google/googletest.git benchmark/googletest
 pushd benchmark
+git checkout v1.8.3
+pushd googletest
+git checkout v1.14.0 
+popd
 mkdir build
 pushd build
-cmake -DCMAKE_BUILD_TYPE=Release ..
+cmake -DCMAKE_BUILD_TYPE=Release $CMAKE_FLAGS ..
 sudo make install
 popd
 popd
 sudo rm -rf benchmark
+
+# Install ezc3d
+git clone https://github.com/pyomeca/ezc3d.git
+pushd ezc3d
+git checkout Release_1.5.4
+mkdir build
+pushd build
+cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_POSITION_INDEPENDENT_CODE=ON $CMAKE_FLAGS ..
+sudo make install
+popd
+popd
+sudo rm -rf ezc3d
 
 # Reset the IDs for our libraries to absolute paths
 sudo install_name_tool -id /usr/local/lib/liburdfdom_sensor.dylib /usr/local/lib/liburdfdom_sensor.dylib
@@ -245,6 +293,8 @@ sudo install_name_tool -id /usr/local/lib/liburdfdom_model.dylib /usr/local/lib/
 sudo install_name_tool -id /usr/local/lib/liburdfdom_world.dylib /usr/local/lib/liburdfdom_world.dylib
 sudo install_name_tool -id /usr/local/lib/libconsole_bridge.dylib /usr/local/lib/libconsole_bridge.dylib
 sudo install_name_tool -id /usr/local/lib/libtinyxml2.8.dylib /usr/local/lib/libtinyxml2.8.dylib
+sudo install_name_tool -id /usr/local/lib/libtinyxml.2.6.2.dylib /usr/local/lib/libtinyxml.2.6.2.dylib
+sudo install_name_tool -id /usr/local/lib/libezc3d.dylib /usr/local/lib/libezc3d.dylib
 # install_name_tool -id /usr/local/lib/liboctomap.1.8.dylib /usr/local/lib/liboctomap.1.8.dylib
 # install_name_tool -id /usr/local/lib/liboctomath.1.8.dylib /usr/local/lib/liboctomath.1.8.dylib
 sudo install_name_tool -id /usr/local/lib/libccd.2.dylib /usr/local/lib/libccd.2.dylib
@@ -259,14 +309,17 @@ sudo install_name_tool -id /usr/local/lib/libassimp.5.dylib /usr/local/lib/libas
 # install_name_tool -id /usr/local/lib/libosgShadow.161.dylib /usr/local/lib/libosgShadow.161.dylib
 # install_name_tool -id /usr/local/lib/libOpenThreads.21.dylib /usr/local/lib/libOpenThreads.21.dylib
 
+# An attempt to fix the assimp linking issue
+sudo install_name_tool -change "@rpath/libIrrXML.dylib" "/usr/local/lib/libIrrXML.dylib" /usr/local/lib/libassimp.5.dylib 
+
 # Different attempts to fix the liblzma linking issue
 # sudo install_name_tool -id /usr/lib/liblzma.5.dylib /usr/lib/liblzma.5.dylib
 # sudo install_name_tool -id /usr/lib/libcompression.dylib /usr/lib/libcompression.dylib
 # brew install xz zlib bzip2
 
 # Fix "icu4c" installed by Brew
-ICU4C_MAJOR_VERSION="69"
-ICU4C_FULL_VERSION="69.1"
+ICU4C_MAJOR_VERSION="74"
+ICU4C_FULL_VERSION="74.2"
 if [ -d "/usr/local/Cellar/icu4c/${ICU4C_FULL_VERSION}/lib/" ]; then
       pushd /usr/local/Cellar/icu4c/${ICU4C_FULL_VERSION}/lib/
 else
@@ -321,7 +374,7 @@ fi
 # echo "Symbolic links complete"
 
 # Install our build tools
-pip3 install pytest delocate
+pip3 install pytest delocate pybind11-stubgen==0.16.2 numpy torch
 
 # Install pkgconfig, which CMake uses to look for dependencies
 brew install pkgconfig

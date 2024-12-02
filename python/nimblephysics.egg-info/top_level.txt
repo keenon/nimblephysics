@@ -1,2 +1,2 @@
-cmake_example
+_nimblephysics
 nimblephysics

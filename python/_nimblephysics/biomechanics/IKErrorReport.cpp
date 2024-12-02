@@ -76,6 +76,13 @@ void IKErrorReport(py::module& m)
           "printReport",
           &dart::biomechanics::IKErrorReport::printReport,
           ::py::arg("limitTimesteps") = -1)
+      .def(
+          "saveCSVMarkerErrorReport",
+          &dart::biomechanics::IKErrorReport::saveCSVMarkerErrorReport,
+          ::py::arg("path"))
+      .def(
+          "getSortedMarkerRMSE",
+          &dart::biomechanics::IKErrorReport::getSortedMarkerRMSE)
       .def_readwrite(
           "sumSquaredError",
           &dart::biomechanics::IKErrorReport::sumSquaredError)
