@@ -24,11 +24,11 @@ Note that another name for :math:`\frac{v_{t+1} - v_t}{\Delta t}` is acceleratio
 
 In its simplest form, when dealing with a robot arm rigidly attached to a base on the ground, the above equation solves the problem.
 
-This can be solved in code by calling :code:`Skeleton.getInverseDynamics(next_vel)`:
+This can be solved in code by calling :code:`Skeleton.getInverseDynamics(accelerations)`:
 
 .. code-block:: python
 
-  control_forces = robot.getInverseDynamics(desired_next_vel)
+  control_forces = robot.getInverseDynamics(desired_acc)
 
 This equation doesn't respect joint force limits, because it's solving a linear system of equations which (if :math:`M` is full rank) has only one solution.
 
@@ -51,7 +51,7 @@ In code, that looks like this:
 
 .. code-block:: python
 
-  result = robot.getContactInverseDynamics(desired_next_vel, right_foot)
+  result = robot.getContactInverseDynamics(desired_acc, right_foot)
   control_forces = result.jointTorques
   right_foot_contact_force = result.contactWrench
 
@@ -101,7 +101,7 @@ To pick the nearest set of contact forces to some initial guess, expressed as a 
 
 .. code-block:: python
 
-  result = robot.getMultipleContactInverseDynamics(next_vel, contact_bodies_list, body_wrench_guesses)
+  result = robot.getMultipleContactInverseDynamics(desired_acc, contact_bodies_list, body_wrench_guesses)
   control_forces = result.jointTorques
   first_foot_contact_force = result.contactWrench[0]
   second_foot_contact_force = result.contactWrench[1]
@@ -110,7 +110,7 @@ To pick the set of contact forces that minimize the torques at each foot (on the
 
 .. code-block:: python
 
-  result = robot.getMultipleContactInverseDynamics(next_vel, contact_bodies_list)
+  result = robot.getMultipleContactInverseDynamics(desired_acc, contact_bodies_list)
   control_forces = result.jointTorques
   first_foot_contact_force = result.contactWrenches[0]
   second_foot_contact_force = result.contactWrenches[1]
