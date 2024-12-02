@@ -95,8 +95,6 @@ class CMakeBuild(build_ext):
                     cmake_args += ['-DCMAKE_OSX_ARCHITECTURES=x86_64']
             build_args += ['--', '-j2']
 
-        cmake_args += ['-DCMAKE_OSX_ARCHITECTURES=x86_64']
-
         env = os.environ.copy()
         env['CXXFLAGS'] = '{} -DVERSION_INFO=\\"{}\\"'.format(env.get('CXXFLAGS', ''),
                                                               self.distribution.get_version())
