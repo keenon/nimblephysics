@@ -61,7 +61,7 @@ rm -rf libccd
 # Install ASSIMP
 git clone https://github.com/assimp/assimp.git
 pushd assimp
-git checkout v5.0.1
+git checkout v5.4.3
 mkdir build
 pushd build
 cmake ..
@@ -240,7 +240,7 @@ PROTOBUF_VERSION="3.14.0"
 # brew install xz zlib bzip2
 
 # Install grpc
-git clone --recurse-submodules -b v1.33.2 https://github.com/grpc/grpc
+git clone --recurse-submodules -b v1.67.0 https://github.com/grpc/grpc
 pushd grpc
 pushd third_party/protobuf
 git checkout v${PROTOBUF_VERSION}
