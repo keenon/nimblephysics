@@ -1,4 +1,4 @@
-FROM quay.io/pypa/manylinux2014_x86_64
+FROM quay.io/pypa/manylinux_2_32
 MAINTAINER keenonwerling@gmail.com
 # TAG keenon/diffdart:base
 
