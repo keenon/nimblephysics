@@ -262,9 +262,11 @@ void ForcePlate::detectAndFixCopMomentConvention(int trial, int i)
         Eigen::Vector3s f = forces[t];
         Eigen::Vector3s m = moments[t];
         Eigen::Vector3s cop = centersOfPressure[t];
-        cop += averageOffset;
-        Eigen::Vector3s tau = cop.cross(f);
+        Eigen::Vector3s offsetCop = cop + averageOffset;
+        Eigen::Vector3s tau = offsetCop.cross(f);
         Eigen::Vector3s worldM = m - tau;
+        worldM(0) = 0.0;
+        worldM(2) = 0.0;
         if (f.norm() < 3 || cop.isZero())
           continue;
         moments[t] = worldM;
