@@ -108,7 +108,7 @@ jobs:
     needs: [build-linux-aarch64]
     steps:
       - name: Download artifacts
-        uses: actions/download-artifact@v2
+        uses: actions/download-artifact@v3
         with:
           path: wheelhouse
       - name: Display structure of downloaded files before flattening
@@ -124,7 +124,7 @@ jobs:
         run: ls -R
         working-directory: wheelhouse
       - name: Publish package to PyPI
-        uses: pypa/gh-action-pypi-publish@release/v1
+        uses: pypa/gh-action-pypi-publish@release/v1.8
         with:
           user: __token__
           password: ${{ secrets.PYPI_API_TOKEN }}
