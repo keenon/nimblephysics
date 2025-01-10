@@ -1,4 +1,4 @@
-FROM quay.io/pypa/manylinux2014_x86_64
+FROM quay.io/pypa/manylinux_2_34_x86_64
 MAINTAINER keenonwerling@gmail.com
 # TAG keenon/diffdart:base
 
@@ -23,7 +23,7 @@ RUN rm cmake-3.19.0.tar.gz
 # RUN yum install epel-release && \
 #     rpm -ivh http://repo.okay.com.mx/centos/7/x86_64/release/okay-release-1-3.el6.noarch.rpm? && \
 #     yum install -y boost-devel-1.55.0-25.el6.x86_64
-RUN yum install -y boost-devel-1.53.0-28.el7.x86_64
+RUN yum install -y boost-devel
 
 # Install Eigen
 RUN curl https://gitlab.com/libeigen/eigen/-/archive/3.3.7/eigen-3.3.7.tar.gz > eigen.tar.gz && \
@@ -102,11 +102,11 @@ RUN git clone https://github.com/flexible-collision-library/fcl.git && \
 # Install octomap
 RUN git clone https://github.com/OctoMap/octomap.git && \
     pushd octomap && \
-    git checkout v1.8.1 && \
+    git checkout v1.10.0 && \
     mkdir build && \
     pushd build && \
     cmake .. -DCMAKE_POSITION_INDEPENDENT_CODE=ON && \
-    make install -j10 && \
+    make install && \
     popd && \
     popd && \
     rm -rf octomap
@@ -211,7 +211,7 @@ RUN git clone https://github.com/PlatformLab/PerfUtils.git && \
     popd && \
     rm -rf PerfUtils
 
-ENV PROTOBUF_VERSION="3.14.0"
+ENV PROTOBUF_VERSION="29.2"
 
 # RUN wget https://github.com/protocolbuffers/protobuf/releases/download/v${PROTOBUF_VERSION}/protobuf-all-${PROTOBUF_VERSION}.tar.gz && \
 #     tar -xvzf protobuf-all-${PROTOBUF_VERSION}.tar.gz && \
@@ -224,10 +224,10 @@ ENV PROTOBUF_VERSION="3.14.0"
 #     popd && \
 #     rm -rf protobuf-${PROTOBUF_VERSION}
 
-RUN git clone --recurse-submodules -b v1.33.2 https://github.com/grpc/grpc
+RUN git clone --recurse-submodules -b v1.69.0 https://github.com/grpc/grpc
 RUN pushd grpc && \
     # This fixes the boringssl build on the ancient CentOS we have to use by adding "rt" as an explicit dependency
-    sed -i '642s/.*/target_link_libraries(bssl ssl crypto rt)/' third_party/boringssl-with-bazel/CMakeLists.txt && \
+    # sed -i '642s/.*/target_link_libraries(bssl ssl crypto rt)/' third_party/boringssl-with-bazel/CMakeLists.txt && \
     pushd third_party/protobuf && \
     git checkout v${PROTOBUF_VERSION} && \
     popd && \

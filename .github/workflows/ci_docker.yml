@@ -16,6 +16,10 @@ jobs:
     env:
       ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION: true
     steps:
+      - name: Set up Node Version 16
+        uses: actions/setup-node@v3
+        with:
+          node-version: 16
       - name: Check out the repo
         uses: actions/checkout@v2
       - name: Build
