@@ -135,9 +135,6 @@ popd
 popd
 rm -rf OpenSceneGraph
 
-# Install pytest
-pip install pytest
-
 # Install tinyxml1
 git clone https://github.com/robotology-dependencies/tinyxml.git
 pushd tinyxml

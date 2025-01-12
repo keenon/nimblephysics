@@ -45,6 +45,17 @@ set(DART_ADDITIONAL_DOCUMENTATION_INSTALL_PATH
 set(CMAKE_DEBUG_POSTFIX "d")
 set(CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake")
 
+# ===============================================================================
+# Change to C++17 and reduce memory overheads
+# ===============================================================================
+find_package(Threads REQUIRED)
+
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+
+# Use lld as the linker
+# set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -fuse-ld=lld --no-keep-memory --reduce-memory-overheads")
+# set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -fuse-ld=lld --no-keep-memory --reduce-memory-overheads")
 include(DARTMacros)
 
 # CMake component helper. It uses the following variables:

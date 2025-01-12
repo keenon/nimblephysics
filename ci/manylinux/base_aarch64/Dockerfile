@@ -1,4 +1,4 @@
-FROM quay.io/pypa/manylinux2014_aarch64
+FROM quay.io/pypa/manylinux_2_28_aarch64
 MAINTAINER keenonwerling@gmail.com
 # TAG keenon/diffdart:base_aarch64
 
@@ -217,7 +217,7 @@ ENV PROTOBUF_VERSION="3.14.0"
 RUN git clone --recurse-submodules -b v1.33.2 https://github.com/grpc/grpc
 RUN pushd grpc && \
     # This fixes the boringssl build on the ancient CentOS we have to use by adding "rt" as an explicit dependency
-    sed -i '642s/.*/target_link_libraries(bssl ssl crypto rt)/' third_party/boringssl-with-bazel/CMakeLists.txt && \
+    # sed -i '642s/.*/target_link_libraries(bssl ssl crypto rt)/' third_party/boringssl-with-bazel/CMakeLists.txt && \
     pushd third_party/protobuf && \
     git checkout v${PROTOBUF_VERSION} && \
     popd && \
