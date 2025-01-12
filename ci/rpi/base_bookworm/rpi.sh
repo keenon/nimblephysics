@@ -251,14 +251,14 @@ rm -rf pybind11
 # -------------------------------------------------------
 python3 -m pip install --break-system-packages pytest
 python3 -m pip install --break-system-packages auditwheel
-python3 -m pip install --break-system-packages pybind11-stubgen
+python3 -m pip install --break-system-packages pybind11-stubgen==0.16.2
 python3 -m pip install --break-system-packages patchelf
 python3 -m pip install --break-system-packages numpy
 
 # -------------------------------------------------------
 # Install extra tools for development
 # -------------------------------------------------------
-apt-get install -y gdb
+apt-get install -y gdb patchelf
 
 # -------------------------------------------------------
 # Verify protoc version

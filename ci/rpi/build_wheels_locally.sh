@@ -27,4 +27,4 @@ python3 setup.py sdist bdist_wheel
 cd dist
 WHEEL_NAME=$(ls *.whl)
 echo "WHEEL_NAME=${WHEEL_NAME}"
-python3 -m auditwheel repair ${WHEEL_NAME}
+python3 -m auditwheel repair --no-update-tags --plat linux_aarch64 ${WHEEL_NAME}
