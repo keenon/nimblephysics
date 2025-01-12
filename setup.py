@@ -96,15 +96,32 @@ class CMakeBuild(build_ext):
             build_args += ['--', '-j2']
 
         env = os.environ.copy()
+
+        # Check if clang is available
+        def find_clang():
+            try:
+                subprocess.check_output(['clang', '--version'])
+                subprocess.check_output(['clang++', '--version'])
+                return True
+            except (OSError, subprocess.CalledProcessError):
+                return False
+
+        if find_clang():
+            print("Clang detected. Using clang as the default compiler.")
+            env['CC'] = 'clang'
+            env['CXX'] = 'clang++'
+        else:
+            print("Clang not detected. Falling back to the default compiler.")
+
         env['CXXFLAGS'] = '{} -DVERSION_INFO=\\"{}\\"'.format(env.get('CXXFLAGS', ''),
-                                                              self.distribution.get_version())
+                                                            self.distribution.get_version())
         if not os.path.exists(self.build_temp):
             os.makedirs(self.build_temp)
         print('Using CMake Args: '+str(cmake_args))
         subprocess.check_call(['cmake', ext.sourcedir] +
-                              cmake_args, cwd=self.build_temp, env=env)
+                            cmake_args, cwd=self.build_temp, env=env)
         subprocess.check_call(['cmake', '--build', '.'] + build_args,
-                              cwd=self.build_temp, env=env)
+                            cwd=self.build_temp, env=env)
 
         # Regenerate the stubs
         dir_path = os.path.dirname(os.path.realpath(__file__))

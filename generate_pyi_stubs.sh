@@ -23,7 +23,7 @@ fi
 # lipo -info $1/_nimblephysics.so
 # otool -L $1/_nimblephysics.so
 PYTHONPATH=$PP python3 -c "import _nimblephysics" || { echo "Python import failed. Exiting."; exit 1; }
-PYTHONPATH=$PP pybind11-stubgen --no-setup-py -o stubs _nimblephysics || { echo "pybind11-stubgen failed. Exiting."; exit 1; }
+PYTHONPATH=$PP python3 -m pybind11_stubgen --no-setup-py --bare-numpy-ndarray -o stubs _nimblephysics || { echo "pybind11-stubgen failed. Exiting."; exit 1; }
 touch stubs/_nimblephysics-stubs/py.typed
 mv stubs/_nimblephysics-stubs/__init__.pyi stubs/_nimblephysics-stubs/_nimblephysics.pyi
 
