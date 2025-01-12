@@ -7657,7 +7657,13 @@ std::vector<std::map<std::string, Eigen::Vector3s>> MarkerFitter::pickSubset(
   // the elements we want
   std::vector<unsigned int> indices(markerObservations.size());
   std::iota(indices.begin(), indices.end(), 0);
-  std::random_shuffle(indices.begin(), indices.end());
+
+  // Create a random number generator
+  std::random_device rd; // Seed
+  std::mt19937 g(rd());  // Mersenne Twister engine
+
+  // Shuffle the vector
+  std::shuffle(indices.begin(), indices.end(), g);
 
   std::vector<std::map<std::string, Eigen::Vector3s>> result;
   for (int i = 0; i < maxSize; i++)

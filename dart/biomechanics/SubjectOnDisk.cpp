@@ -1227,13 +1227,13 @@ void FramePass::readFromProto(
   markerRMS = 0.0;
   if (header.mTrials[trial]->mTrialPasses[pass]->mMarkerRMS.size() > t)
   {
-    header.mTrials[trial]->mTrialPasses[pass]->mMarkerRMS[t];
+    markerRMS = header.mTrials[trial]->mTrialPasses[pass]->mMarkerRMS[t];
   }
   // s_t markerMax;
   markerMax = 0.0;
   if (header.mTrials[trial]->mTrialPasses[pass]->mMarkerMax.size() > t)
   {
-    header.mTrials[trial]->mTrialPasses[pass]->mMarkerMax[t];
+    markerMax = header.mTrials[trial]->mTrialPasses[pass]->mMarkerMax[t];
   }
   // s_t linearResidual;
   linearResidual = 0.0;
