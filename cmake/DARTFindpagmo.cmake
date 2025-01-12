@@ -17,7 +17,8 @@ if(TARGET Pagmo::pagmo)
   include(CheckCXXSourceCompiles)
   set(CMAKE_REQUIRED_DEFINITIONS "")
   set(CMAKE_REQUIRED_LIBRARIES Pagmo::pagmo)
-  set(CMAKE_REQUIRED_FLAGS "-std=c++11 -w")
+  # set(CMAKE_REQUIRED_FLAGS "-std=c++11 -w")
+  set(CMAKE_REQUIRED_FLAGS "-w")
 
   check_cxx_source_compiles(
     "

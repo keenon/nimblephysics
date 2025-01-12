@@ -57,7 +57,7 @@ namespace urdf_parsing {
 
 namespace {
 
-bool parsePose(urdf::Pose &pose, tinyxml2::XMLElement* xml)
+bool parsePoseLocal(urdf::Pose &pose, tinyxml2::XMLElement* xml)
 {
   pose.clear();
   if (xml)
@@ -211,7 +211,7 @@ std::shared_ptr<World> parseWorldURDF(
           auto* origin = entity_xml->FirstChildElement("origin");
           if( origin )
           {
-            if( !parsePose( entity.origin, origin ) )
+            if( !parsePoseLocal( entity.origin, origin ) )
             {
               dtwarn << "[ERROR] Missing origin tag for '" << entity.model->getName() << "'\n";
               return world;

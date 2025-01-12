@@ -137,7 +137,16 @@ target_link_libraries(dart
   # protobuf::libprotobuf-lite
   # protobuf::libprotoc
   gRPC::grpc++
+  protobuf::libprotobuf
+  absl::strings
+  absl::cord
+  absl::cord_internal
+  absl::base
+  absl::synchronization
 )
+if(EXISTS "/usr/local/lib/libutf8_validity.a")
+  target_link_libraries(dart PRIVATE /usr/local/lib/libutf8_validity.a)
+endif()
 
 if(PerfUtils_FOUND)
   target_link_libraries(dart
@@ -162,11 +171,11 @@ if(NOT MSVC)
   target_link_libraries(dart PUBLIC Boost::regex)
 endif()
 
-if(CMAKE_VERSION VERSION_LESS 3.8.2)
-  target_compile_options(dart PUBLIC -std=c++14)
-else()
-  target_compile_features(dart PUBLIC cxx_std_14)
-endif()
+# if(CMAKE_VERSION VERSION_LESS 3.8.2)
+#   target_compile_options(dart PUBLIC -std=c++14)
+# else()
+#   target_compile_features(dart PUBLIC cxx_std_14)
+# endif()
 
 # Enable pthreads
 set(THREADS_PREFER_PTHREAD_FLAG ON)

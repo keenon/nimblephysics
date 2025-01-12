@@ -12,11 +12,11 @@ target_include_directories(${target_name}
     $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}>
     $<BUILD_INTERFACE:${CMAKE_BINARY_DIR}>
 )
-if(CMAKE_VERSION VERSION_LESS 3.8.2)
-  target_compile_options(${target_name} PUBLIC -std=c++14)
-else()
-  target_compile_features(${target_name} PUBLIC cxx_std_14)
-endif()
+# if(CMAKE_VERSION VERSION_LESS 3.8.2)
+#   target_compile_options(${target_name} PUBLIC -std=c++14)
+# else()
+#   target_compile_features(${target_name} PUBLIC cxx_std_14)
+# endif()
 
 # Component
 add_component(${PROJECT_NAME} ${component_name})

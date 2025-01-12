@@ -61,7 +61,7 @@ pybind11_add_module(_nimblephysics
 )
 
 # Add C++14 support
-set_property(TARGET _nimblephysics PROPERTY CXX_STANDARD 14)
+set_property(TARGET _nimblephysics PROPERTY CXX_STANDARD 17)
 
 target_include_directories(_nimblephysics
   SYSTEM PUBLIC

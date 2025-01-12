@@ -34,7 +34,8 @@ if(ASSIMP_FOUND)
   include(CheckCXXSourceCompiles)
   set(CMAKE_REQUIRED_DEFINITIONS "")
   if (NOT ASSIMP_VERSION VERSION_LESS 3.3.0 AND NOT MSVC)
-    set(CMAKE_REQUIRED_FLAGS "-std=c++11 -w")
+    # set(CMAKE_REQUIRED_FLAGS "-std=c++11 -w")
+    set(CMAKE_REQUIRED_FLAGS "-w")
   else()
     set(CMAKE_REQUIRED_FLAGS "-w")
   endif()
@@ -103,6 +104,7 @@ dart_find_package(PerfUtils)
 # Protobuf + gRPC
 dart_find_package(Protobuf)
 dart_find_package(gRPC)
+dart_find_package(absl)
 
 # MPFR + GMP -- Arbitrary precision floating point math
 dart_find_package(MPFR)
