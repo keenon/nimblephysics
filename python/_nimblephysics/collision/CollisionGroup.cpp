@@ -142,6 +142,12 @@ void CollisionGroup(py::module& m)
             self->addShapeFramesOf();
           })
       .def(
+          "addShapeFramesOf",
+          +[](dart::collision::CollisionGroup* self,
+              dart::dynamics::BodyNode* bodyNode) {
+            self->addShapeFramesOf(bodyNode);
+          })
+      .def(
           "subscribeTo",
           +[](dart::collision::CollisionGroup* self) { self->subscribeTo(); })
       .def(
@@ -161,6 +167,12 @@ void CollisionGroup(py::module& m)
           "removeShapeFramesOf",
           +[](dart::collision::CollisionGroup* self) {
             self->removeShapeFramesOf();
+          })
+      .def(
+          "removeShapeFramesOf",
+          +[](dart::collision::CollisionGroup* self,
+              dart::dynamics::BodyNode* bodyNode) {
+            self->removeShapeFramesOf(bodyNode);
           })
       .def(
           "removeAllShapeFrames",
