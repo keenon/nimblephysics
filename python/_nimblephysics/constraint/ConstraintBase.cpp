@@ -83,7 +83,7 @@ void ConstraintBase(py::module& m)
           +[](dart::constraint::ConstraintBase* self) { self->unexcite(); })
       .def(
           "applyImpulse",
-          +[](dart::constraint::ConstraintBase* self, s_t* lambda) {
+          +[](dart::constraint::ConstraintBase* self, Eigen::VectorXs lambda) {
             self->applyImpulse(lambda);
           },
           ::py::arg("impulse"))
