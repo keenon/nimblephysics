@@ -175,6 +175,7 @@ RUN git clone https://github.com/ros/urdfdom_headers.git && \
 # Install console_bridge
 RUN git clone https://github.com/ros/console_bridge.git && \
     pushd console_bridge && \
+    git checkout 1.0.1 && \
     mkdir build && \
     pushd build && \
     cmake .. -DCMAKE_POSITION_INDEPENDENT_CODE=ON && \
