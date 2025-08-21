@@ -175,6 +175,7 @@ RUN git clone https://github.com/ros/urdfdom_headers.git && \
 # Install console_bridge
 RUN git clone https://github.com/ros/console_bridge.git && \
     pushd console_bridge && \
+    git checkout 1.0.1 && \
     mkdir build && \
     pushd build && \
     cmake .. -DCMAKE_POSITION_INDEPENDENT_CODE=ON && \
@@ -257,15 +258,15 @@ RUN rm -rf benchmark
 
 # Install MPFR - Arbirtatry precision floating point math
 RUN yum install -y gmp-devel
-RUN curl https://www.mpfr.org/mpfr-current/mpfr-4.2.1.tar.gz > mpfr-4.2.1.tar.gz && \
-    tar -zxf mpfr-4.2.1.tar.gz && \
-    pushd mpfr-4.2.1 && \
+RUN curl https://www.mpfr.org/mpfr-current/mpfr-4.2.2.tar.gz > mpfr-4.2.2.tar.gz && \
+    tar -zxf mpfr-4.2.2.tar.gz && \
+    pushd mpfr-4.2.2 && \
     ./configure && \
     make && \
     make install && \
     popd && \
-    rm -rf mpfr-4.2.1 && \
-    rm mpfr-4.2.1.tar.gz
+    rm -rf mpfr-4.2.2 && \
+    rm mpfr-4.2.2.tar.gz
 
 # # Install MPIR - Arbirtatry precision integer math
 # RUN yum install -y yasm m4
