@@ -796,6 +796,14 @@ void Joint(
             return self->getRelativeTransform();
           })
       .def(
+          "getWorldAxisScrewForPosition",
+          &dart::dynamics::Joint::getWorldAxisScrewForPosition,
+          ::py::arg("dof"))
+      .def(
+          "getWorldAxisScrewForVelocity",
+          &dart::dynamics::Joint::getWorldAxisScrewForVelocity,
+          ::py::arg("dof"))
+      .def(
           "getRelativeSpatialVelocity",
           +[](const dart::dynamics::Joint* self) -> const Eigen::Vector6s& {
             return self->getRelativeSpatialVelocity();
