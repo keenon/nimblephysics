@@ -4392,7 +4392,8 @@ Eigen::Vector2s computeClosestPointOnSupportPolygon(
   }
 
   s_t best = std::numeric_limits<s_t>::infinity(), check;
-  Eigen::Vector2s test, result;
+  Eigen::Vector2s test = Eigen::Vector2s::Zero();
+  Eigen::Vector2s result = Eigen::Vector2s::Zero();
   for (std::size_t i = 0; i < _support.size(); ++i)
   {
     const Eigen::Vector2s& p1 = (i == 0) ? _support.back() : _support[i - 1];
