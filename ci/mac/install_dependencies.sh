@@ -101,7 +101,7 @@ pushd pybind11
 git checkout v2.11.1
 mkdir build
 pushd build
-cmake .. -DPYTHON_EXECUTABLE:FILEPATH=$(which python3) $CMAKE_FLAGS
+cmake .. -DPYTHON_EXECUTABLE:FILEPATH=$(which python3.11) $CMAKE_FLAGS
 sudo make install -j
 popd
 popd

@@ -2,12 +2,12 @@
 set -e
 
 export VERSION=$(cat ../../VERSION.txt)
-PYTHON=$(which python3)
+PYTHON=$(which python3.11)
 
 # Find our python paths
-export PYTHON_INCLUDE=$(python3-config --includes)
+export PYTHON_INCLUDE=$(python3.11-config --includes)
 echo "PYTHON_INCLUDE=${PYTHON_INCLUDE}"
-export PYTHON_LIB=$(python3-config --libs)
+export PYTHON_LIB=$(python3.11-config --libs)
 echo "PYTHON_LIB=${PYTHON_LIB}"
 
 pushd ../..
@@ -28,4 +28,4 @@ popd
 
 # Actually push the wheel to PyPI
 # python3 -m pip install --user --upgrade twine
-python3 -m twine upload --repository pypi wheelhouse/*
+python3.11 -m twine upload --repository pypi wheelhouse/*
