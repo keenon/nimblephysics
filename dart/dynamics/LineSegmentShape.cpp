@@ -337,7 +337,7 @@ Eigen::Matrix3s LineSegmentShape::computeInertia(s_t _mass) const
     else
     {
       v.normalize();
-      Eigen::Vector3s axis = Eigen::Vector3s::UnitZ().cross(v);
+      axis = Eigen::Vector3s::UnitZ().cross(v);
       if (axis.norm() == 0)
       {
         angle = 0;
