@@ -234,6 +234,8 @@ elseif(CMAKE_COMPILER_IS_GNUCXX)
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Werror -Wno-sign-compare -Wno-deprecated-copy -Wno-deprecated-declarations -Wno-reorder")
   endif()
 
+  add_compile_options(-Wno-error=overloaded-virtual)
+
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra -fPIC -Werror=return-type")
   execute_process(
     COMMAND ${CMAKE_CXX_COMPILER} -dumpfullversion -dumpversion OUTPUT_VARIABLE GCC_VERSION)
