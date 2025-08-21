@@ -14,6 +14,7 @@ RUN rm /usr/bin/python && \
 ENV CPATH="${PYTHON_INCLUDE}"
 RUN git clone https://github.com/pybind/pybind11.git && \
     pushd pybind11 && \
+    git checkout v2.10.4 && \
     mkdir build && \
     pushd build && \
     cmake .. && \
