@@ -172,9 +172,9 @@ if(NOT MSVC)
 endif()
 
 if(CMAKE_VERSION VERSION_LESS 3.8.2)
-  target_compile_options(dart PUBLIC -std=c++14)
+  target_compile_options(dart PUBLIC -std=c++17)
 else()
-  target_compile_features(dart PUBLIC cxx_std_14)
+  target_compile_features(dart PUBLIC cxx_std_17)
 endif()
 
 # Enable pthreads
