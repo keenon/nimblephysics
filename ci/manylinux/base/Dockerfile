@@ -237,6 +237,7 @@ RUN pushd grpc && \
     cmake -DgRPC_INSTALL=ON \
     -DgRPC_BUILD_TESTS=OFF \
     -DCMAKE_POSITION_INDEPENDENT_CODE=ON \
+    -D_GLIBCXX_USE_CXX11_ABI=1 \
     ../.. && \
     make -j3 && \
     make install && \
