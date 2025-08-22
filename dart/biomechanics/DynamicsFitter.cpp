@@ -12986,7 +12986,7 @@ DynamicsFitter::zeroLinearResidualsAndOptimizeAngular(
           Eigen::Matrix3s compareAng = Eigen::Matrix3s::Zero();
           compareAng.col(0) = originalInitialAngPos;
           compareAng.col(1) = initialAngPos;
-          compareAng.col(3) = originalInitialAngPos - initialAngPos;
+          compareAng.col(2) = originalInitialAngPos - initialAngPos;
 
           std::cout << "Original ang - new ang - diff" << std::endl
                     << compareAng << std::endl;
