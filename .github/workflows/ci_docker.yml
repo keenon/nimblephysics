@@ -26,7 +26,7 @@ jobs:
         run: mkdir build &&
           cd build &&
           cmake .. -DCMAKE_BUILD_TYPE=Release &&
-          make tests -j2
+          make tests
       - name: Run tests
         run: cd build &&
           ctest -T Test
