@@ -133,7 +133,7 @@ target_link_libraries(dart
   Boost::filesystem
   IPOPT::ipopt
 
-  # protobuf::libprotobuf
+  protobuf::libprotobuf
   # protobuf::libprotobuf-lite
   # protobuf::libprotoc
   gRPC::grpc++
@@ -145,6 +145,7 @@ target_link_libraries(dart
   absl::str_format
   absl::synchronization
   absl::time
+  absl::statusor
 )
 
 if(PerfUtils_FOUND)
