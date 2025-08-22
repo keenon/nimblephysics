@@ -21,6 +21,8 @@ class SubjectOnDiskHeader;
 
 struct FramePass
 {
+  EIGEN_MAKE_ALIGNED_OPERATOR_NEW
+
   ProcessingPassType type;
   s_t markerRMS;
   s_t markerMax;
@@ -85,6 +87,7 @@ struct FramePass
 
 struct Frame
 {
+  EIGEN_MAKE_ALIGNED_OPERATOR_NEW
   int trial;
   int t;
   MissingGRFReason missingGRFReason;
@@ -545,6 +548,8 @@ protected:
  */
 class SubjectOnDisk
 {
+  EIGEN_MAKE_ALIGNED_OPERATOR_NEW
+
 public:
   SubjectOnDisk(const std::string& path);
 
