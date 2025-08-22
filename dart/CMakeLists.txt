@@ -137,6 +137,14 @@ target_link_libraries(dart
   # protobuf::libprotobuf-lite
   # protobuf::libprotoc
   gRPC::grpc++
+  absl::log
+  absl::strings
+  absl::status
+  absl::base
+  absl::raw_hash_set
+  absl::str_format
+  absl::synchronization
+  absl::time
 )
 
 if(PerfUtils_FOUND)
