@@ -23,6 +23,13 @@ struct ForcePlate
   std::vector<Eigen::Vector3s> moments;
   std::vector<Eigen::Vector3s> forces;
 
+  // Default constructors and assignment operators:
+  ForcePlate() = default;
+  ForcePlate(const ForcePlate&) = default;
+  ForcePlate(ForcePlate&&) = default;
+  ForcePlate& operator=(const ForcePlate&) = default;
+  ForcePlate& operator=(ForcePlate&&) = default;
+
   void autodetectNoiseThresholdAndClip(
       s_t percentOfMaxToDetectThumb = 0.25,
       s_t percentOfMaxToCheckThumbRightEdge = 0.35);
