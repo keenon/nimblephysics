@@ -137,6 +137,7 @@ void StreamingIK::startSolverThread()
       }
       else
       {
+        expNegLogPdf = 0;
         anthropometricDiff = 0;
         expNegLogPdfGradient
             = Eigen::VectorXs::Zero(mSkeletonBallJoints->getGroupScaleDim());
