@@ -146,6 +146,8 @@ target_link_libraries(dart
   absl::synchronization
   absl::time
   absl::statusor
+
+  utf8_range::utf8_range
 )
 
 if(PerfUtils_FOUND)

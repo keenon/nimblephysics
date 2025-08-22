@@ -47,9 +47,11 @@ endif()
 
 find_package(gRPC CONFIG REQUIRED)
 find_package(absl REQUIRED)
+find_package(utf8_range REQUIRED)
 
 message(STATUS "gRPC_FOUND: ${gRPC_FOUND}")
 message(STATUS "absl_FOUND: ${absl_FOUND}")
+message(STATUS "utf8_range_FOUND: ${utf8_range_FOUND}")
 
 # get_target_property(gRPC_INCLUDE_DIRS gRPC::grpc++ INTERFACE_INCLUDE_DIRECTORIES)
 # get_target_property(gRPC_LIBRARIES gRPC::grpc++ INTERFACE_LINK_LIBRARIES)
