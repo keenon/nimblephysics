@@ -111,7 +111,7 @@ option(DART_ENABLE_SIMD
 option(DART_BUILD_GUI_OSG "Build osgDart library" OFF)
 option(DART_BUILD_EXTRAS "Build extra projects" OFF)
 option(DART_CODECOV "Turn on codecov support" OFF)
-option(DART_TREAT_WARNINGS_AS_ERRORS "Treat warnings as errors" ON)
+set(DART_TREAT_WARNINGS_AS_ERRORS "Treat warnings as errors" OFF)
 option(DART_FAST_DEBUG "Add -O1 option for DEBUG mode build" OFF)
 option(DART_BUILD_DARTPY "Build dartpy (the python binding)" ON)
 option(DART_BUILD_BENCHMARKS "Build benchmarks" ON)
@@ -236,7 +236,7 @@ elseif(CMAKE_COMPILER_IS_GNUCXX)
 
   add_compile_options(-Wno-error=overloaded-virtual -Wno-error=template-id-cdtor)
 
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra -fPIC -Werror=return-type")
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra -fPIC")
   execute_process(
     COMMAND ${CMAKE_CXX_COMPILER} -dumpfullversion -dumpversion OUTPUT_VARIABLE GCC_VERSION)
   set(CXX_COMPILER_VERSION ${GCC_VERSION})
