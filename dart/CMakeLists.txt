@@ -148,7 +148,9 @@ target_link_libraries(dart
   absl::statusor
   absl::log_internal_message
   absl::log_internal_check_op
+
   utf8_range::utf8_range
+  utf8_range::utf8_validity
 )
 
 if(PerfUtils_FOUND)
