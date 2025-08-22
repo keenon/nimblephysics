@@ -14,6 +14,8 @@ namespace biomechanics {
 
 struct ForcePlate
 {
+  EIGEN_MAKE_ALIGNED_OPERATOR_NEW
+
   Eigen::Vector3s worldOrigin;
   std::vector<s_t> timestamps;
   std::vector<Eigen::Vector3s> corners;

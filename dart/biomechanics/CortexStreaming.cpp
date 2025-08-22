@@ -1436,44 +1436,6 @@ CortexFrameOfData CortexStreaming::parseFrameOfData(char* data, int nBytes)
   }
 
   return result;
-
-  /*
-
-  // These items are optional
-
-  while (nTotalBytes > nBytes + 4)
-  {
-    int Tag;
-    memcpy(&Tag, ptr, 4);
-    ptr += 4;
-    nBytes += 4;
-
-    int nTheseBytes;
-    memcpy(&nTheseBytes, ptr, 4);
-    ptr += 4;
-    nBytes += 4;
-
-    switch (Tag)
-    {
-      case TAG_ENCODER_ANGLES:
-        Unpack_EncoderAngles(ptr, nTheseBytes, &Frame->AnalogData);
-        break;
-
-      case TAG_RECORDING_STATUS:
-        Unpack_RecordingStatus(ptr, nTheseBytes, &Frame->RecordingStatus);
-        break;
-
-      case TAG_ZOOM_FOCUS_ENCODER_DATA:
-        Unpack_ZoomFocusEncoderData(ptr, nTheseBytes, Frame);
-        break;
-    }
-
-    ptr += nTheseBytes;
-    nBytes += nTheseBytes;
-  }
-
-  return result;
-  */
 }
 
 //==============================================================================
