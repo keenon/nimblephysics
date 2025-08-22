@@ -212,8 +212,7 @@ RUN git clone https://github.com/PlatformLab/PerfUtils.git && \
     popd && \
     rm -rf PerfUtils
 
-# ENV PROTOBUF_VERSION="29.2"
-ENV PROTOBUF_VERSION="3.14.0"
+ENV PROTOBUF_VERSION="29.2"
 
 # RUN wget https://github.com/protocolbuffers/protobuf/releases/download/v${PROTOBUF_VERSION}/protobuf-all-${PROTOBUF_VERSION}.tar.gz && \
 #     tar -xvzf protobuf-all-${PROTOBUF_VERSION}.tar.gz && \
@@ -226,7 +225,7 @@ ENV PROTOBUF_VERSION="3.14.0"
 #     popd && \
 #     rm -rf protobuf-${PROTOBUF_VERSION}
 
-RUN git clone --recurse-submodules -b v1.33.2 https://github.com/grpc/grpc
+RUN git clone --recurse-submodules -b v1.69.0 https://github.com/grpc/grpc
 RUN pushd grpc && \
     # This fixes the boringssl build on the ancient CentOS we have to use by adding "rt" as an explicit dependency
     # sed -i '642s/.*/target_link_libraries(bssl ssl crypto rt)/' third_party/boringssl-with-bazel/CMakeLists.txt && \

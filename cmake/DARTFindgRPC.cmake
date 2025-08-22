@@ -46,6 +46,7 @@ if(APPLE)
 endif()
 
 find_package(gRPC CONFIG REQUIRED)
+find_package(absl REQUIRED)
 
 message(STATUS "gRPC_FOUND: ${gRPC_FOUND}")
 message(STATUS "absl_FOUND: ${absl_FOUND}")
