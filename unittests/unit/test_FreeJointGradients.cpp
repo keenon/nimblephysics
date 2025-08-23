@@ -14,7 +14,6 @@
 #include "dart/server/GUIWebsocketServer.hpp"
 #include "dart/utils/DartResourceRetriever.hpp"
 #include "dart/utils/sdf/sdf.hpp"
-#include "dart/utils/urdf/urdf.hpp"
 
 #include "TestHelpers.hpp"
 

@@ -53,7 +53,6 @@
 #include "dart/simulation/World.hpp"
 #include "dart/utils/DartResourceRetriever.hpp"
 #include "dart/utils/sdf/sdf.hpp"
-#include "dart/utils/urdf/urdf.hpp"
 #include "dart/trajectory/SingleShot.hpp"
 #include "dart/trajectory/MultiShot.hpp"
 #include "dart/trajectory/Solution.hpp"

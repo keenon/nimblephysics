@@ -36,7 +36,6 @@
 #include <memory>
 #include <thread>
 
-#include <dart/utils/urdf/urdf.hpp>
 #include <dart/utils/utils.hpp>
 #include <gtest/gtest.h>
 
@@ -67,7 +66,6 @@
 #include "dart/utils/DartResourceRetriever.hpp"
 #include "dart/utils/UniversalLoader.hpp"
 #include "dart/utils/sdf/sdf.hpp"
-#include "dart/utils/urdf/urdf.hpp"
 
 #include "GradientTestUtils.hpp"
 #include "TestHelpers.hpp"

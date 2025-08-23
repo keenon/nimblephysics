@@ -36,7 +36,6 @@
 #include <memory>
 #include <thread>
 
-#include <dart/utils/urdf/urdf.hpp>
 #include <dart/utils/utils.hpp>
 #include <gtest/gtest.h>
 
