@@ -1,5 +1,5 @@
 if(NOT DARTPY_PYTHON_VERSION)
- set(DARTPY_PYTHON_VERSION 3.8 CACHE STRING "Choose the target Python version (e.g., 3.8, 3.9)" FORCE)
+ set(DARTPY_PYTHON_VERSION 3.11 CACHE STRING "Choose the target Python version (e.g., 3.8, 3.9)" FORCE)
 endif()
 
 # find_package(PythonInterp ${DARTPY_PYTHON_VERSION} QUIET)
@@ -24,7 +24,12 @@ endif()
 #   return()
 # endif()
 
-find_program(PYTHON_EXECUTABLE python3)
+if(APPLE)
+  find_program(PYTHON_EXECUTABLE python3.11)
+else()
+  find_program(PYTHON_EXECUTABLE python3)
+endif()
+
 execute_process(COMMAND "${PYTHON_EXECUTABLE}" "-c" "from distutils.sysconfig import get_python_inc; print(get_python_inc())" OUTPUT_VARIABLE Python3_INCLUDE_DIRS)
 message(STATUS "Python3_INCLUDE_DIRS=${Python3_INCLUDE_DIRS}")
 execute_process(COMMAND "${PYTHON_EXECUTABLE}" "-c" "import distutils.sysconfig as sysconfig; print(sysconfig.get_config_var('LIBDIR'))" OUTPUT_VARIABLE Python3_LIBRARIES)
