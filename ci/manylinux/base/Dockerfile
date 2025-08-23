@@ -1,4 +1,4 @@
-FROM quay.io/pypa/manylinux_2_34_x86_64
+FROM quay.io/pypa/manylinux_2_28_x86_64
 MAINTAINER keenonwerling@gmail.com
 # TAG keenon/diffdart:base
 
@@ -67,12 +67,14 @@ RUN yum install -y lapack-devel
 # Install MUMPS
 RUN git clone https://github.com/coin-or-tools/ThirdParty-Mumps.git && \
     pushd ThirdParty-Mumps && \
+    git checkout releases/3.0.10 && \
     ./get.Mumps && \
     ./configure && \
-    make -j14 && \
+    make && \
     make install && \
     popd && \
-    rm -rf ThirdParty-Mumps
+    rm -rf ThirdParty-Mumps && \
+    ldconfig
 
 # Install FCL
 # Key note: this needs to happen before octomap
@@ -303,9 +305,9 @@ RUN rm -rf ezc3d
 # Install IPOPT
 RUN git clone https://github.com/coin-or/Ipopt.git && \
     pushd Ipopt && \
-    git checkout releases/3.13.4 && \
+    git checkout releases/3.14.19 && \
     ./configure --with-mumps && \
-    make -j14 && \
+    make && \
     make install && \
     popd && \
     rm -rf Ipopt && \
