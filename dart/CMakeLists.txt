@@ -211,6 +211,7 @@ endif()
 # TODO(JS): just for debugging
 # target_compile_definitions(dart PUBLIC -DDART_DEBUG_ANALYTICAL_DERIV)
 target_compile_definitions(dart PUBLIC -DDART_USE_IDENTITY_JACOBIAN)
+target_compile_definitions(dart PRIVATE ASIO_STANDALONE)
 
 # Default component
 add_component_targets(${PROJECT_NAME} dart dart)
