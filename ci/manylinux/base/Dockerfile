@@ -74,17 +74,6 @@ RUN git clone https://github.com/coin-or-tools/ThirdParty-Mumps.git && \
     popd && \
     rm -rf ThirdParty-Mumps
 
-# Install IPOPT
-RUN git clone https://github.com/coin-or/Ipopt.git && \
-    pushd Ipopt && \
-    git checkout releases/3.14.12 && \
-    ./configure --with-mumps && \
-    make -j14 && \
-    make install && \
-    popd && \
-    rm -rf Ipopt && \
-    ln -s /usr/local/include/coin-or /usr/local/include/coin
-
 # Install FCL
 # Key note: this needs to happen before octomap
 RUN git clone https://github.com/flexible-collision-library/fcl.git && \
@@ -310,6 +299,17 @@ RUN pushd ezc3d && \
     popd && \
     popd
 RUN rm -rf ezc3d
+
+# Install IPOPT
+RUN git clone https://github.com/coin-or/Ipopt.git && \
+    pushd Ipopt && \
+    git checkout releases/3.13.4 && \
+    ./configure --with-mumps && \
+    make -j14 && \
+    make install && \
+    popd && \
+    rm -rf Ipopt && \
+    ln -s /usr/local/include/coin-or /usr/local/include/coin
 
 # RUN ls /usr/local/lib64 | grep assimp
 # RUN ls /usr/local/lib | grep assimp
