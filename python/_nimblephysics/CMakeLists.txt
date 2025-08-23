@@ -1,5 +1,5 @@
 if(NOT DARTPY_PYTHON_VERSION)
- set(DARTPY_PYTHON_VERSION 3.11 CACHE STRING "Choose the target Python version (e.g., 3.8, 3.9)" FORCE)
+ set(DARTPY_PYTHON_VERSION 3.8 CACHE STRING "Choose the target Python version (e.g., 3.8, 3.9)" FORCE)
 endif()
 
 # find_package(PythonInterp ${DARTPY_PYTHON_VERSION} QUIET)
@@ -26,6 +26,7 @@ endif()
 
 if(APPLE)
   find_program(PYTHON_EXECUTABLE python3.11)
+  set(DARTPY_PYTHON_VERSION 3.11 CACHE STRING "Choose the target Python version (e.g., 3.8, 3.9)" FORCE)
 else()
   find_program(PYTHON_EXECUTABLE python3)
 endif()
