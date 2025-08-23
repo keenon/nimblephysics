@@ -35,6 +35,7 @@
 #include "dart/utils/MJCFExporter.hpp"
 #include "dart/utils/UniversalLoader.hpp"
 #include "dart/utils/sdf/sdf.hpp"
+#include "dart/utils/CompositeResourceRetriever.hpp"
 
 #include "GradientTestUtils.hpp"
 #include "TestHelpers.hpp"
