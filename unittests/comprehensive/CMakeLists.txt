@@ -92,6 +92,8 @@ if(TARGET dart-utils)
     target_link_libraries(test_KR5Trajectory dart-utils-urdf)
     target_link_libraries(test_Cartpole dart-utils)
     target_link_libraries(test_Cartpole dart-utils-urdf)
+    target_link_libraries(test_CatapultTrajectory dart-utils)
+    target_link_libraries(test_CatapultTrajectory dart-utils-urdf)
 
     dart_add_test("comprehensive" test_Gradients)
     target_link_libraries(test_Gradients dart-utils-urdf)
