@@ -77,6 +77,7 @@ RUN git clone https://github.com/coin-or-tools/ThirdParty-Mumps.git && \
 # Install IPOPT
 RUN git clone https://github.com/coin-or/Ipopt.git && \
     pushd Ipopt && \
+    git checkout releases/3.14.12 && \
     ./configure --with-mumps && \
     make -j14 && \
     make install && \
