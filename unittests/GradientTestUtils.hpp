@@ -33,6 +33,8 @@
  */
 
 #include <iostream>
+#include <random>
+#include <algorithm>
 
 #include <gtest/gtest.h>
 
@@ -3526,7 +3528,9 @@ bool verifyBackpropWorldSpacePositionToSpatial(
   // Delete the 2nd body node, arbitrarily, to force some shuffling
   bodyNodes.erase(bodyNodes.begin()++);
   // Shuffle the remaining elements
-  std::random_shuffle(bodyNodes.begin(), bodyNodes.end());
+  std::random_device rd; // Obtain a random number from hardware
+  std::mt19937 g(rd());   // Seed the generator
+  std::shuffle(bodyNodes.begin(), bodyNodes.end(), g);
 
   Eigen::VectorXs originalWorldPos = convertJointSpaceToWorldSpace(
       world, position, bodyNodes, ConvertToSpace::POS_SPATIAL, false);
@@ -3582,7 +3586,9 @@ bool verifyBackpropWorldSpaceVelocityToSpatial(
   // Delete the 2nd body node, arbitrarily, to force some shuffling
   bodyNodes.erase(bodyNodes.begin()++);
   // Shuffle the remaining elements
-  std::random_shuffle(bodyNodes.begin(), bodyNodes.end());
+  std::random_device rd; // Obtain a random number from hardware
+  std::mt19937 g(rd());   // Seed the generator
+  std::shuffle(bodyNodes.begin(), bodyNodes.end(), g);
 
   Eigen::VectorXs originalWorldVel = convertJointSpaceToWorldSpace(
       world, velocity, bodyNodes, ConvertToSpace::VEL_SPATIAL, false);
@@ -3971,7 +3977,9 @@ bool verifyLinearIKMapping(WorldPtr world)
   srand(42);
 
   // Shuffle the elements
-  std::random_shuffle(bodyNodes.begin(), bodyNodes.end());
+  std::random_device rd; // Obtain a random number from hardware
+  std::mt19937 g(rd());   // Seed the generator
+  std::shuffle(bodyNodes.begin(), bodyNodes.end(), g);
 
   std::shared_ptr<IKMapping> mapping = std::make_shared<IKMapping>(world);
   for (dynamics::BodyNode* node : bodyNodes)
@@ -4023,7 +4031,9 @@ bool verifyAngularIKMapping(WorldPtr world)
   srand(42);
 
   // Shuffle the elements
-  std::random_shuffle(bodyNodes.begin(), bodyNodes.end());
+  std::random_device rd; // Obtain a random number from hardware
+  std::mt19937 g(rd());   // Seed the generator
+  std::shuffle(bodyNodes.begin(), bodyNodes.end(), g);
 
   std::shared_ptr<IKMapping> mapping = std::make_shared<IKMapping>(world);
   for (dynamics::BodyNode* node : bodyNodes)
@@ -4049,7 +4059,9 @@ bool verifyRandomIKMapping(WorldPtr world)
   srand(42);
 
   // Shuffle the elements
-  std::random_shuffle(bodyNodes.begin(), bodyNodes.end());
+  std::random_device rd; // Obtain a random number from hardware
+  std::mt19937 g(rd());   // Seed the generator
+  std::shuffle(bodyNodes.begin(), bodyNodes.end(), g);
 
   std::shared_ptr<IKMapping> mapping = std::make_shared<IKMapping>(world);
   for (dynamics::BodyNode* node : bodyNodes)
@@ -4885,7 +4897,9 @@ bool verifyClosestIKPosition(WorldPtr world, Eigen::VectorXs position)
     std::vector<dynamics::BodyNode*> bodyNodes
         = world->getSkeleton(i)->getBodyNodes();
     // Shuffle the elements
-    std::random_shuffle(bodyNodes.begin(), bodyNodes.end());
+    std::random_device rd; // Obtain a random number from hardware
+    std::mt19937 g(rd());   // Seed the generator
+    std::shuffle(bodyNodes.begin(), bodyNodes.end(), g);
 
     IKMapping mapping(world);
     for (dynamics::BodyNode* node : bodyNodes)
@@ -4946,7 +4960,9 @@ bool verifyClosestIKVelocity(WorldPtr world, Eigen::VectorXs velocity)
     std::vector<dynamics::BodyNode*> bodyNodes
         = world->getSkeleton(i)->getBodyNodes();
     // Shuffle the elements
-    std::random_shuffle(bodyNodes.begin(), bodyNodes.end());
+    std::random_device rd; // Obtain a random number from hardware
+    std::mt19937 g(rd());   // Seed the generator
+    std::shuffle(bodyNodes.begin(), bodyNodes.end(), g);
 
     IKMapping mapping(world);
     for (dynamics::BodyNode* node : bodyNodes)
@@ -4997,7 +5013,9 @@ bool verifyLinearJacobian(
     std::vector<dynamics::BodyNode*> bodyNodes
         = world->getSkeleton(i)->getBodyNodes();
     // Shuffle the elements
-    std::random_shuffle(bodyNodes.begin(), bodyNodes.end());
+    std::random_device rd; // Obtain a random number from hardware
+    std::mt19937 g(rd());   // Seed the generator
+    std::shuffle(bodyNodes.begin(), bodyNodes.end(), g);
 
     IKMapping mapping(world);
     for (dynamics::BodyNode* node : bodyNodes)
@@ -5058,7 +5076,9 @@ bool verifySpatialJacobian(
     std::vector<dynamics::BodyNode*> bodyNodes
         = world->getSkeleton(i)->getBodyNodes();
     // Shuffle the elements
-    std::random_shuffle(bodyNodes.begin(), bodyNodes.end());
+    std::random_device rd; // Obtain a random number from hardware
+    std::mt19937 g(rd());   // Seed the generator
+    std::shuffle(bodyNodes.begin(), bodyNodes.end(), g);
 
     IKMapping mapping(world);
     for (dynamics::BodyNode* node : bodyNodes)
