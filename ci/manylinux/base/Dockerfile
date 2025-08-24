@@ -319,3 +319,11 @@ RUN git clone https://github.com/coin-or/Ipopt.git && \
 # RUN rm -rf /usr/local/lib64/libassimp.5.so
 # RUN rm -rf /usr/local/lib64/libassimp.5.0.1.so
 RUN protoc --version
+
+ENV LD_LIBRARY_PATH="/usr/local/lib64:${LD_LIBRARY_PATH}"
+
+# Add the custom library path to the dynamic linker's config
+RUN echo "/usr/local/lib64" > /etc/ld.so.conf.d/local.conf
+
+# Update the linker cache
+RUN ldconfig
