@@ -154,8 +154,8 @@ setup(
     packages=['nimblephysics'],
     package_data={'nimblephysics': ['web_gui/*', 'web_gui/*/*',
                                     'web_gui/*/*/*', 'models/*', 'models/*/*', 'models/*/*/*']},
-    ext_package='nimblephysics_libs',
-    ext_modules=[CMakeExtension('_nimblephysics', target='_nimblephysics')],
+    # ext_package='nimblephysics_libs',
+    ext_modules=[CMakeExtension('nimblephysics._nimblephysics', target='_nimblephysics')],
     install_requires=[
         'torch',
         'numpy'
