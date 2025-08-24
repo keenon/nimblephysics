@@ -125,6 +125,7 @@ lipo -info "${HOMEBREW_PREFIX}/lib/libtinyxml.2.6.2.dylib"
 echo "Installing urdfdom_headers..."
 git clone https://github.com/ros/urdfdom_headers.git
 pushd urdfdom_headers
+# git checkout 1.0.5
 mkdir build
 pushd build
 cmake .. -DCMAKE_INSTALL_PREFIX="${HOMEBREW_PREFIX}" ${CMAKE_FLAGS}
@@ -137,6 +138,7 @@ sudo rm -rf urdfdom_headers
 echo "Installing console_bridge..."
 git clone https://github.com/ros/console_bridge.git
 pushd console_bridge
+git checkout 1.0.1
 mkdir build
 pushd build
 cmake .. -DCMAKE_INSTALL_PREFIX="${HOMEBREW_PREFIX}" ${CMAKE_FLAGS}
@@ -149,7 +151,7 @@ sudo rm -rf console_bridge
 echo "Installing urdfdom..."
 git clone https://github.com/ros/urdfdom.git
 pushd urdfdom
-git checkout 3.0.0
+# git checkout 3.0.0
 mkdir build
 pushd build
 cmake .. -DCMAKE_INSTALL_PREFIX="${HOMEBREW_PREFIX}" ${CMAKE_FLAGS}
