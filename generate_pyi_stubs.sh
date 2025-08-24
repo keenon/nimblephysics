@@ -1,13 +1,19 @@
 #!/bin/bash
 # Remove set -e and handle errors manually
 # set -e
-export LC_CTYPE=C 
+export LC_CTYPE=C
 export LANG=C
 
+# Check for the directory argument
 if [ -z "$1" ]; then
-  echo "Usage: $0 <directory>"
+  # Updated usage message to show the optional python executable
+  echo "Usage: $0 <directory> [<python_executable>]"
   exit 1
 fi
+
+# Use the second argument as the Python command, or default to "python3"
+PYTHON_EXEC=${2:-python3}
+echo "Using Python executable: $PYTHON_EXEC"
 
 PP=$1:`pwd`/build/python/_nimblephysics/
 echo $PP
@@ -18,12 +24,11 @@ if [ ! -f "$1/_nimblephysics.so" ]; then
   exit 1
 fi
 
-# Continue if the file exists
-# file $1/_nimblephysics.so
-# lipo -info $1/_nimblephysics.so
-# otool -L $1/_nimblephysics.so
-PYTHONPATH=$PP python3 -c "import _nimblephysics" || { echo "Python import failed. Exiting."; exit 1; }
-PYTHONPATH=$PP pybind11-stubgen --no-setup-py -o stubs _nimblephysics || { echo "pybind11-stubgen failed. Exiting."; exit 1; }
+# Use the PYTHON_EXEC variable instead of the hardcoded "python3"
+PYTHONPATH=$PP $PYTHON_EXEC -c "import _nimblephysics" || { echo "Python import failed. Exiting."; exit 1; }
+# It's also more robust to run pybind11-stubgen as a module
+PYTHONPATH=$PP $PYTHON_EXEC -m pybind11.stubgen --no-setup-py -o stubs _nimblephysics || { echo "pybind11-stubgen failed. Exiting."; exit 1; }
+
 touch stubs/_nimblephysics-stubs/py.typed
 mv stubs/_nimblephysics-stubs/__init__.pyi stubs/_nimblephysics-stubs/_nimblephysics.pyi
 

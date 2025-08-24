@@ -109,8 +109,12 @@ class CMakeBuild(build_ext):
         # Regenerate the stubs
         dir_path = os.path.dirname(os.path.realpath(__file__))
         gen_stubs_script = os.path.join(dir_path, 'generate_pyi_stubs.sh')
-        subprocess.check_call([gen_stubs_script, extdir],
-                              cwd=dir_path, env=env)
+
+        # Get the current python executable and pass it to the script
+        python_executable = sys.executable
+        subprocess.check_call([gen_stubs_script, extdir, python_executable],
+                                cwd=dir_path, env=env)
+        
         stubs_home = os.path.join(dir_path, 'stubs', '_nimblephysics-stubs')
 
         stub_files = os.listdir(stubs_home)

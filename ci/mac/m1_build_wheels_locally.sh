@@ -9,6 +9,7 @@ export PYTHON_INCLUDE=$(python3.11-config --includes)
 echo "PYTHON_INCLUDE=${PYTHON_INCLUDE}"
 export PYTHON_LIB=$(python3.11-config --libs)
 echo "PYTHON_LIB=${PYTHON_LIB}"
+export PYTHON_VERSION_NUMBER=$(python3.11 -c 'import sys; print(".".join(map(str, sys.version_info[:2])))')
 
 pushd ../..
 
