@@ -130,9 +130,16 @@ class CMakeBuild(build_ext):
         Path(extdir+"/__init__.py").touch()
 
 
-with open('VERSION.txt', 'r') as file:
-    VERSION = file.read().replace('\n', '')
-print("VERSION: "+VERSION)
+try:
+    with open('VERSION.txt', 'r') as file:
+        VERSION = file.read().strip()  # .strip() is safer than .replace()
+except FileNotFoundError:
+    raise RuntimeError("VERSION.txt not found. This file is required to build the package.")
+
+if not VERSION:
+    raise RuntimeError("VERSION.txt is empty. It must contain the package version.")
+
+print("VERSION: " + VERSION)
 
 setup(
     name='nimblephysics',
