@@ -71,7 +71,7 @@ jobs:
           echo "PYTHON_VERSION_CODE=${{ matrix.PYTHON_VERSION_CODE }}"
 
       - name: Install build dependencies
-        run: ${{ matrix.PYTHON }} -m pip install pytest wheel auditwheel==5.1.2 pybind11-stubgen==0.16.2 numpy torch
+        run: ${{ matrix.PYTHON }} -m pip install setuptools pytest wheel auditwheel==5.1.2 pybind11-stubgen==0.16.2 numpy torch
 
       - name: Install Pybind11 for this Python version
         run: |
