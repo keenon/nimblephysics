@@ -27,17 +27,11 @@ jobs:
     steps:
       - name: Check out the repo
         uses: actions/checkout@v2
-      - name: Install gettext
-        run: |
-          brew install gettext
-          export PATH="/usr/local/opt/gettext/bin:$PATH"
-          export LDFLAGS="-L/usr/local/opt/gettext/lib"
-          export CPPFLAGS="-I/usr/local/opt/gettext/include"
       - name: Select Python
         uses: actions/setup-python@v2
         with:
           python-version: ${{ matrix.python-version }}
-          architecture: "x64" # optional x64 or x86. Defaults to x64 if not specified
+          architecture: "arm64" # optional x64 or x86. Defaults to x64 if not specified
       - name: Set variables
         run: |
           VER=$(cat ./VERSION.txt)
