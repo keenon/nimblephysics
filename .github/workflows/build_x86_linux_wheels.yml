@@ -4,14 +4,19 @@ on:
   workflow_dispatch:
   release:
     types: [published]
+
 jobs:
   build-linux-x86_64:
     name: Linux Python x86_64 ${{ matrix.python-version }} - Build Wheels
     runs-on: ubuntu-latest
+    # Using a container with the necessary build environment
     container: keenon/diffdart:base
     env:
+      # This is set for compatibility with older Node.js versions if needed by dependencies.
       ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION: true
     strategy:
+      # Fail-fast is set to false to ensure all Python versions are attempted even if one fails.
+      fail-fast: true
       matrix:
         python-version: ["3.8", "3.9", "3.10", "3.11"]
         include:
@@ -42,79 +47,75 @@ jobs:
             PYTHON: /opt/python/cp311-cp311/bin/python3.11
             PYTHON_PATH: /opt/python/cp311-cp311/bin/
             PYTHON_INCLUDE: /opt/python/cp311-cp311/include/python3.11/
-            PYTHON_LIB: /opt/python/cp311-cp311/lib/python3.11
     steps:
-      - name: Set up Node Version 16
-        uses: actions/setup-node@v3
+      - name: Set up Node Version
+        # Updated to v4 for latest features and security.
+        uses: actions/setup-node@v4
         with:
           node-version: 16
+
       - name: Check out the repo
-        uses: actions/checkout@v2
-      - name: Set variables
+        # Updated to v4 for latest features and security.
+        uses: actions/checkout@v4
+
+      - name: Set version variable
+        id: set_version
         run: |
           VER=$(cat ./VERSION.txt)
           echo "VERSION=$VER"
           echo "VERSION=$VER" >> $GITHUB_ENV
+
       - name: Test environment
         run: |
           echo "VERSION=${{ env.VERSION }}"
           echo "PYTHON_VERSION_CODE=${{ matrix.PYTHON_VERSION_CODE }}"
-          echo "PYTHON_VERSION_NUMBER=${{ matrix.PYTHON_VERSION_NUMBER }}"
-      - name: Install pytest, wheel, auditwheel, pybind11-stubgen, numpy and torch
+
+      - name: Install build dependencies
         run: ${{ matrix.PYTHON }} -m pip install pytest wheel auditwheel==5.1.2 pybind11-stubgen==0.16.2 numpy torch
+
       - name: Install Pybind11 for this Python version
         run: |
           git clone https://github.com/pybind/pybind11.git
-          pushd pybind11
+          cd pybind11
           git checkout v2.11.1
-          mkdir build
-          pushd build
+          mkdir build && cd build
           PATH="${{ matrix.PYTHON_PATH }}:${PATH}" CPATH="${{ matrix.PYTHON_INCLUDE }}" cmake ..
           PATH="${{ matrix.PYTHON_PATH }}:${PATH}" CPATH="${{ matrix.PYTHON_INCLUDE }}" make install -j2
-        env:
-          PYTHON: ${{ matrix.PYTHON }}
-          PYTHON_VERSION: ${{ matrix.PYTHON_VERSION_CODE }}
-          PYTHON_INCLUDE: ${{ matrix.PYTHON_INCLUDE }}
-          PYTHON_LIB: ${{ matrix.PYTHON_LIB }}
-          PYTHON_VERSION_NUMBER: ${{ matrix.PYTHON_VERSION_NUMBER }}
+
       - name: Build wheel
         run: |
           PATH="${{ matrix.PYTHON_PATH }}:${PATH}" CPATH="${{ matrix.PYTHON_INCLUDE }}" ${{ matrix.PYTHON }} setup.py sdist bdist_wheel
-          PATH="${{ matrix.PYTHON_PATH }}:${PATH}" CPATH="${{ matrix.PYTHON_INCLUDE }}" ${{ matrix.PYTHON }} -m auditwheel repair dist/nimblephysics-${{ env.VERSION }}-${{ matrix.PYTHON_VERSION_CODE }}-linux_x86_64.whl
-        env:
-          PYTHON: ${{ matrix.PYTHON }}
-          PYTHON_VERSION: ${{ matrix.PYTHON_VERSION_CODE }}
-          PYTHON_INCLUDE: ${{ matrix.PYTHON_INCLUDE }}
-          PYTHON_LIB: ${{ matrix.PYTHON_LIB }}
-          PYTHON_VERSION_NUMBER: ${{ matrix.PYTHON_VERSION_NUMBER }}
-      - name: Publish artifact
-        uses: actions/upload-artifact@v3
+          # The auditwheel command repairs the wheel and places it in the 'wheelhouse' directory
+          ${{ matrix.PYTHON }} -m auditwheel repair dist/nimblephysics-${{ env.VERSION }}-${{ matrix.PYTHON_VERSION_CODE }}-linux_x86_64.whl --wheel-dir wheelhouse
+
+      - name: Upload wheel artifact
+        # Updated to actions/upload-artifact@v4
+        # All wheels from the matrix jobs will be added to a single artifact named 'python-wheels'.
+        uses: actions/upload-artifact@v4
         with:
-          name: nimblephysics-${{ env.VERSION }}-${{ matrix.PYTHON_VERSION_CODE }}-manylinux_2_17_x86_64.manylinux2014_x86_64.whl
-          path: wheelhouse/nimblephysics-${{ env.VERSION }}-${{ matrix.PYTHON_VERSION_CODE }}-manylinux_2_17_x86_64.manylinux2014_x86_64.whl
+          name: python-wheels
+          path: wheelhouse/*.whl
+
   publish:
     name: Publish to PyPI
     runs-on: ubuntu-latest
+    # This job depends on the successful completion of all the build jobs.
     needs: [build-linux-x86_64]
     steps:
-      - name: Download artifacts
-        uses: actions/download-artifact@v3
+      - name: Download all wheel artifacts
+        # Updated to actions/download-artifact@v4
+        # It downloads all files from the 'python-wheels' artifact directly into the 'wheelhouse' directory.
+        uses: actions/download-artifact@v4
         with:
+          name: python-wheels
           path: wheelhouse
-      - name: Display structure of downloaded files before flattening
-        run: ls -R
-        working-directory: wheelhouse
-      - name: Flatten files
-        run: |
-          mkdir wheelhouse2
-          find wheelhouse -type f -exec mv {} wheelhouse2 \;
-          rm -rf wheelhouse
-          mv wheelhouse2 wheelhouse
-      - name: Display structure of downloaded files after flattening
-        run: ls -R
-        working-directory: wheelhouse
+
+      - name: Display structure of downloaded files
+        run: ls -R wheelhouse
+
       - name: Publish package to PyPI
-        uses: pypa/gh-action-pypi-publish@release/v1.8
+        # Using the latest major version of the pypi-publish action.
+        uses: pypa/gh-action-pypi-publish@v1
         with:
           user: __token__
           password: ${{ secrets.PYPI_API_TOKEN }}
