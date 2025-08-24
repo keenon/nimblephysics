@@ -119,7 +119,7 @@ jobs:
 
       - name: Publish package to PyPI
         # Using the latest major version of the pypi-publish action.
-        uses: pypa/gh-action-pypi-publish@v1
+        uses: pypa/gh-action-pypi-publish@release/v1.8
         with:
           user: __token__
           password: ${{ secrets.PYPI_API_TOKEN }}
