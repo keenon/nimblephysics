@@ -21,6 +21,7 @@ class SubjectOnDiskHeader;
 
 struct FramePass
 {
+  public:
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 
   ProcessingPassType type;
@@ -87,6 +88,7 @@ struct FramePass
 
 struct Frame
 {
+  public:
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW
   int trial;
   int t;
@@ -548,9 +550,9 @@ protected:
  */
 class SubjectOnDisk
 {
+public:
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 
-public:
   SubjectOnDisk(const std::string& path);
 
   SubjectOnDisk(std::shared_ptr<SubjectOnDiskHeader> header);
