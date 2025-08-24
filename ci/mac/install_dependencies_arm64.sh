@@ -30,7 +30,7 @@ brew install boost eigen lapack pkgconfig
 brew install openssl@1.1
 OPENSSL_PREFIX=$(brew --prefix openssl@1.1)
 mkdir -p "${HOMEBREW_PREFIX}/lib/pkgconfig"
-cp "${OPENSSL_PREFIX}/lib/pkgconfig/"*.pc "${HOMEBREW_PREFIX}/lib/pkgconfig/"
+sudo cp "${OPENSSL_PREFIX}/lib/pkgconfig/"*.pc "${HOMEBREW_PREFIX}/lib/pkgconfig/"
 
 # --- Build from Source ---
 
