@@ -151,7 +151,7 @@ sudo rm -rf console_bridge
 echo "Installing urdfdom..."
 git clone https://github.com/ros/urdfdom.git
 pushd urdfdom
-git checkout 3.0.0
+# git checkout 3.0.0
 mkdir build
 pushd build
 cmake .. -DCMAKE_INSTALL_PREFIX="${HOMEBREW_PREFIX}" ${CMAKE_FLAGS}
@@ -159,8 +159,8 @@ sudo make install -j
 popd
 popd
 sudo rm -rf urdfdom
-file "${HOMEBREW_PREFIX}/lib/liburdfdom_sensor.3.0.dylib"
-lipo -info "${HOMEBREW_PREFIX}/lib/liburdfdom_sensor.3.0.dylib"
+file "${HOMEBREW_PREFIX}/lib/liburdfdom_sensor.5.0.dylib"
+lipo -info "${HOMEBREW_PREFIX}/lib/liburdfdom_sensor.5.0.dylib"
 
 # Install grpc
 echo "Installing grpc..."
