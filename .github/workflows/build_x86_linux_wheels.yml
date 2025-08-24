@@ -109,7 +109,7 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           # Use a wildcard to download all artifacts that match the pattern
-          name: python-wheels-*
+          pattern: python-wheels-*
           path: wheelhouse
           # This ensures all downloaded artifacts are placed into the same directory
           merge-multiple: true
