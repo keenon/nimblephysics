@@ -93,7 +93,8 @@ jobs:
         # All wheels from the matrix jobs will be added to a single artifact named 'python-wheels'.
         uses: actions/upload-artifact@v4
         with:
-          name: python-wheels
+          # Use the Python version to create a unique artifact name for each job
+          name: python-wheels-${{ matrix.python-version }}
           path: wheelhouse/*.whl
 
   publish:
@@ -107,8 +108,11 @@ jobs:
         # It downloads all files from the 'python-wheels' artifact directly into the 'wheelhouse' directory.
         uses: actions/download-artifact@v4
         with:
-          name: python-wheels
+          # Use a wildcard to download all artifacts that match the pattern
+          name: python-wheels-*
           path: wheelhouse
+          # This ensures all downloaded artifacts are placed into the same directory
+          merge-multiple: true
 
       - name: Display structure of downloaded files
         run: ls -R wheelhouse
