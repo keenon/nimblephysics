@@ -1,6 +1,10 @@
 #!/bin/bash
 set -e
 
+# Define the Homebrew prefix for architecture-independent paths
+HOMEBREW_PREFIX=$(brew --prefix)
+echo "Using Homebrew prefix: ${HOMEBREW_PREFIX}"
+
 # Use sudo for sudo commands, but only if we're not already root
 sudo ()
 {
@@ -19,235 +23,159 @@ export CMAKE_FLAGS="-DCMAKE_OSX_ARCHITECTURES=arm64"
 export PYTHON3=$(which python3)
 echo "Python3=${PYTHON3}"
 
-# Install perfutils - Keenon's fork, compatible with Mac OSX
-# This doesn't work with ARM on mac, since it inlines x86 instructions
-# git clone https://github.com/keenon/PerfUtils.git
-# pushd PerfUtils
-# mkdir build
-# pushd build
-# cmake ..
-# make install
-# popd
-# popd
-# rm -rf PerfUtils
+# --- Homebrew Packages ---
+brew install boost eigen lapack pkgconfig
 
-brew install boost # @1.73
-brew install eigen
-
+# --- OpenSSL Configuration ---
 brew install openssl@1.1
-# Get the correct Homebrew prefix for openssl@1.1
 OPENSSL_PREFIX=$(brew --prefix openssl@1.1)
-# Create the target directory if it doesn't exist
-mkdir -p /usr/local/lib/pkgconfig
-# Copy the files from the correct location
-cp "$OPENSSL_PREFIX"/lib/pkgconfig/*.pc /usr/local/lib/pkgconfig/
+mkdir -p "${HOMEBREW_PREFIX}/lib/pkgconfig"
+cp "${OPENSSL_PREFIX}/lib/pkgconfig/"*.pc "${HOMEBREW_PREFIX}/lib/pkgconfig/"
+
+# --- Build from Source ---
 
 # Install CCD
+echo "Installing libccd..."
 git clone https://github.com/danfis/libccd.git
 pushd libccd
 git checkout v2.1
 mkdir build
 pushd build
-cmake .. -DENABLE_DOUBLE_PRECISION=ON -DCMAKE_OSX_DEPLOYMENT_TARGET="10.15"
+cmake .. -DCMAKE_INSTALL_PREFIX="${HOMEBREW_PREFIX}" -DENABLE_DOUBLE_PRECISION=ON -DCMAKE_OSX_DEPLOYMENT_TARGET="10.15"
 sudo make install -j
 popd
 popd
 rm -rf libccd
 
 # Install ASSIMP
+echo "Installing assimp..."
 git clone https://github.com/assimp/assimp.git
 pushd assimp
 git checkout v5.0.1
 mkdir build
 pushd build
-cmake ..
+cmake .. -DCMAKE_INSTALL_PREFIX="${HOMEBREW_PREFIX}"
 sudo make install -j
 popd
 popd
 rm -rf assimp
 
-# Install LAPACK
-brew install lapack
-
 # Install MUMPS
+echo "Installing MUMPS..."
 git clone https://github.com/coin-or-tools/ThirdParty-Mumps.git
 pushd ThirdParty-Mumps
 ./get.Mumps
-./configure # CFLAGS="-arch x86_64 -arch arm64" FCFLAGS="-arch x86_64 -arch arm64" LDFLAGS="-arch x86_64 -arch arm64" 
-# make # Don't build mumps in parallel, that seems to have a race-condition on the Azure CI Mac's?
+./configure --prefix="${HOMEBREW_PREFIX}"
 sudo make install
 popd
 sudo rm -rf ThirdParty-Mumps
 
-# NOTE: on local arm64 M1 mac, I've had to do the following when I get linker errors during "delocate"
-# ln -s /opt/homebrew/Cellar/gcc/11.2.0_3/lib/gcc/11/libgcc_s.1.1.dylib /opt/homebrew/Cellar/gcc/11.2.0_3/lib/gcc/11/libgcc_s.1.dylib 
-
 # Install IPOPT
+echo "Installing Ipopt..."
 git clone https://github.com/coin-or/Ipopt.git
 pushd Ipopt
-./configure --with-mumps --disable-java # CFLAGS="-arch x86_64 -arch arm64" FCFLAGS="-arch x86_64 -arch arm64" LDFLAGS="-arch x86_64 -arch arm64"
+./configure --prefix="${HOMEBREW_PREFIX}" --with-mumps --disable-java
 sudo make install -j
 popd
 sudo rm -rf Ipopt
-sudo ln -s /usr/local/include/coin-or /usr/local/include/coin
+# Create coin symlink in the correct prefix
+sudo ln -sf "${HOMEBREW_PREFIX}/include/coin-or" "${HOMEBREW_PREFIX}/include/coin"
 
 # Install pybind11
+echo "Installing pybind11..."
 git clone https://github.com/pybind/pybind11.git
 pushd pybind11
 git checkout v2.11.1
 mkdir build
 pushd build
-cmake .. -DPYTHON_EXECUTABLE:FILEPATH=$(which python3.11) $CMAKE_FLAGS
+cmake .. -DCMAKE_INSTALL_PREFIX="${HOMEBREW_PREFIX}" -DPYTHON_EXECUTABLE:FILEPATH=$(which python3.11) ${CMAKE_FLAGS}
 sudo make install -j
 popd
 popd
 sudo rm -rf pybind11
 
-# Install FCL
-# Key note: this needs to happen before octomap
-# git clone https://github.com/flexible-collision-library/fcl.git
-# pushd fcl
-# git checkout 0.3.4
-# mkdir build
-# pushd build
-# cmake .. -DFCL_WITH_OCTOMAP=OFF -DBUILD_TESTING=OFF
-# make install -j
-# popd
-# popd
-# rm -rf fcl
-
-# Install octomap
-# git clone https://github.com/OctoMap/octomap.git
-# pushd octomap
-# git checkout v1.8.1
-# mkdir build
-# pushd build
-# cmake ..
-# make install -j
-# popd
-# popd
-# rm -rf octomap
-
 # Install tinyxml2
+echo "Installing tinyxml2..."
 git clone https://github.com/leethomason/tinyxml2.git
 pushd tinyxml2
 git checkout 8.0.0
 mkdir build
 pushd build
-cmake .. $CMAKE_FLAGS
+cmake .. -DCMAKE_INSTALL_PREFIX="${HOMEBREW_PREFIX}" ${CMAKE_FLAGS}
 sudo make install -j
 popd
 popd
 sudo rm -rf tinyxml2
 
-# Install freeglut
-# brew cask install xquartz
-# brew install freeglut
-
-# Install Open Scene Graph
-# brew install open-scene-graph
-
-# Install pytest
-pip3 install pytest
-
-
 # Install tinyxml1
+echo "Installing tinyxml..."
 git clone https://github.com/robotology-dependencies/tinyxml.git
 pushd tinyxml
 mkdir build
 pushd build
-cmake .. $CMAKE_FLAGS
+cmake .. -DCMAKE_INSTALL_PREFIX="${HOMEBREW_PREFIX}" ${CMAKE_FLAGS}
 sudo make install -j
 popd
 popd
 sudo rm -rf tinyxml
-file /usr/local/lib/libtinyxml.2.6.2.dylib
-lipo -info /usr/local/lib/libtinyxml.2.6.2.dylib
+file "${HOMEBREW_PREFIX}/lib/libtinyxml.2.6.2.dylib"
+lipo -info "${HOMEBREW_PREFIX}/lib/libtinyxml.2.6.2.dylib"
 
 # Install urdfdom_headers
+echo "Installing urdfdom_headers..."
 git clone https://github.com/ros/urdfdom_headers.git
 pushd urdfdom_headers
 mkdir build
 pushd build
-cmake .. $CMAKE_FLAGS
+cmake .. -DCMAKE_INSTALL_PREFIX="${HOMEBREW_PREFIX}" ${CMAKE_FLAGS}
 sudo make install -j
 popd
 popd
 sudo rm -rf urdfdom_headers
 
 # Install console_bridge
+echo "Installing console_bridge..."
 git clone https://github.com/ros/console_bridge.git
 pushd console_bridge
 mkdir build
 pushd build
-cmake .. $CMAKE_FLAGS
+cmake .. -DCMAKE_INSTALL_PREFIX="${HOMEBREW_PREFIX}" ${CMAKE_FLAGS}
 sudo make install -j
 popd
 popd
 sudo rm -rf console_bridge
 
 # Install urdfdom
+echo "Installing urdfdom..."
 git clone https://github.com/ros/urdfdom.git
 pushd urdfdom
 git checkout 3.0.0
 mkdir build
 pushd build
-cmake .. $CMAKE_FLAGS
+cmake .. -DCMAKE_INSTALL_PREFIX="${HOMEBREW_PREFIX}" ${CMAKE_FLAGS}
 sudo make install -j
 popd
 popd
 sudo rm -rf urdfdom
-file /usr/local/lib/liburdfdom_sensor.3.0.dylib
-lipo -info /usr/local/lib/liburdfdom_sensor.3.0.dylib
-
-echo "Fixing path on liburdfdom_sensor.dylib"
-otool -L /usr/local/lib/liburdfdom_sensor.dylib
-sudo install_name_tool -change libtinyxml.2.6.2.dylib /usr/local/lib/libtinyxml.2.6.2.dylib /usr/local/lib/liburdfdom_sensor.dylib
-otool -L /usr/local/lib/liburdfdom_sensor.dylib
-
-echo "Fixing path on liburdfdom_model.dylib"
-otool -L /usr/local/lib/liburdfdom_model.dylib
-sudo install_name_tool -change libtinyxml.2.6.2.dylib /usr/local/lib/libtinyxml.2.6.2.dylib /usr/local/lib/liburdfdom_model.dylib
-otool -L /usr/local/lib/liburdfdom_model.dylib
-
-echo "Fixing path on liburdfdom_world.dylib"
-otool -L /usr/local/lib/liburdfdom_world.dylib
-sudo install_name_tool -change libtinyxml.2.6.2.dylib /usr/local/lib/libtinyxml.2.6.2.dylib /usr/local/lib/liburdfdom_world.dylib
-otool -L /usr/local/lib/liburdfdom_world.dylib
-
-echo "Fixing path on liburdfdom_model_state.dylib"
-otool -L /usr/local/lib/liburdfdom_model_state.dylib
-sudo install_name_tool -change libtinyxml.2.6.2.dylib /usr/local/lib/libtinyxml.2.6.2.dylib /usr/local/lib/liburdfdom_model_state.dylib
-otool -L /usr/local/lib/liburdfdom_model_state.dylib
-
-# Install protobuf
-PROTOBUF_VERSION="3.14.0"
-# wget https://github.com/protocolbuffers/protobuf/releases/download/v${PROTOBUF_VERSION}/protobuf-all-${PROTOBUF_VERSION}.tar.gz
-# tar -xvzf protobuf-all-${PROTOBUF_VERSION}.tar.gz
-# rm protobuf-all-${PROTOBUF_VERSION}.tar.gz
-# pushd protobuf-${PROTOBUF_VERSION}
-# CXX_FLAGS="-fvisibility=hidden" ./configure
-# make -j
-# make install
-# popd
-# rm -rf protobuf-${PROTOBUF_VERSION}
-
-# brew install zlib
-# brew install xz zlib bzip2
+file "${HOMEBREW_PREFIX}/lib/liburdfdom_sensor.3.0.dylib"
+lipo -info "${HOMEBREW_PREFIX}/lib/liburdfdom_sensor.3.0.dylib"
 
 # Install grpc
+echo "Installing grpc..."
 git clone --recurse-submodules -b v1.33.2 https://github.com/grpc/grpc
 pushd grpc
 pushd third_party/protobuf
+PROTOBUF_VERSION="3.14.0"
 git checkout v${PROTOBUF_VERSION}
 popd
 mkdir -p cmake/build
 pushd cmake/build
-cmake -DgRPC_INSTALL=ON \
+cmake -DCMAKE_INSTALL_PREFIX="${HOMEBREW_PREFIX}" \
+      -DgRPC_INSTALL=ON \
       -DgRPC_BUILD_TESTS=OFF \
       -DCMAKE_OSX_DEPLOYMENT_TARGET="10.15" \
       -DCMAKE_CXX_FLAGS="-fvisibility=hidden" \
-      $CMAKE_FLAGS \
+      ${CMAKE_FLAGS} \
       ../..
 sudo make install -j
 popd
@@ -255,122 +183,114 @@ popd
 sudo rm -rf grpc
 
 # Install Google benchmark
+echo "Installing Google benchmark..."
 git clone https://github.com/google/benchmark.git
 git clone https://github.com/google/googletest.git benchmark/googletest
 pushd benchmark
 git checkout v1.8.3
 pushd googletest
-git checkout v1.14.0 
+git checkout v1.14.0
 popd
 mkdir build
 pushd build
-cmake -DCMAKE_BUILD_TYPE=Release $CMAKE_FLAGS ..
+cmake -DCMAKE_INSTALL_PREFIX="${HOMEBREW_PREFIX}" -DCMAKE_BUILD_TYPE=Release ${CMAKE_FLAGS} ..
 sudo make install
 popd
 popd
 sudo rm -rf benchmark
 
 # Install ezc3d
+echo "Installing ezc3d..."
 git clone https://github.com/pyomeca/ezc3d.git
 pushd ezc3d
 git checkout Release_1.5.4
 mkdir build
 pushd build
-cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_POSITION_INDEPENDENT_CODE=ON $CMAKE_FLAGS ..
+cmake -DCMAKE_INSTALL_PREFIX="${HOMEBREW_PREFIX}" -DCMAKE_BUILD_TYPE=Release -DCMAKE_POSITION_INDEPENDENT_CODE=ON ${CMAKE_FLAGS} ..
 sudo make install
 popd
 popd
 sudo rm -rf ezc3d
 
-# Reset the IDs for our libraries to absolute paths
-sudo install_name_tool -id /usr/local/lib/liburdfdom_sensor.dylib /usr/local/lib/liburdfdom_sensor.dylib
-sudo install_name_tool -id /usr/local/lib/liburdfdom_model_state.dylib /usr/local/lib/liburdfdom_model_state.dylib
-sudo install_name_tool -id /usr/local/lib/liburdfdom_model.dylib /usr/local/lib/liburdfdom_model.dylib
-sudo install_name_tool -id /usr/local/lib/liburdfdom_world.dylib /usr/local/lib/liburdfdom_world.dylib
-sudo install_name_tool -id /usr/local/lib/libconsole_bridge.dylib /usr/local/lib/libconsole_bridge.dylib
-sudo install_name_tool -id /usr/local/lib/libtinyxml2.8.dylib /usr/local/lib/libtinyxml2.8.dylib
-sudo install_name_tool -id /usr/local/lib/libtinyxml.2.6.2.dylib /usr/local/lib/libtinyxml.2.6.2.dylib
-sudo install_name_tool -id /usr/local/lib/libezc3d.dylib /usr/local/lib/libezc3d.dylib
-# install_name_tool -id /usr/local/lib/liboctomap.1.8.dylib /usr/local/lib/liboctomap.1.8.dylib
-# install_name_tool -id /usr/local/lib/liboctomath.1.8.dylib /usr/local/lib/liboctomath.1.8.dylib
-sudo install_name_tool -id /usr/local/lib/libccd.2.dylib /usr/local/lib/libccd.2.dylib
-# install_name_tool -id /usr/local/lib/libfcl.dylib /usr/local/lib/libfcl.dylib
-sudo install_name_tool -id /usr/local/lib/libassimp.5.dylib /usr/local/lib/libassimp.5.dylib
-# We're not installing Open Scene Graph, so these aren't necessary
-# install_name_tool -id /usr/local/lib/libosg.161.dylib /usr/local/lib/libosg.161.dylib
-# install_name_tool -id /usr/local/lib/libosgViewer.161.dylib /usr/local/lib/libosgViewer.161.dylib
-# install_name_tool -id /usr/local/lib/libosgManipulator.161.dylib /usr/local/lib/libosgManipulator.161.dylib
-# install_name_tool -id /usr/local/lib/libosgGA.161.dylib /usr/local/lib/libosgGA.161.dylib
-# install_name_tool -id /usr/local/lib/libosgDB.161.dylib /usr/local/lib/libosgDB.161.dylib
-# install_name_tool -id /usr/local/lib/libosgShadow.161.dylib /usr/local/lib/libosgShadow.161.dylib
-# install_name_tool -id /usr/local/lib/libOpenThreads.21.dylib /usr/local/lib/libOpenThreads.21.dylib
+# --- Dynamic Library Path Fixes ---
 
-# An attempt to fix the assimp linking issue
-sudo install_name_tool -change "@rpath/libIrrXML.dylib" "/usr/local/lib/libIrrXML.dylib" /usr/local/lib/libassimp.5.dylib 
+echo "Fixing dylib paths for urdfdom..."
+for lib in sensor model world model_state; do
+    LIB_PATH="${HOMEBREW_PREFIX}/lib/liburdfdom_${lib}.dylib"
+    echo "Fixing path on ${LIB_PATH}"
+    otool -L "${LIB_PATH}"
+    sudo install_name_tool -change libtinyxml.2.6.2.dylib "${HOMEBREW_PREFIX}/lib/libtinyxml.2.6.2.dylib" "${LIB_PATH}"
+    otool -L "${LIB_PATH}"
+done
 
-# Different attempts to fix the liblzma linking issue
-# sudo install_name_tool -id /usr/lib/liblzma.5.dylib /usr/lib/liblzma.5.dylib
-# sudo install_name_tool -id /usr/lib/libcompression.dylib /usr/lib/libcompression.dylib
-# brew install xz zlib bzip2
+echo "Resetting dylib IDs to absolute paths..."
+LIBS_TO_FIX=(
+    "liburdfdom_sensor.dylib"
+    "liburdfdom_model_state.dylib"
+    "liburdfdom_model.dylib"
+    "liburdfdom_world.dylib"
+    "libconsole_bridge.dylib"
+    "libtinyxml2.8.dylib"
+    "libtinyxml.2.6.2.dylib"
+    "libezc3d.dylib"
+    "libccd.2.dylib"
+    "libassimp.5.dylib"
+)
+for lib in "${LIBS_TO_FIX[@]}"; do
+    LIB_PATH="${HOMEBREW_PREFIX}/lib/${lib}"
+    if [ -f "$LIB_PATH" ]; then
+        echo "Setting install_name_tool id for ${LIB_PATH}"
+        sudo install_name_tool -id "${LIB_PATH}" "${LIB_PATH}"
+    fi
+done
 
-# Fix "icu4c" installed by Brew
+echo "Fixing assimp linking issue..."
+sudo install_name_tool -change "@rpath/libIrrXML.dylib" "${HOMEBREW_PREFIX}/lib/libIrrXML.dylib" "${HOMEBREW_PREFIX}/lib/libassimp.5.dylib"
+
+echo "Fixing 'icu4c' dylib links..."
 ICU4C_MAJOR_VERSION="74"
 ICU4C_FULL_VERSION="74.2"
-if [ -d "/usr/local/Cellar/icu4c/${ICU4C_FULL_VERSION}/lib/" ]; then
-      pushd /usr/local/Cellar/icu4c/${ICU4C_FULL_VERSION}/lib/
+ICU4C_PREFIX=$(brew --prefix icu4c)
+ICU4C_LIB_PATH="${ICU4C_PREFIX}/lib"
+
+if [ -d "${ICU4C_LIB_PATH}" ]; then
+    pushd "${ICU4C_LIB_PATH}"
+    sudo install_name_tool -change "@loader_path/libicuuc.${ICU4C_MAJOR_VERSION}.dylib" "@loader_path/libicuuc.${ICU4C_FULL_VERSION}.dylib" "libicui18n.${ICU4C_FULL_VERSION}.dylib"
+    sudo install_name_tool -change "@loader_path/libicudata.${ICU4C_MAJOR_VERSION}.dylib" "@loader_path/libicudata.${ICU4C_FULL_VERSION}.dylib" "libicui18n.${ICU4C_FULL_VERSION}.dylib"
+    sudo install_name_tool -change "@loader_path/libicuuc.${ICU4C_MAJOR_VERSION}.dylib" "@loader_path/libicuuc.${ICU4C_FULL_VERSION}.dylib" "libicuio.${ICU4C_FULL_VERSION}.dylib"
+    sudo install_name_tool -change "@loader_path/libicudata.${ICU4C_MAJOR_VERSION}.dylib" "@loader_path/libicudata.${ICU4C_FULL_VERSION}.dylib" "libicuio.${ICU4C_FULL_VERSION}.dylib"
+    sudo install_name_tool -change "@loader_path/libicui18n.${ICU4C_MAJOR_VERSION}.dylib" "@loader_path/libicui18n.${ICU4C_MAJOR_VERSION}.dylib" "libicuio.${ICU4C_FULL_VERSION}.dylib"
+    sudo install_name_tool -change "@loader_path/libicutu.${ICU4C_MAJOR_VERSION}.dylib" "@loader_path/libicutu.${ICU4C_FULL_VERSION}.dylib" "libicutest.${ICU4C_FULL_VERSION}.dylib"
+    sudo install_name_tool -change "@loader_path/libicui18n.${ICU4C_MAJOR_VERSION}.dylib" "@loader_path/libicui18n.${ICU4C_MAJOR_VERSION}.dylib" "libicutest.${ICU4C_FULL_VERSION}.dylib"
+    sudo install_name_tool -change "@loader_path/libicuuc.${ICU4C_MAJOR_VERSION}.dylib" "@loader_path/libicuuc.${ICU4C_FULL_VERSION}.dylib" "libicutest.${ICU4C_FULL_VERSION}.dylib"
+    sudo install_name_tool -change "@loader_path/libicudata.${ICU4C_MAJOR_VERSION}.dylib" "@loader_path/libicudata.${ICU4C_FULL_VERSION}.dylib" "libicutest.${ICU4C_FULL_VERSION}.dylib"
+    sudo install_name_tool -change "@loader_path/libicuuc.${ICU4C_MAJOR_VERSION}.dylib" "@loader_path/libicuuc.${ICU4C_FULL_VERSION}.dylib" "libicutu.${ICU4C_FULL_VERSION}.dylib"
+    sudo install_name_tool -change "@loader_path/libicudata.${ICU4C_MAJOR_VERSION}.dylib" "@loader_path/libicudata.${ICU4C_FULL_VERSION}.dylib" "libicutu.${ICU4C_FULL_VERSION}.dylib"
+    sudo install_name_tool -change "@loader_path/libicui18n.${ICU4C_MAJOR_VERSION}.dylib" "@loader_path/libicui18n.${ICU4C_MAJOR_VERSION}.dylib" "libicutu.${ICU4C_FULL_VERSION}.dylib"
+    sudo install_name_tool -change "@loader_path/libicudata.${ICU4C_MAJOR_VERSION}.dylib" "@loader_path/libicudata.${ICU4C_FULL_VERSION}.dylib" "libicuuc.${ICU4C_FULL_VERSION}.dylib"
+    sudo codesign -f -s - "libicui18n.${ICU4C_FULL_VERSION}.dylib"
+    sudo codesign -f -s - "libicuio.${ICU4C_FULL_VERSION}.dylib"
+    sudo codesign -f -s - "libicutest.${ICU4C_FULL_VERSION}.dylib"
+    sudo codesign -f -s - "libicutu.${ICU4C_FULL_VERSION}.dylib"
+    sudo codesign -f -s - "libicuuc.${ICU4C_FULL_VERSION}.dylib"
+    popd
 else
-      pushd /opt/homebrew/Cellar/icu4c/${ICU4C_FULL_VERSION}/lib/
+    echo "Warning: icu4c library path not found at ${ICU4C_LIB_PATH}. Skipping fix."
 fi
-sudo install_name_tool -change "@loader_path/libicuuc.${ICU4C_MAJOR_VERSION}.dylib" "@loader_path/libicuuc.${ICU4C_FULL_VERSION}.dylib" libicui18n.${ICU4C_FULL_VERSION}.dylib
-sudo install_name_tool -change "@loader_path/libicudata.${ICU4C_MAJOR_VERSION}.dylib" "@loader_path/libicudata.${ICU4C_FULL_VERSION}.dylib" libicui18n.${ICU4C_FULL_VERSION}.dylib
-sudo install_name_tool -change "@loader_path/libicuuc.${ICU4C_MAJOR_VERSION}.dylib" "@loader_path/libicuuc.${ICU4C_FULL_VERSION}.dylib" libicuio.${ICU4C_FULL_VERSION}.dylib
-sudo install_name_tool -change "@loader_path/libicudata.${ICU4C_MAJOR_VERSION}.dylib" "@loader_path/libicudata.${ICU4C_FULL_VERSION}.dylib" libicuio.${ICU4C_FULL_VERSION}.dylib
-sudo install_name_tool -change "@loader_path/libicui18n.${ICU4C_MAJOR_VERSION}.dylib" "@loader_path/libicui18n.${ICU4C_MAJOR_VERSION}.dylib" libicuio.${ICU4C_FULL_VERSION}.dylib
-sudo install_name_tool -change "@loader_path/libicutu.${ICU4C_MAJOR_VERSION}.dylib" "@loader_path/libicutu.${ICU4C_FULL_VERSION}.dylib" libicutest.${ICU4C_FULL_VERSION}.dylib
-sudo install_name_tool -change "@loader_path/libicui18n.${ICU4C_MAJOR_VERSION}.dylib" "@loader_path/libicui18n.${ICU4C_MAJOR_VERSION}.dylib" libicutest.${ICU4C_FULL_VERSION}.dylib
-sudo install_name_tool -change "@loader_path/libicuuc.${ICU4C_MAJOR_VERSION}.dylib" "@loader_path/libicuuc.${ICU4C_FULL_VERSION}.dylib" libicutest.${ICU4C_FULL_VERSION}.dylib
-sudo install_name_tool -change "@loader_path/libicudata.${ICU4C_MAJOR_VERSION}.dylib" "@loader_path/libicudata.${ICU4C_FULL_VERSION}.dylib" libicutest.${ICU4C_FULL_VERSION}.dylib
-sudo install_name_tool -change "@loader_path/libicuuc.${ICU4C_MAJOR_VERSION}.dylib" "@loader_path/libicuuc.${ICU4C_FULL_VERSION}.dylib" libicutu.${ICU4C_FULL_VERSION}.dylib
-sudo install_name_tool -change "@loader_path/libicudata.${ICU4C_MAJOR_VERSION}.dylib" "@loader_path/libicudata.${ICU4C_FULL_VERSION}.dylib" libicutu.${ICU4C_FULL_VERSION}.dylib
-sudo install_name_tool -change "@loader_path/libicui18n.${ICU4C_MAJOR_VERSION}.dylib" "@loader_path/libicui18n.${ICU4C_MAJOR_VERSION}.dylib" libicutu.${ICU4C_FULL_VERSION}.dylib
-sudo install_name_tool -change "@loader_path/libicudata.${ICU4C_MAJOR_VERSION}.dylib" "@loader_path/libicudata.${ICU4C_FULL_VERSION}.dylib" libicuuc.${ICU4C_FULL_VERSION}.dylib 
-sudo codesign -f -s - libicui18n.${ICU4C_FULL_VERSION}.dylib
-sudo codesign -f -s - libicuio.${ICU4C_FULL_VERSION}.dylib
-sudo codesign -f -s - libicutest.${ICU4C_FULL_VERSION}.dylib
-sudo codesign -f -s - libicutu.${ICU4C_FULL_VERSION}.dylib
-sudo codesign -f -s - libicuuc.${ICU4C_FULL_VERSION}.dylib
-popd
 
-# Get ready to bundle the links
+echo "Linking system ImageIO libraries..."
 if [ -f "/System/Library/Frameworks/ApplicationServices.framework/Versions/A/Frameworks/ImageIO.framework/Versions/A/Resources/libJPEG.dylib" ]; then
-    ls /usr/local/lib/
-    sudo mv /usr/local/lib/libjpeg.dylib /usr/local/lib/libjpeg.old.dylib
-    ln -s /System/Library/Frameworks/ApplicationServices.framework/Versions/A/Frameworks/ImageIO.framework/Versions/A/Resources/libJPEG.dylib /usr/local/lib/libjpeg.lib
-    # sudo mv /usr/local/lib/libGIF.dylib /usr/local/lib/libGIF.old.dylib
-    # ln -s /System/Library/Frameworks/ApplicationServices.framework/Versions/A/Frameworks/ImageIO.framework/Versions/A/Resources/libGIF.dylib /usr/local/lib/libGIF.lib
-    sudo mv /usr/local/lib/libTIFF.dylib /usr/local/lib/libTIFF.old.dylib
-    ln -s /System/Library/Frameworks/ApplicationServices.framework/Versions/A/Frameworks/ImageIO.framework/Versions/A/Resources/libTIFF.dylib /usr/local/lib/libTIFF.lib
-    sudo mv /usr/local/lib/libPng.dylib /usr/local/lib/libPng.old.dylib
-    ln -s /System/Library/Frameworks/ApplicationServices.framework/Versions/A/Frameworks/ImageIO.framework/Versions/A/Resources/libPng.dylib /usr/local/lib/libPng.lib
+    ls "${HOMEBREW_PREFIX}/lib/"
+    sudo mv "${HOMEBREW_PREFIX}/lib/libjpeg.dylib" "${HOMEBREW_PREFIX}/lib/libjpeg.old.dylib" 2>/dev/null || true
+    ln -sf /System/Library/Frameworks/ApplicationServices.framework/Versions/A/Frameworks/ImageIO.framework/Versions/A/Resources/libJPEG.dylib "${HOMEBREW_PREFIX}/lib/libjpeg.lib"
+    sudo mv "${HOMEBREW_PREFIX}/lib/libTIFF.dylib" "${HOMEBREW_PREFIX}/lib/libTIFF.old.dylib" 2>/dev/null || true
+    ln -sf /System/Library/Frameworks/ApplicationServices.framework/Versions/A/Frameworks/ImageIO.framework/Versions/A/Resources/libTIFF.dylib "${HOMEBREW_PREFIX}/lib/libTIFF.lib"
+    sudo mv "${HOMEBREW_PREFIX}/lib/libPng.dylib" "${HOMEBREW_PREFIX}/lib/libPng.old.dylib" 2>/dev/null || true
+    ln -sf /System/Library/Frameworks/ApplicationServices.framework/Versions/A/Frameworks/ImageIO.framework/Versions/A/Resources/libPng.dylib "${HOMEBREW_PREFIX}/lib/libPng.lib"
 fi
 
-
-# Replace liblzma with a hard copy of the library, instead of a link
-# echo "Attempting to read LZMA links"
-# readlink /usr/lib/liblzma.dylib
-# readlink /usr/lib/liblzma.5.dylib
-# LZMA_PATH=$(readlink /usr/lib/liblzma.dylib)
-# LZMA_5_PATH=$(readlink /usr/lib/liblzma.5.dylib)
-# echo "LZMA_PATH=$LZMA_PATH"
-# echo "LZMA_5_PATH=$LZMA_5_PATH"
-# sudo mv /usr/local/lib/liblzma.5.dylib /usr/local/lib/liblzma.5.old.dylib
-# echo "Attempting to add symbolic links"
-# ln -s $LZMA_PATH /usr/local/lib/liblzma.dylib
-# ln -s $LZMA_5_PATH /usr/local/lib/liblzma.5.dylib
-# echo "Symbolic links complete"
-
-# Install our build tools
+# --- Final Setup ---
+echo "Installing Python build tools..."
 pip3 install pytest delocate pybind11-stubgen==0.16.2 numpy torch
 
-# Install pkgconfig, which CMake uses to look for dependencies
-brew install pkgconfig
+echo "Script finished successfully!"
