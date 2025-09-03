@@ -8,7 +8,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python-version: ["3.8", "3.9", "3.10", "3.11"]
+        python-version: ["3.8", "3.9", "3.10", "3.11", "3.12", "3.13"]
         include:
           - python-version: "3.8"
             PYTHON_VERSION_CODE: cp38-cp38
@@ -38,6 +38,20 @@ jobs:
             PYTHON_PATH: /opt/python/cp311-cp311/bin/
             PYTHON_INCLUDE: /opt/python/cp311-cp311/include/python3.11/
             PYTHON_LIB: /opt/python/cp311-cp311/lib/python3.11
+          - python-version: "3.12"
+            PYTHON_VERSION_CODE: cp312-cp312
+            PYTHON_VERSION_NUMBER: "3.12"
+            PYTHON: /opt/python/cp312-cp312/bin/python3.12
+            PYTHON_PATH: /opt/python/cp312-cp312/bin/
+            PYTHON_INCLUDE: /opt/python/cp312-cp312/include/python3.12/
+            PYTHON_LIB: /opt/python/cp312-cp312/lib/python3.12
+          - python-version: "3.13"
+            PYTHON_VERSION_CODE: cp313-cp313
+            PYTHON_VERSION_NUMBER: "3.13"
+            PYTHON: /opt/python/cp313-cp313/bin/python3.13
+            PYTHON_PATH: /opt/python/cp313-cp313/bin/
+            PYTHON_INCLUDE: /opt/python/cp313-cp313/include/python3.13/
+            PYTHON_LIB: /opt/python/cp313-cp313/lib/python3.13
     steps:
       - name: Install QEMU deps
         run: |

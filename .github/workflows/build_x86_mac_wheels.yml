@@ -10,7 +10,7 @@ jobs:
     runs-on: macos-12
     strategy:
       matrix:
-        python-version: ["3.8", "3.9", "3.10", "3.11"]
+        python-version: ["3.8", "3.9", "3.10", "3.11", "3.12", "3.13"]
         include:
           - python-version: "3.8"
             PYTHON_VERSION_CODE: cp38-cp38
@@ -24,6 +24,12 @@ jobs:
           - python-version: "3.11"
             PYTHON_VERSION_CODE: cp311-cp311
             PYTHON_VERSION_NUMBER: "3.11"
+          - python-version: "3.12"
+            PYTHON_VERSION_CODE: cp312-cp312
+            PYTHON_VERSION_NUMBER: "3.12"
+          - python-version: "3.13"
+            PYTHON_VERSION_CODE: cp313-cp313
+            PYTHON_VERSION_NUMBER: "3.13"
     steps:
       - name: Check out the repo
         uses: actions/checkout@v2
