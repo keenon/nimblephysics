@@ -18,15 +18,8 @@ jobs:
       # Fail-fast is set to false to ensure all Python versions are attempted even if one fails.
       fail-fast: true
       matrix:
-        python-version: ["3.8", "3.9", "3.10", "3.11", "3.12", "3.13"]
+        python-version: ["3.9", "3.10", "3.11", "3.12", "3.13"]
         include:
-          - python-version: "3.8"
-            PYTHON_VERSION_CODE: cp38-cp38
-            PYTHON_VERSION_NUMBER: "3.8"
-            PYTHON: /opt/python/cp38-cp38/bin/python3.8
-            PYTHON_PATH: /opt/python/cp38-cp38/bin/
-            PYTHON_INCLUDE: /opt/python/cp38-cp38/include/python3.8/
-            PYTHON_LIB: /opt/python/cp38-cp38/lib/python3.8
           - python-version: "3.9"
             PYTHON_VERSION_CODE: cp39-cp39
             PYTHON_VERSION_NUMBER: "3.9"
