@@ -7,16 +7,11 @@ jobs:
     name: Linux Python aarch64 ${{ matrix.python-version }} - Build Wheels
     runs-on: ubuntu-latest
     strategy:
+      # Fail-fast is set to false to ensure all Python versions are attempted even if one fails.
+      fail-fast: false
       matrix:
-        python-version: ["3.8", "3.9", "3.10", "3.11", "3.12", "3.13"]
+        python-version: ["3.9", "3.10", "3.11", "3.12"]
         include:
-          - python-version: "3.8"
-            PYTHON_VERSION_CODE: cp38-cp38
-            PYTHON_VERSION_NUMBER: "3.8"
-            PYTHON: /opt/python/cp38-cp38/bin/python3.8
-            PYTHON_PATH: /opt/python/cp38-cp38/bin/
-            PYTHON_INCLUDE: /opt/python/cp38-cp38/include/python3.8/
-            PYTHON_LIB: /opt/python/cp38-cp38/lib/python3.8
           - python-version: "3.9"
             PYTHON_VERSION_CODE: cp39-cp39
             PYTHON_VERSION_NUMBER: "3.9"
@@ -45,13 +40,6 @@ jobs:
             PYTHON_PATH: /opt/python/cp312-cp312/bin/
             PYTHON_INCLUDE: /opt/python/cp312-cp312/include/python3.12/
             PYTHON_LIB: /opt/python/cp312-cp312/lib/python3.12
-          - python-version: "3.13"
-            PYTHON_VERSION_CODE: cp313-cp313
-            PYTHON_VERSION_NUMBER: "3.13"
-            PYTHON: /opt/python/cp313-cp313/bin/python3.13
-            PYTHON_PATH: /opt/python/cp313-cp313/bin/
-            PYTHON_INCLUDE: /opt/python/cp313-cp313/include/python3.13/
-            PYTHON_LIB: /opt/python/cp313-cp313/lib/python3.13
     steps:
       - name: Install QEMU deps
         run: |

@@ -16,9 +16,9 @@ jobs:
       ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION: true
     strategy:
       # Fail-fast is set to false to ensure all Python versions are attempted even if one fails.
-      fail-fast: true
+      fail-fast: false
       matrix:
-        python-version: ["3.9", "3.10", "3.11", "3.12", "3.13"]
+        python-version: ["3.9", "3.10", "3.11", "3.12"]
         include:
           - python-version: "3.9"
             PYTHON_VERSION_CODE: cp39-cp39
@@ -46,12 +46,6 @@ jobs:
             PYTHON: /opt/python/cp312-cp312/bin/python3.12
             PYTHON_PATH: /opt/python/cp312-cp312/bin/
             PYTHON_INCLUDE: /opt/python/cp312-cp312/include/python3.12/
-          - python-version: "3.13"
-            PYTHON_VERSION_CODE: cp313-cp313
-            PYTHON_VERSION_NUMBER: "3.13"
-            PYTHON: /opt/python/cp313-cp313/bin/python3.13
-            PYTHON_PATH: /opt/python/cp313-cp313/bin/
-            PYTHON_INCLUDE: /opt/python/cp313-cp313/include/python3.13/
     steps:
       - name: Set up Node Version
         # Updated to v4 for latest features and security.
