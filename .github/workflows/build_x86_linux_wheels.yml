@@ -18,7 +18,7 @@ jobs:
       # Fail-fast is set to false to ensure all Python versions are attempted even if one fails.
       fail-fast: false
       matrix:
-        python-version: ["3.9", "3.10", "3.11", "3.12"]
+        python-version: ["3.9", "3.10", "3.11"]
         include:
           - python-version: "3.9"
             PYTHON_VERSION_CODE: cp39-cp39
@@ -40,12 +40,6 @@ jobs:
             PYTHON: /opt/python/cp311-cp311/bin/python3.11
             PYTHON_PATH: /opt/python/cp311-cp311/bin/
             PYTHON_INCLUDE: /opt/python/cp311-cp311/include/python3.11/
-          - python-version: "3.12"
-            PYTHON_VERSION_CODE: cp312-cp312
-            PYTHON_VERSION_NUMBER: "3.12"
-            PYTHON: /opt/python/cp312-cp312/bin/python3.12
-            PYTHON_PATH: /opt/python/cp312-cp312/bin/
-            PYTHON_INCLUDE: /opt/python/cp312-cp312/include/python3.12/
     steps:
       - name: Set up Node Version
         # Updated to v4 for latest features and security.
@@ -71,7 +65,7 @@ jobs:
 
       - name: Install build dependencies
         # auditwheel==5.1.2
-        run: ${{ matrix.PYTHON }} -m pip install setuptools pytest wheel auditwheel pybind11-stubgen==0.16.2 numpy torch
+        run: ${{ matrix.PYTHON }} -m pip install setuptools pytest wheel auditwheel pybind11-stubgen numpy torch
 
       - name: Install Pybind11 for this Python version
         run: |
