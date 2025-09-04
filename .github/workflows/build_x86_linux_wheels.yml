@@ -71,16 +71,16 @@ jobs:
 
       - name: Install build dependencies
         # auditwheel==5.1.2
-        run: ${{ matrix.PYTHON }} -m pip install setuptools pytest wheel auditwheel pybind11 pybind11-stubgen numpy torch
+        run: ${{ matrix.PYTHON }} -m pip install setuptools pytest wheel auditwheel pybind11-stubgen==0.16.2 numpy torch
 
-    #   - name: Install Pybind11 for this Python version
-    #     run: |
-    #       git clone https://github.com/pybind/pybind11.git
-    #       cd pybind11
-    #       git checkout v2.11.1
-    #       mkdir build && cd build
-    #       PATH="${{ matrix.PYTHON_PATH }}:${PATH}" CPATH="${{ matrix.PYTHON_INCLUDE }}" cmake ..
-    #       PATH="${{ matrix.PYTHON_PATH }}:${PATH}" CPATH="${{ matrix.PYTHON_INCLUDE }}" make install -j2
+      - name: Install Pybind11 for this Python version
+        run: |
+          git clone https://github.com/pybind/pybind11.git
+          cd pybind11
+          git checkout v2.11.1
+          mkdir build && cd build
+          PATH="${{ matrix.PYTHON_PATH }}:${PATH}" CPATH="${{ matrix.PYTHON_INCLUDE }}" cmake ..
+          PATH="${{ matrix.PYTHON_PATH }}:${PATH}" CPATH="${{ matrix.PYTHON_INCLUDE }}" make install -j2
 
       - name: Build wheel
         run: |
