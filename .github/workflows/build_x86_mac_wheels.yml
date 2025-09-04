@@ -7,7 +7,7 @@ on:
 jobs:
   build-mac:
     name: Mac OSX Python ${{ matrix.python-version }} - Build Wheels
-    runs-on: macos-12
+    runs-on: macos-latest-large
     strategy:
     # Fail-fast is set to false to ensure all Python versions are attempted even if one fails.
       fail-fast: false
