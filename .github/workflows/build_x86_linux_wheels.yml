@@ -65,7 +65,7 @@ jobs:
 
       - name: Install build dependencies
         # auditwheel==5.1.2
-        run: ${{ matrix.PYTHON }} -m pip install setuptools pytest wheel auditwheel pybind11-stubgen numpy torch
+        run: ${{ matrix.PYTHON }} -m pip install setuptools pytest wheel auditwheel pybind11-stubgen==0.16.2 numpy torch
 
       - name: Install Pybind11 for this Python version
         run: |
