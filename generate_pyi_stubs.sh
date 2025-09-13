@@ -27,7 +27,7 @@ fi
 # Use the PYTHON_EXEC variable instead of the hardcoded "python3"
 PYTHONPATH=$PP $PYTHON_EXEC -c "import _nimblephysics" || { echo "Python import failed. Exiting."; exit 1; }
 # It's also more robust to run pybind11-stubgen as a module
-PYTHONPATH=$PP $PYTHON_EXEC -m pybind11.stubgen --no-setup-py -o stubs _nimblephysics || { echo "pybind11-stubgen failed. Exiting."; exit 1; }
+PYTHONPATH=$PP $PYTHON_EXEC -m pybind11_stubgen --no-setup-py -o stubs _nimblephysics || { echo "pybind11-stubgen failed. Exiting."; exit 1; }
 
 touch stubs/_nimblephysics-stubs/py.typed
 mv stubs/_nimblephysics-stubs/__init__.pyi stubs/_nimblephysics-stubs/_nimblephysics.pyi
