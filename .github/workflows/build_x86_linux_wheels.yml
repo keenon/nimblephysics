@@ -18,7 +18,7 @@ jobs:
       # Fail-fast is set to false to ensure all Python versions are attempted even if one fails.
       fail-fast: false
       matrix:
-        python-version: ["3.9", "3.10", "3.11", "3.12", "3.13", "3.14"]
+        python-version: ["3.9", "3.10", "3.11", "3.12"]
         include:
           - python-version: "3.9"
             PYTHON_VERSION_CODE: cp39-cp39
