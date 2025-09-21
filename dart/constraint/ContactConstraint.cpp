@@ -627,7 +627,7 @@ void ContactConstraint::unexcite()
 }
 
 //==============================================================================
-void ContactConstraint::applyImpulse(s_t* lambda)
+void ContactConstraint::applyImpulse(Eigen::VectorXs lambda)
 {
   //----------------------------------------------------------------------------
   // Friction case

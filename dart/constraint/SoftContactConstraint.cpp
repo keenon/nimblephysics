@@ -733,7 +733,7 @@ void SoftContactConstraint::unexcite()
 }
 
 //==============================================================================
-void SoftContactConstraint::applyImpulse(s_t* _lambda)
+void SoftContactConstraint::applyImpulse(Eigen::VectorXs _lambda)
 {
   // TODO(JS): Need to optimize code
 

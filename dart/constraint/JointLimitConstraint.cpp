@@ -360,7 +360,7 @@ void JointLimitConstraint::unexcite()
 }
 
 //==============================================================================
-void JointLimitConstraint::applyImpulse(s_t* _lambda)
+void JointLimitConstraint::applyImpulse(Eigen::VectorXs _lambda)
 {
   std::size_t localIndex = 0;
   std::size_t dof = mJoint->getNumDofs();

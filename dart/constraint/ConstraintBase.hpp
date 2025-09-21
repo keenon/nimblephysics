@@ -98,7 +98,7 @@ public:
   virtual void unexcite() = 0;
 
   /// Apply computed constraint impulse to constrained skeletons
-  virtual void applyImpulse(s_t* lambda) = 0;
+  virtual void applyImpulse(Eigen::VectorXs lambda) = 0;
 
   /// Return true if this constraint is active
   virtual bool isActive() const = 0;
